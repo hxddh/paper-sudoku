@@ -143,6 +143,8 @@ val MIGRATION_1_2: Migration = object : Migration(1, 2) {
         db.execSQL("ALTER TABLE `game_results` ADD COLUMN `difficulty` TEXT NOT NULL DEFAULT ''")
         db.execSQL("ALTER TABLE `game_results` ADD COLUMN `coachLevel` INTEGER NOT NULL DEFAULT 0")
         db.execSQL("ALTER TABLE `game_results` ADD COLUMN `epochDay` INTEGER")
+        // The v1 Coach always revealed the digit, so any v1 hint means an answered game.
+        db.execSQL("UPDATE `game_results` SET `coachLevel` = 3 WHERE `hints` > 0")
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_game_results_puzzleKey` ON `game_results` (`puzzleKey`)")
         db.execSQL(
             """

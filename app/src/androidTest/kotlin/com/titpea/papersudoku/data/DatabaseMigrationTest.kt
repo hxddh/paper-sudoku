@@ -51,7 +51,9 @@ class DatabaseMigrationTest {
             assertEquals(2, database.resultDao().count())
             val stats = database.resultDao().observeStats().first()
             assertEquals(listOf("classic", "mini"), stats.map { it.mode })
-            assertEquals(95L, stats.single { it.mode == "mini" }.bestSeconds)
+            // The v1 mini used a hint (the old Coach revealed digits), so it is not a clean best.
+            assertEquals(null, stats.single { it.mode == "mini" }.bestSeconds)
+            assertEquals(600L, stats.single { it.mode == "classic" }.bestSeconds)
 
             val store = RoomGameStore(database.savedGameDao(), database.resultDao())
             val game = GameState.new(Catalog.classic(Difficulty.Gentle, 0))
