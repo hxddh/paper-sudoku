@@ -122,7 +122,7 @@
 - [x] 题库单测（2 个）：全部唯一解 + 只用两种技巧可解 + 日期轮换
 - [x] Compose UI 测试（4 个）：棋盘语义、选格/键盘/Coach 事件、Stats、Expanded 双栏
 - [x] `AccessibilityChecks.enable()` 已接入 UI 测试
-- [ ] UI 测试设备结果：CI 的 API 35 emulator job 负责实际执行；本地 orb 无 KVM，只做编译
+- [x] Compose UI/无障碍测试实际执行：GitHub API 35 emulator 上 4/4 通过；本地 orb 无 KVM，只做编译
 - [ ] 截图测试：light/dark、6×6/9×9、Coach、Solved
 - [ ] TalkBack 手测
 - [ ] Macrobenchmark：启动、棋盘交互
@@ -152,7 +152,8 @@
 - [ ] 9×9 有替代输入或明确例外（当前明确 43.3dp 例外）
 - [ ] TalkBack、200% 字体、键盘、深色、横屏/多窗口设备通过
 - [x] 所有 sheet/menu/dialog 使用 Material 3 原生组件
-- [ ] 引擎 + ViewModel + 题库 + UI + 截图 + 无障碍测试全绿（UI 待 CI emulator 结果）
+- [x] 引擎 + ViewModel + 题库 + UI 无障碍测试全绿（4/4 instrumentation）
+- [ ] 截图测试：light/dark、6×6/9×9、Coach、Solved
 - [x] 题库 validator 在 CI 中阻断错误题
 - [ ] Play 预发布报告无阻断项
 - [ ] 隐私/Data Safety/内容分级在 Play Console 完成

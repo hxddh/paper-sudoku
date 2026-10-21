@@ -65,7 +65,7 @@ UI tests need a device/emulator:
 ```
 
 GitHub Actions runs JVM tests, debug/release builds, lint, and a separate API 35 emulator job for
-the Compose/accessibility tests.
+the Compose/accessibility tests. The instrumentation suite currently passes 4/4 on the emulator.
 
 ## Implementation
 
@@ -81,9 +81,9 @@ the Compose/accessibility tests.
 - `SudokuTheme`: Paper light/dark tokens, type, shapes.
 - Room: local `game_results` history; DataStore: theme.
 
-Tests currently cover the engine, ViewModel, puzzle bank, and Compose/accessibility UI. The
-instrumentation suite is wired into CI; local orb runs cannot execute it because the orb has no
-emulator/KVM.
+Tests cover the engine, ViewModel, puzzle bank, and Compose/accessibility UI. The instrumentation
+suite is wired into CI and passes 4/4 on the API 35 emulator; local orb runs cannot execute it
+because the orb has no emulator/KVM.
 
 ## Not in v1
 

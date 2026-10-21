@@ -89,7 +89,12 @@ jobs:
           emulator-boot-timeout: 900
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
-          script: ./gradlew --no-daemon :app:connectedDebugAndroidTest
+          script: |
+            ./gradlew --no-daemon :app:connectedDebugAndroidTest
+            mkdir -p app/build/outputs
+            adb shell am start -W -n com.titpea.papersudoku/.MainActivity
+            sleep 5
+            adb exec-out screencap -p > app/build/outputs/paper-sudoku-default.png
 
       - name: Upload instrumentation report
         if: always()
@@ -97,3 +102,10 @@ jobs:
         with:
           name: paper-sudoku-instrumentation
           path: app/build/reports/androidTests/
+
+      - name: Upload device screenshot
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: paper-sudoku-screenshot
+          path: app/build/outputs/paper-sudoku-default.png
