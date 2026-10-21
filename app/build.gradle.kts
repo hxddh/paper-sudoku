@@ -15,12 +15,32 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "1.0.0"
+    }
+
+    val releaseKeystore = providers.environmentVariable("PAPER_SUDOKU_KEYSTORE").orNull
+    val releaseStorePassword = providers.environmentVariable("PAPER_SUDOKU_STORE_PASSWORD").orNull
+    val releaseKeyAlias = providers.environmentVariable("PAPER_SUDOKU_KEY_ALIAS").orNull
+    val releaseKeyPassword = providers.environmentVariable("PAPER_SUDOKU_KEY_PASSWORD").orNull
+
+    signingConfigs {
+        if (releaseKeystore != null && releaseStorePassword != null &&
+            releaseKeyAlias != null && releaseKeyPassword != null
+        ) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.findByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

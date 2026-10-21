@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">Paper Sudoku</string>
     <string name="daily_mini">Daily Mini</string>
+    <string name="daily_mini_on">Daily Mini · %1$s</string>
     <string name="classic">Classic</string>
     <string name="mini_format">6 × 6</string>
     <string name="classic_format">9 × 9</string>
@@ -24,20 +25,22 @@
     <string name="no_hint_title">No simple hint right now.</string>
     <string name="no_hint_body">This position needs a more advanced technique. Try another cell first.</string>
     <string name="solved">Solved.</string>
-    <string name="solved_body">%1$s · ready for the next one.</string>
+    <string name="solved_body">Solved in %1$s · ready for the next one.</string>
     <string name="cell_description">Row %1$d, column %2$d, %3$s</string>
     <string name="cell_empty">empty</string>
     <string name="cell_given">given %1$d</string>
     <string name="cell_entered">entered %1$d</string>
     <string name="cell_conflict">conflict, %1$d</string>
     <string name="notes_active">Notes on</string>
-    <string name="mini_time">2–3 min</string>
-    <string name="classic_time">20–40 min</string>
 
     <string name="theme_menu">Theme: %1$s</string>
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
+    <string name="stats">Stats</string>
+    <string name="best_time">Best: %1$s</string>
+    <string name="no_completed_games">Finish a puzzle to start your record.</string>
+    <string name="close">Close</string>
     <plurals name="completed_count">
         <item quantity="one">%1$d solved</item>
         <item quantity="other">%1$d solved</item>

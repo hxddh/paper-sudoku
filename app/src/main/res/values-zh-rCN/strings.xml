@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">纸上数独</string>
     <string name="daily_mini">每日 Mini</string>
+    <string name="daily_mini_on">每日 Mini · %1$s</string>
     <string name="classic">经典</string>
     <string name="mini_format">6 × 6</string>
     <string name="classic_format">9 × 9</string>
@@ -24,20 +25,22 @@
     <string name="no_hint_title">当前没有简单的提示。</string>
     <string name="no_hint_body">这个局面需要更高阶的技巧，先试试别的格子。</string>
     <string name="solved">完成。</string>
-    <string name="solved_body">%1$s · 可以开始下一局了。</string>
+    <string name="solved_body">用时 %1$s · 可以开始下一局了。</string>
     <string name="cell_description">第 %1$d 行，第 %2$d 列，%3$s</string>
     <string name="cell_empty">空</string>
     <string name="cell_given">题目数字 %1$d</string>
     <string name="cell_entered">已填 %1$d</string>
     <string name="cell_conflict">冲突，%1$d</string>
     <string name="notes_active">笔记开启</string>
-    <string name="mini_time">2–3 分钟</string>
-    <string name="classic_time">20–40 分钟</string>
 
     <string name="theme_menu">主题：%1$s</string>
     <string name="theme_system">跟随系统</string>
     <string name="theme_light">浅色</string>
     <string name="theme_dark">深色</string>
+    <string name="stats">统计</string>
+    <string name="best_time">最佳：%1$s</string>
+    <string name="no_completed_games">完成一局后这里会出现记录。</string>
+    <string name="close">关闭</string>
     <plurals name="completed_count">
         <item quantity="other">已完成 %1$d 局</item>
     </plurals>

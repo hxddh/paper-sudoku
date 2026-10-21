@@ -16,17 +16,23 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class GameViewModelTest {
 
     private val stats = FakeStatsRepository()
     private val mainDispatcher = StandardTestDispatcher()
+    private val clock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)
 
     @Before
     fun setUp() {
@@ -40,7 +46,7 @@ class GameViewModelTest {
     }
 
     private fun viewModel(handle: SavedStateHandle = SavedStateHandle()) =
-        GameViewModel(handle, stats)
+        GameViewModel(handle, stats, clock)
 
     @Test
     fun `starts on the mini board with the keypad visible`() {
@@ -111,6 +117,28 @@ class GameViewModelTest {
     }
 
     @Test
+    fun `daily mini rotates with the date`() {
+        val first = Puzzles.dailyMiniFor(LocalDate.ofEpochDay(0))
+        val second = Puzzles.dailyMiniFor(LocalDate.ofEpochDay(1))
+
+        assertEquals(Puzzles.mini6, first)
+        assertNotEquals(first, second)
+    }
+
+    @Test
+    fun `new classic game advances to another puzzle`() {
+        val viewModel = viewModel()
+        viewModel.onEvent(GameEvent.ToggleMode)
+        val first = viewModel.uiState.value.cells.map { if (it.given) it.value else 0 }
+
+        viewModel.onEvent(GameEvent.NewGame)
+        val second = viewModel.uiState.value.cells.map { if (it.given) it.value else 0 }
+
+        assertEquals(9, viewModel.uiState.value.size)
+        assertNotEquals(first, second)
+    }
+
+    @Test
     fun `state survives a new view model with the same saved state handle`() {
         val handle = SavedStateHandle()
         val first = viewModel(handle)
@@ -150,6 +178,7 @@ class GameViewModelTest {
 
 private class FakeStatsRepository : StatsRepository {
     override val completedCount: Flow<Int> = MutableStateFlow(0)
+    override val bestSeconds: Flow<Long?> = MutableStateFlow(null)
     val results = mutableListOf<GameResult>()
 
     override suspend fun record(result: GameResult) {

@@ -20,6 +20,7 @@ data class GameResult(
 
 interface StatsRepository {
     val completedCount: Flow<Int>
+    val bestSeconds: Flow<Long?>
     suspend fun record(result: GameResult)
 }
 
@@ -39,6 +40,9 @@ interface GameResultDao {
 
     @Query("SELECT COUNT(*) FROM game_results")
     fun observeCount(): Flow<Int>
+
+    @Query("SELECT MIN(durationSeconds) FROM game_results")
+    fun observeBestSeconds(): Flow<Long?>
 }
 
 @Database(
@@ -61,6 +65,7 @@ abstract class SudokuDatabase : RoomDatabase() {
 
 class RoomStatsRepository(private val dao: GameResultDao) : StatsRepository {
     override val completedCount: Flow<Int> = dao.observeCount()
+    override val bestSeconds: Flow<Long?> = dao.observeBestSeconds()
 
     override suspend fun record(result: GameResult) {
         dao.insert(

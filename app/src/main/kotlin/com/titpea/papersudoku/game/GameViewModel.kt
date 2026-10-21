@@ -17,6 +17,8 @@ import com.titpea.papersudoku.engine.Technique
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.Clock
+import java.time.LocalDate
 
 data class CellUi(
     val value: Int,
@@ -39,6 +41,8 @@ data class GameUiState(
     val hint: HintUi?,
     val conflicts: Set<Int>,
     val solved: Boolean,
+    val startedAt: Long = 0L,
+    val puzzleDate: LocalDate? = null,
 ) {
     val isMini: Boolean get() = size == 6
 }
@@ -67,9 +71,13 @@ sealed interface GameEvent {
 class GameViewModel(
     private val savedStateHandle: SavedStateHandle,
     private val statsRepository: StatsRepository,
+    private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
 
-    private var puzzle = Puzzles.mini6
+    private val today: LocalDate get() = LocalDate.now(clock)
+    private var puzzle = Puzzles.dailyMiniFor(today)
+    private var puzzleIndex = Math.floorMod(today.toEpochDay(), Puzzles.dailyMini.size.toLong()).toInt()
+    private var puzzleDate: LocalDate? = today
     private var engine = SudokuEngine(puzzle)
     private var values = puzzle.givens.toIntArray()
     private var notes = MutableList(puzzle.givens.size) { mutableSetOf<Int>() }
@@ -79,7 +87,7 @@ class GameViewModel(
     private var hint: Hint? = null
     private val history = ArrayDeque<Snapshot>()
 
-    private var startedAt: Long = savedStateHandle.get<Long>(KEY_STARTED_AT) ?: System.currentTimeMillis()
+    private var startedAt: Long = savedStateHandle.get<Long>(KEY_STARTED_AT) ?: clock.millis()
     private var hintsUsed: Int = savedStateHandle.get<Int>(KEY_HINTS) ?: 0
     private var recorded: Boolean = savedStateHandle.get<Boolean>(KEY_RECORDED) ?: false
 
@@ -105,7 +113,7 @@ class GameViewModel(
             GameEvent.Coach -> coach()
             GameEvent.PlaceHint -> placeHint()
             GameEvent.DismissSheet -> dismissSheet()
-            GameEvent.NewGame -> resetBoard()
+            GameEvent.NewGame -> newGame()
             GameEvent.ToggleMode -> toggleMode()
         }
     }
@@ -197,14 +205,41 @@ class GameViewModel(
         hint = null
         history.clear()
         sheet = if (puzzle.size == 6) Sheet.Keypad else Sheet.None
-        startedAt = System.currentTimeMillis()
+        startedAt = clock.millis()
         hintsUsed = 0
         recorded = false
         publish()
     }
 
+    private fun newGame() {
+        if (puzzle.size == 6) {
+            // The daily mini is one puzzle per day: restart or load today's if the day changed.
+            if (puzzleDate != today) selectMini(today) else resetBoard()
+        } else {
+            selectClassic(puzzleIndex + 1, today)
+        }
+    }
+
     private fun toggleMode() {
-        puzzle = if (puzzle.size == 6) Puzzles.classic9 else Puzzles.mini6
+        if (puzzle.size == 6) {
+            selectClassic(0, today)
+        } else {
+            selectMini(today)
+        }
+    }
+
+    private fun selectMini(date: LocalDate) {
+        puzzleIndex = Math.floorMod(date.toEpochDay(), Puzzles.dailyMini.size.toLong()).toInt()
+        puzzle = Puzzles.dailyMini[puzzleIndex]
+        puzzleDate = date
+        engine = SudokuEngine(puzzle)
+        resetBoard()
+    }
+
+    private fun selectClassic(index: Int, date: LocalDate) {
+        puzzleIndex = Math.floorMod(index.toLong(), Puzzles.classic.size.toLong()).toInt()
+        puzzle = Puzzles.classic[puzzleIndex]
+        puzzleDate = date
         engine = SudokuEngine(puzzle)
         resetBoard()
     }
@@ -246,11 +281,15 @@ class GameViewModel(
             hint = hint?.let { HintUi(it.index, it.digit, it.technique) },
             conflicts = engine.conflicts(values),
             solved = engine.isSolved(values),
+            startedAt = startedAt,
+            puzzleDate = puzzleDate,
         )
     }
 
     private fun persist() {
         savedStateHandle[KEY_MODE] = if (puzzle.size == 6) MODE_MINI else MODE_CLASSIC
+        savedStateHandle[KEY_PUZZLE_INDEX] = puzzleIndex
+        savedStateHandle[KEY_PUZZLE_DAY] = puzzleDate?.toEpochDay()
         savedStateHandle[KEY_VALUES] = ArrayList(values.toList())
         savedStateHandle[KEY_NOTES] = ArrayList(notes.map { it.joinToString(",") })
         savedStateHandle[KEY_SELECTED] = selected
@@ -265,14 +304,15 @@ class GameViewModel(
         recorded = true
         savedStateHandle[KEY_RECORDED] = true
         val mode = if (puzzle.size == 6) MODE_MINI else MODE_CLASSIC
-        val duration = ((System.currentTimeMillis() - startedAt) / 1000L).coerceAtLeast(0L)
+        val completedAt = clock.millis()
+        val duration = ((completedAt - startedAt) / 1000L).coerceAtLeast(0L)
         viewModelScope.launch {
             statsRepository.record(
                 GameResult(
                     mode = mode,
                     durationSeconds = duration,
                     hints = hintsUsed,
-                    completedAt = System.currentTimeMillis(),
+                    completedAt = completedAt,
                 ),
             )
         }
@@ -282,7 +322,14 @@ class GameViewModel(
         val mode = savedStateHandle.get<String>(KEY_MODE) ?: return false
         val savedValues = savedStateHandle.get<ArrayList<Int>>(KEY_VALUES) ?: return false
 
-        puzzle = if (mode == MODE_CLASSIC) Puzzles.classic9 else Puzzles.mini6
+        val bank = if (mode == MODE_CLASSIC) Puzzles.classic else Puzzles.dailyMini
+        val savedIndex = savedStateHandle.get<Int>(KEY_PUZZLE_INDEX) ?: 0
+        if (savedIndex !in bank.indices) return false
+        puzzleIndex = savedIndex
+        puzzle = bank[savedIndex]
+        puzzleDate = savedStateHandle.get<Long>(KEY_PUZZLE_DAY)
+            ?.let(LocalDate::ofEpochDay)
+            ?: if (mode == MODE_MINI) today else null
         if (savedValues.size != puzzle.givens.size) return false
 
         engine = SudokuEngine(puzzle)
@@ -298,7 +345,7 @@ class GameViewModel(
         }
         selected = savedStateHandle.get<Int>(KEY_SELECTED)?.takeIf { it in values.indices }
         notesMode = savedStateHandle.get<Boolean>(KEY_NOTES_MODE) ?: false
-        startedAt = savedStateHandle.get<Long>(KEY_STARTED_AT) ?: System.currentTimeMillis()
+        startedAt = savedStateHandle.get<Long>(KEY_STARTED_AT) ?: clock.millis()
         hintsUsed = savedStateHandle.get<Int>(KEY_HINTS) ?: 0
         recorded = savedStateHandle.get<Boolean>(KEY_RECORDED) ?: false
         sheet = if (puzzle.size == 6) Sheet.Keypad else Sheet.None
@@ -310,6 +357,8 @@ class GameViewModel(
 
     companion object {
         private const val KEY_MODE = "mode"
+        private const val KEY_PUZZLE_INDEX = "puzzle_index"
+        private const val KEY_PUZZLE_DAY = "puzzle_day"
         private const val KEY_VALUES = "values"
         private const val KEY_NOTES = "notes"
         private const val KEY_SELECTED = "selected"

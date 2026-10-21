@@ -12,9 +12,9 @@
 - [x] `android:enableOnBackInvokedCallback="true"`；不依赖 `onBackPressed`
 - [x] 不锁 orientation、不设 `resizeableActivity=false`
 - [x] 不绘制假状态栏 / 假 Home indicator；使用真实系统栏 + insets
-- [ ] 关闭 R8 的 release 构建也要在 CI 跑通（当前 release 未开 minify）
-- [ ] Play target/API、Data Safety、内容分级、隐私政策
-- [ ] `versionCode` / 签名 / App Bundle / 分阶段发布
+- [x] R8 + resource shrinking 的 release 构建跑通（`assembleRelease` 已验证）
+- [ ] Play target/API、Data Safety、内容分级、隐私政策（文案已准备，Play 提交待做）
+- [x] `versionCode` / 签名配置 / App Bundle 构建路径；（正式签名与分阶段发布待 owner）
 
 ## 1. 触控与视觉
 
@@ -61,9 +61,9 @@
 - [x] 单元格：`CollectionItemInfo(row, column, 1, 1)`、`Role.Button`、`contentDescription`、`selected`
 - [x] 数字用 `Text`，不是 Canvas 文本
 - [x] 读屏文案中英双语；`values-zh-rCN`
-- [ ] 单元格自定义动作：Notes / Erase / Hint
-- [ ] 键盘：方向键移动、1–9 输入、Backspace 擦除、N 笔记、H 提示
-- [ ] 可见焦点环；外接键盘/Chromebook
+- [x] 单元格自定义动作：Notes / Erase / Coach
+- [x] 键盘：方向键移动、1–9 输入、Backspace 擦除、N 笔记、H 提示
+- [ ] 可见焦点环；外接键盘/Chromebook 设备手测
 - [ ] TalkBack 手测：6×6、9×9、Coach、Solved
 - [ ] Switch Access / Voice Access
 - [ ] 200% 字体、显示大小、深色、色盲/高对比
@@ -104,10 +104,11 @@
 - [x] Room 2.8.5 记录完成局；DataStore 保存主题
 - [ ] 进程死亡恢复的设备级验证（当前只有 JVM `SavedStateHandle` 单测）
 - [ ] undo history 持久化（当前只在内存中，上限 100）
-- [ ] 题库构建时校验：唯一解、无猜测、技巧分级
-- [ ] 每日题：打包题库 + `Clock` 注入 + 本地日期/时区
-- [ ] 设置：触感、大数字、自动清笔记（主题已实现）
-- [ ] 统计页：最佳时间、streak（当前只在菜单显示完成数）
+- [x] 题库校验：唯一解 + 只用 naked/hidden single 可解（`PuzzleBankTest`）
+- [x] 每日题：61 个 6×6 题 + `Clock` 注入 + 本地日期轮换
+- [x] 设置：主题（触感/大数字/自动清笔记未做）
+- [x] 统计：完成数、最佳时间（本地 Room；无 streak）
+- [x] 计时：TopAppBar 实时计时，完成页显示实际用时
 - [ ] 模块化：`app` / `core:engine` / `core:data` / `core:designsystem` / `feature:game`
 - [ ] DI：模块少用手写 `AppContainer`；团队/模块多了再 Hilt
 - [ ] 导航：Navigation Compose type-safe routes（Home/Game/Stats/Settings）
@@ -117,17 +118,18 @@
 ## 7. 测试与 CI
 
 - [x] 引擎单测（6 个）：候选、naked single、hidden single、完成、冲突
-- [x] ViewModel 单测（7 个）：选格、填数、笔记/撤销、Coach/Place、模式切换、SavedStateHandle 恢复、完成只记一次
-- [x] Compose UI 测试（3 个，已编译）：棋盘语义、选格/键盘/Coach 事件、Expanded 双栏
+- [x] ViewModel 单测（9 个）：选格、填数、笔记/撤销、Coach/Place、模式切换、每日轮换、Classic 下一题、SavedStateHandle 恢复、完成只记一次
+- [x] 题库单测（2 个）：全部唯一解 + 只用两种技巧可解 + 日期轮换
+- [x] Compose UI 测试（4 个）：棋盘语义、选格/键盘/Coach 事件、Stats、Expanded 双栏
 - [x] `AccessibilityChecks.enable()` 已接入 UI 测试
-- [ ] UI 测试实际执行：当前 orb 无 KVM/模拟器，`assembleDebugAndroidTest` 只证明可编译
+- [ ] UI 测试设备结果：CI 的 API 35 emulator job 负责实际执行；本地 orb 无 KVM，只做编译
 - [ ] 截图测试：light/dark、6×6/9×9、Coach、Solved
 - [ ] TalkBack 手测
 - [ ] Macrobenchmark：启动、棋盘交互
 - [ ] Baseline Profile
 - [x] `lintDebug` 无 Error（保留版本提示/`ObsoleteSdkInt` 警告）
-- [x] GitHub Actions workflow（`.github/workflows/android.yml`）
-- [ ] 题库 validator Gradle task
+- [x] GitHub Actions workflow（build/test/lint + API 35 instrumentation job）
+- [x] 题库 validator（JVM `PuzzleBankTest`，CI 阻断）
 - [ ] Play 预发布报告、内部测试、staged rollout
 
 ## 8. 隐私与变现
@@ -137,20 +139,20 @@
 | 买断 $4.99 | 无 `INTERNET` / `BILLING` | 最强，完全离线 | 较低 |
 | 免费 + 一次性 IAP | `INTERNET` + `BILLING` | 仅 Billing 联网；无广告/分析 | 较高 |
 
-- [x] 当前 skeleton：无 `INTERNET`、无广告、无分析
-- [ ] 若 IAP：Billing 9.x、query/acknowledge/restore、pending、license testers
-- [ ] 若通知：`POST_NOTIFICATIONS` + WorkManager；不用 exact alarm；不制造 streak 焦虑
-- [ ] Data Safety / 隐私政策 / 内容分级
+- [x] v1：无 `INTERNET`、无广告、无分析、无 IAP
+- [ ] 若未来做 IAP：Billing 9.x、query/acknowledge/restore、pending、license testers
+- [ ] 若未来加通知：`POST_NOTIFICATIONS` + WorkManager；不用 exact alarm；不制造 streak 焦虑
+- [x] 隐私政策草案 `PRIVACY.md`；Play Data Safety/内容分级待提交
 - [ ] 字体/题库/图标许可证；不要复制 GPL 代码（如 Lantern Sudoku）
 
 ## 9. Definition of Done
 
-- [ ] `targetSdk 36`，edge-to-edge，无假系统栏
-- [ ] 6×6 手机主路径所有触控 ≥48dp
-- [ ] 9×9 有替代输入或明确例外
-- [ ] TalkBack、200% 字体、键盘、深色、横屏/多窗口通过
-- [ ] 所有 sheet/menu/dialog 使用 Material 3 原生组件
-- [ ] 引擎 + ViewModel + UI + 截图 + 无障碍测试全绿
-- [ ] 题库 validator 在 CI 中阻断错误题
+- [x] `targetSdk 36`，edge-to-edge，无假系统栏
+- [x] 6×6 手机主路径所有触控 ≥48dp
+- [ ] 9×9 有替代输入或明确例外（当前明确 43.3dp 例外）
+- [ ] TalkBack、200% 字体、键盘、深色、横屏/多窗口设备通过
+- [x] 所有 sheet/menu/dialog 使用 Material 3 原生组件
+- [ ] 引擎 + ViewModel + 题库 + UI + 截图 + 无障碍测试全绿（UI 待 CI emulator 结果）
+- [x] 题库 validator 在 CI 中阻断错误题
 - [ ] Play 预发布报告无阻断项
-- [ ] 隐私/Data Safety/内容分级完成
+- [ ] 隐私/Data Safety/内容分级在 Play Console 完成

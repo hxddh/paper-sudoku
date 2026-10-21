@@ -39,6 +39,8 @@ class MainActivity : ComponentActivity() {
                 .collectAsStateWithLifecycle(initialValue = ThemeMode.System)
             val completedCount by container.statsRepository.completedCount
                 .collectAsStateWithLifecycle(initialValue = 0)
+            val bestSeconds by container.statsRepository.bestSeconds
+                .collectAsStateWithLifecycle(initialValue = null)
 
             val darkTheme = when (themeMode) {
                 ThemeMode.System -> isSystemInDarkTheme()
@@ -74,6 +76,7 @@ class MainActivity : ComponentActivity() {
                         onEvent = viewModel::onEvent,
                         widthSizeClass = windowSizeClass.widthSizeClass,
                         completedCount = completedCount,
+                        bestSeconds = bestSeconds,
                         themeLabel = themeLabel,
                         onCycleTheme = {
                             lifecycleScope.launch {

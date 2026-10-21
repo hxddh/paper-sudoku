@@ -27,10 +27,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CollectionInfo
 import androidx.compose.ui.semantics.CollectionItemInfo
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.collectionInfo
 import androidx.compose.ui.semantics.collectionItemInfo
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -40,6 +42,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.titpea.papersudoku.R
+
+enum class BoardAction { Notes, Erase, Coach }
 
 /**
  * The board is the one custom-drawn component in the app.
@@ -56,6 +60,7 @@ import com.titpea.papersudoku.R
 fun SudokuBoard(
     state: GameUiState,
     onCellSelected: (Int) -> Unit,
+    onCellAction: (Int, BoardAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val lineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)
@@ -112,6 +117,7 @@ fun SudokuBoard(
                                 column = column,
                                 cellSize = cellSize,
                                 onCellSelected = onCellSelected,
+                                onCellAction = onCellAction,
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                             )
                         }
@@ -130,6 +136,7 @@ private fun BoardCell(
     column: Int,
     cellSize: Dp,
     onCellSelected: (Int) -> Unit,
+    onCellAction: (Int, BoardAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val cell = state.cells[index]
@@ -162,6 +169,9 @@ private fun BoardCell(
         else -> stringResource(R.string.cell_empty)
     }
     val description = stringResource(R.string.cell_description, row + 1, column + 1, valueText)
+    val notesLabel = stringResource(R.string.notes)
+    val eraseLabel = stringResource(R.string.erase)
+    val coachLabel = stringResource(R.string.coach)
     val shape = RoundedCornerShape(2.dp)
 
     Box(
@@ -180,6 +190,20 @@ private fun BoardCell(
                 role = Role.Button
                 contentDescription = description
                 selected = isSelected
+                customActions = listOf(
+                    CustomAccessibilityAction(notesLabel) {
+                        onCellAction(index, BoardAction.Notes)
+                        true
+                    },
+                    CustomAccessibilityAction(eraseLabel) {
+                        onCellAction(index, BoardAction.Erase)
+                        true
+                    },
+                    CustomAccessibilityAction(coachLabel) {
+                        onCellAction(index, BoardAction.Coach)
+                        true
+                    },
+                )
             }
             .clickable { onCellSelected(index) },
         contentAlignment = Alignment.Center,

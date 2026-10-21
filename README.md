@@ -5,19 +5,24 @@ light Coach when you are stuck; 9×9 remains available as Classic.
 
 The source lives at [github.com/hxddh/paper-sudoku](https://github.com/hxddh/paper-sudoku).
 
-`applicationId`: `com.titpea.papersudoku` — treat this as permanent once a build is published.
+`applicationId`: `com.titpea.papersudoku` — permanent once a build is published.
 
-- 6×6 daily mini (default) and 9×9 classic mode
-- Edge-to-edge Material 3 screen with `BottomSheetScaffold` keypad / Coach sheet
-- Expanded (≥840dp) two-pane layout: board + 360dp dock / keypad / Coach rail
-- Custom board with `CollectionInfo` / `CollectionItemInfo` semantics
-- Pure Kotlin engine: candidates, naked single, hidden single, conflicts, solved
-- Paper light/dark theme with accessible accent/muted tokens
-- Notes, undo, erase, Coach, Place, solved overlay
-- `SavedStateHandle` in-progress restore; Room completion stats; DataStore theme
-- No ads, no analytics, no `INTERNET` permission
+## v1 product scope
 
-The detailed platform checklist is in [docs/android-standards.md](docs/android-standards.md).
+- 61 daily 6×6 puzzles, rotating deterministically by local date
+- 31 Classic 9×9 puzzles; “New game” advances through the Classic bank
+- Coach teaches naked single and hidden single, with technique-specific copy
+- Notes, undo, erase, timer, solved overlay with elapsed time, local stats (completed + best)
+- Paper light/dark theme; saved theme; edge-to-edge Material 3 layout
+- Expanded (≥840dp) two-pane layout: board + dock / keypad / Coach rail
+- Hardware keyboard: arrows move, digits enter, Backspace erases, N notes, H coach
+- TalkBack cell semantics plus Notes / Erase / Coach custom actions
+- `SavedStateHandle` in-progress restore; Room history; DataStore settings
+- No accounts, ads, analytics, notifications, billing, or `INTERNET` permission
+
+The platform checklist is in [docs/android-standards.md](docs/android-standards.md). Release and
+store procedures are in [docs/release.md](docs/release.md) and
+[docs/store-listing.md](docs/store-listing.md). The privacy policy draft is [PRIVACY.md](PRIVACY.md).
 
 ## Requirements
 
@@ -33,73 +38,59 @@ sdk.dir=/path/to/Android/Sdk
 ## Build / verify
 
 ```bash
-./gradlew :core:engine:test
-./gradlew :app:testDebugUnitTest
-./gradlew :app:assembleDebug
-./gradlew :app:assembleDebugAndroidTest
-./gradlew :app:lintDebug
+./gradlew --no-daemon \
+  :core:engine:test \
+  :app:testDebugUnitTest \
+  :app:assembleDebug \
+  :app:assembleDebugAndroidTest \
+  :app:lintDebug
 ```
 
 Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
 
-The 3 Compose UI tests need a connected device/emulator:
+Release R8/resource shrinking can be checked without keys:
+
+```bash
+./gradlew --no-daemon :app:assembleRelease
+# or with the four PAPER_SUDOKU_* signing variables from docs/release.md:
+./gradlew --no-daemon :app:bundleRelease
+```
+
+An unsigned release artifact is not a Play upload. See [docs/release.md](docs/release.md).
+
+UI tests need a device/emulator:
 
 ```bash
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-## What is implemented
+GitHub Actions runs JVM tests, debug/release builds, lint, and a separate API 35 emulator job for
+the Compose/accessibility tests.
 
-- `MainActivity`: `enableEdgeToEdge()` + Compose; DataStore theme; Room completion count.
-- `GameViewModel`: unidirectional state, 6×6/9×9 toggle, notes, undo, erase, coach;
-  `SavedStateHandle` restores values/notes/selection/mode/timer/hint counter after process death.
-- `StatsRepository`: Room `game_results` table; one row per completed game, recorded once.
-- `SudokuBoard`: Canvas grid lines + Text digits + per-cell semantics and test tags.
-- `GameScreen`: `TopAppBar`, compact `BottomSheetScaffold`, 3×2/3×3 keypad; Expanded two-pane rail.
-- `SudokuTheme`: Paper light/dark color roles, typography, shapes.
-- English + Simplified Chinese strings; `localeConfig`.
-- Manifest: target 36, no orientation lock, `enableOnBackInvokedCallback`, no network.
-- Tests: 6 engine + 7 ViewModel JVM tests pass; 3 Compose UI tests (AccessibilityChecks) compile.
-- GitHub Actions builds, tests, and lints on pushes and pull requests to `main`.
+## Implementation
 
-## Intentionally not implemented yet
+- `MainActivity`: edge-to-edge Compose, DataStore theme, system bar appearance, stats collection.
+- `GameViewModel`: unidirectional state, daily/Classic selection, notes, undo, erase, Coach,
+  timer persistence, one completion record per game.
+- `Puzzles`: compact, validated daily/Classic bank. `PuzzleBankTest` proves every entry has one
+  solution and is solvable with the two Coach techniques.
+- `SudokuEngine`: candidates, naked/hidden singles, conflicts, solved check.
+- `SudokuBoard`: Canvas grid + Text digits, collection semantics, custom actions, test tags.
+- `GameScreen`: compact `BottomSheetScaffold` and expanded two-pane layouts; timer; stats dialog;
+  keyboard handling; solved overlay.
+- `SudokuTheme`: Paper light/dark tokens, type, shapes.
+- Room: local `game_results` history; DataStore: theme.
 
-- Device-level rotation/process-death verification and TalkBack testing (no emulator in this orb)
-- Undo-history persistence; Room migrations/exported schema; stats screen and best times
+Tests currently cover the engine, ViewModel, puzzle bank, and Compose/accessibility UI. The
+instrumentation suite is wired into CI; local orb runs cannot execute it because the orb has no
+emulator/KVM.
+
+## Not in v1
+
+- Accounts, cloud sync, ads, analytics, notifications, billing/IAP
+- Streak systems or social features
+- A larger technique curriculum beyond naked/hidden single
 - Medium-width (600–839dp) two-pane layout; it keeps the bottom sheet to preserve board size
-- Bundled Fraunces/Figtree fonts (skeleton uses platform serif/sans)
-- Full technique curriculum / difficulty grader / puzzle-bank validator
-- Keyboard/TalkBack custom actions beyond the basic grid semantics
-- Billing, notifications, share sheet, in-app review
-- Screenshot tests, macrobenchmark, CI
-
-## Dependency note
-
-The project is pinned to a known-good stable set (`Compose BOM 2025.10.00`, Material 3 1.4.0,
-AGP 8.13.2, Kotlin 2.2.21) so it builds with `compileSdk 36`.
-
-Current 2026 AndroidX artifacts (Compose 1.12 / Material3 1.5) require AGP 9.1+ and
-`compileSdk 37`. Upgrade path: AGP 9.4.x → `compileSdk 37` → Compose BOM 2026.09.00 →
-Material3 1.5 / connected `ButtonGroup`. `targetSdk` can stay 36 until Play requires 37.
-
-## Structure
-
-```text
-app/
-  src/main/kotlin/com/example/sudoku/
-    MainActivity.kt
-    data/Puzzles.kt
-    data/SettingsRepository.kt
-    data/StatsRepository.kt
-    designsystem/Theme.kt
-    game/GameViewModel.kt
-    game/GameScreen.kt
-    game/SudokuBoard.kt
-  src/main/res/...
-  src/test/...                 # ViewModel tests
-  src/androidTest/...          # Compose UI / accessibility tests
-core/engine/
-  src/main/kotlin/.../engine/  # pure Kotlin engine
-  src/test/kotlin/...          # engine tests
-docs/android-standards.md
-```
+- Bundled custom display fonts (uses platform serif/sans)
+- Play publication itself: the upload key, Play Console, hosted privacy URL, and store assets
+  require the app owner

@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -21,6 +22,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.time.LocalDate
 
 class GameScreenTest {
 
@@ -66,6 +68,17 @@ class GameScreenTest {
     }
 
     @Test
+    fun statsDialogShowsRecord() {
+        showMini(selected = null, completedCount = 3, bestSeconds = 93)
+
+        composeRule.onNodeWithContentDescription("More options").performClick()
+        composeRule.onNodeWithText("Stats").performClick()
+
+        composeRule.onNodeWithText("3 solved").assertExists()
+        composeRule.onNodeWithText("Best: 1:33").assertExists()
+    }
+
+    @Test
     fun expandedLayoutShowsBoardAndSidePanel() {
         composeRule.setContent {
             SudokuTheme {
@@ -90,6 +103,8 @@ class GameScreenTest {
     private fun showMini(
         selected: Int?,
         events: MutableList<GameEvent> = mutableListOf(),
+        completedCount: Int = 0,
+        bestSeconds: Long? = null,
     ) {
         composeRule.setContent {
             SudokuTheme {
@@ -97,7 +112,8 @@ class GameScreenTest {
                     state = miniState(selected),
                     onEvent = { events += it },
                     widthSizeClass = WindowWidthSizeClass.Compact,
-                    completedCount = 0,
+                    completedCount = completedCount,
+                    bestSeconds = bestSeconds,
                     themeLabel = "System",
                     onCycleTheme = {},
                 )
@@ -127,6 +143,8 @@ class GameScreenTest {
             hint = null,
             conflicts = emptySet(),
             solved = false,
+            startedAt = System.currentTimeMillis(),
+            puzzleDate = LocalDate.ofEpochDay(0),
         )
     }
 }

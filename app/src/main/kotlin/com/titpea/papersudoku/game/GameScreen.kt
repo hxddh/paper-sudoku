@@ -2,6 +2,7 @@ package com.titpea.papersudoku.game
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
@@ -45,13 +47,24 @@ import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.utf16CodePoint
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -59,7 +72,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
 import com.titpea.papersudoku.engine.Technique
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun GameScreen(
@@ -67,6 +83,7 @@ fun GameScreen(
     onEvent: (GameEvent) -> Unit,
     widthSizeClass: WindowWidthSizeClass,
     completedCount: Int,
+    bestSeconds: Long? = null,
     themeLabel: String,
     onCycleTheme: () -> Unit,
 ) {
@@ -75,6 +92,7 @@ fun GameScreen(
             state = state,
             onEvent = onEvent,
             completedCount = completedCount,
+            bestSeconds = bestSeconds,
             themeLabel = themeLabel,
             onCycleTheme = onCycleTheme,
         )
@@ -83,6 +101,7 @@ fun GameScreen(
             state = state,
             onEvent = onEvent,
             completedCount = completedCount,
+            bestSeconds = bestSeconds,
             themeLabel = themeLabel,
             onCycleTheme = onCycleTheme,
         )
@@ -95,6 +114,7 @@ private fun CompactGameScreen(
     state: GameUiState,
     onEvent: (GameEvent) -> Unit,
     completedCount: Int,
+    bestSeconds: Long?,
     themeLabel: String,
     onCycleTheme: () -> Unit,
 ) {
@@ -131,6 +151,7 @@ private fun CompactGameScreen(
                 state = state,
                 onEvent = onEvent,
                 completedCount = completedCount,
+                bestSeconds = bestSeconds,
                 themeLabel = themeLabel,
                 onCycleTheme = onCycleTheme,
             )
@@ -160,6 +181,7 @@ private fun ExpandedGameScreen(
     state: GameUiState,
     onEvent: (GameEvent) -> Unit,
     completedCount: Int,
+    bestSeconds: Long?,
     themeLabel: String,
     onCycleTheme: () -> Unit,
 ) {
@@ -173,6 +195,7 @@ private fun ExpandedGameScreen(
                 state = state,
                 onEvent = onEvent,
                 completedCount = completedCount,
+                bestSeconds = bestSeconds,
                 themeLabel = themeLabel,
                 onCycleTheme = onCycleTheme,
             )
@@ -237,13 +260,29 @@ private fun GameBoardArea(
     onEvent: (GameEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
     Box(
-        modifier = modifier,
+        modifier = modifier
+            .focusRequester(focusRequester)
+            .onPreviewKeyEvent { event -> handleBoardKey(event, state, onEvent) }
+            .focusable(),
         contentAlignment = Alignment.TopCenter,
     ) {
         SudokuBoard(
             state = state,
             onCellSelected = { onEvent(GameEvent.SelectCell(it)) },
+            onCellAction = { index, action ->
+                onEvent(GameEvent.SelectCell(index))
+                when (action) {
+                    BoardAction.Notes -> onEvent(GameEvent.ToggleNotes)
+                    BoardAction.Erase -> onEvent(GameEvent.Erase)
+                    BoardAction.Coach -> onEvent(GameEvent.Coach)
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 640.dp),
@@ -255,6 +294,97 @@ private fun GameBoardArea(
                 onNewGame = { onEvent(GameEvent.NewGame) },
             )
         }
+
+    }
+}
+
+private fun handleBoardKey(
+    event: KeyEvent,
+    state: GameUiState,
+    onEvent: (GameEvent) -> Unit,
+): Boolean {
+    if (event.type != KeyEventType.KeyDown || state.solved) return false
+
+    val size = state.size
+    val current = state.selected ?: firstEmptyCell(state) ?: 0
+    val row = current / size
+    val column = current % size
+
+    fun moveTo(nextRow: Int, nextColumn: Int): Boolean {
+        if (nextRow !in 0 until size || nextColumn !in 0 until size) return false
+        onEvent(GameEvent.SelectCell(nextRow * size + nextColumn))
+        return true
+    }
+
+    return when (event.key) {
+        Key.DirectionUp -> moveTo(row - 1, column)
+        Key.DirectionDown -> moveTo(row + 1, column)
+        Key.DirectionLeft -> moveTo(row, column - 1)
+        Key.DirectionRight -> moveTo(row, column + 1)
+        Key.Backspace, Key.Delete -> {
+            if (state.selected == null) false else {
+                onEvent(GameEvent.Erase)
+                true
+            }
+        }
+        Key.N -> {
+            onEvent(GameEvent.ToggleNotes)
+            true
+        }
+        Key.H -> {
+            onEvent(GameEvent.Coach)
+            true
+        }
+        else -> {
+            val digit = event.utf16CodePoint - '0'.code
+            if (digit !in 1..size || (state.selected == null && firstEmptyCell(state) == null)) {
+                false
+            } else {
+                if (state.selected == null) onEvent(GameEvent.SelectCell(current))
+                onEvent(GameEvent.Digit(digit))
+                true
+            }
+        }
+    }
+}
+
+private fun firstEmptyCell(state: GameUiState): Int? =
+    state.cells.indexOfFirst { it.value == 0 }.takeIf { it >= 0 }
+
+@Composable
+private fun GameTimer(
+    startedAt: Long,
+    solved: Boolean,
+) {
+    var now by remember(startedAt) { mutableLongStateOf(System.currentTimeMillis()) }
+
+    LaunchedEffect(startedAt, solved) {
+        if (solved) {
+            now = System.currentTimeMillis()
+        } else {
+            while (true) {
+                now = System.currentTimeMillis()
+                delay(1_000)
+            }
+        }
+    }
+
+    Text(
+        text = formatElapsed(((now - startedAt) / 1_000L).coerceAtLeast(0L)),
+        modifier = Modifier.padding(horizontal = 8.dp),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+private fun formatElapsed(totalSeconds: Long): String {
+    val hours = totalSeconds / 3_600
+    val minutes = (totalSeconds % 3_600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) {
+        String.format(Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format(Locale.US, "%d:%02d", minutes, seconds)
     }
 }
 
@@ -264,18 +394,32 @@ private fun GameTopBar(
     state: GameUiState,
     onEvent: (GameEvent) -> Unit,
     completedCount: Int,
+    bestSeconds: Long?,
     themeLabel: String,
     onCycleTheme: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
+    var statsOpen by remember { mutableStateOf(false) }
+
+    val locale = LocalConfiguration.current.locales[0]
+    val dayLabel = state.puzzleDate?.let { date ->
+        remember(date, locale) {
+            date.format(DateTimeFormatter.ofPattern("EEE, MMM d", locale))
+        }
+    }
 
     TopAppBar(
         title = {
             Column {
                 Text(
-                    text = stringResource(if (state.isMini) R.string.daily_mini else R.string.classic),
+                    text = if (state.isMini && dayLabel != null) {
+                        stringResource(R.string.daily_mini_on, dayLabel)
+                    } else {
+                        stringResource(if (state.isMini) R.string.daily_mini else R.string.classic)
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                 )
                 Text(
                     text = stringResource(if (state.isMini) R.string.mini_format else R.string.classic_format),
@@ -285,6 +429,7 @@ private fun GameTopBar(
             }
         },
         actions = {
+            GameTimer(startedAt = state.startedAt, solved = state.solved)
             Box {
                 IconButton(onClick = { menuOpen = true }) {
                     Icon(
@@ -324,17 +469,11 @@ private fun GameTopBar(
                         },
                     )
                     DropdownMenuItem(
-                        text = {
-                            Text(
-                                pluralStringResource(
-                                    R.plurals.completed_count,
-                                    completedCount,
-                                    completedCount,
-                                ),
-                            )
+                        text = { Text(stringResource(R.string.stats)) },
+                        onClick = {
+                            menuOpen = false
+                            statsOpen = true
                         },
-                        enabled = false,
-                        onClick = {},
                     )
                 }
             }
@@ -343,6 +482,51 @@ private fun GameTopBar(
             containerColor = Color.Transparent,
             scrolledContainerColor = Color.Transparent,
         ),
+    )
+
+    if (statsOpen) {
+        StatsDialog(
+            completedCount = completedCount,
+            bestSeconds = bestSeconds,
+            onDismiss = { statsOpen = false },
+        )
+    }
+}
+
+@Composable
+private fun StatsDialog(
+    completedCount: Int,
+    bestSeconds: Long?,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.stats)) },
+        text = {
+            Column {
+                Text(
+                    pluralStringResource(
+                        R.plurals.completed_count,
+                        completedCount,
+                        completedCount,
+                    ),
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    if (bestSeconds == null) {
+                        stringResource(R.string.no_completed_games)
+                    } else {
+                        stringResource(R.string.best_time, formatElapsed(bestSeconds))
+                    },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.close))
+            }
+        },
     )
 }
 
@@ -577,7 +761,13 @@ private fun SolvedOverlay(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = stringResource(R.string.solved_body, stringResource(if (state.isMini) R.string.mini_time else R.string.classic_time)),
+                text = stringResource(
+                    R.string.solved_body,
+                    formatElapsed(
+                        ((System.currentTimeMillis() - state.startedAt) / 1_000L)
+                            .coerceAtLeast(0L),
+                    ),
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
