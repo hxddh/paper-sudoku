@@ -71,6 +71,7 @@ fun SudokuBoard(
         modifier = modifier
             .fillMaxWidth()
             .widthIn(max = 640.dp)
+            .padding(horizontal = 2.dp)
             .testTag("sudoku-board")
             .semantics { collectionInfo = CollectionInfo(state.size, state.size) },
         contentAlignment = Alignment.Center,
