@@ -42,7 +42,7 @@ jobs:
         run: ./gradlew --no-daemon :core:engine:test :core:game:test :app:testDebugUnitTest
 
       - name: Build debug APKs and release APK
-        run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease
+        run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease -PpaperSudoku.sideload=true
 
       - name: Run lint
         run: ./gradlew --no-daemon :app:lintDebug

@@ -39,12 +39,14 @@ Source: [github.com/hxddh/paper-sudoku](https://github.com/hxddh/paper-sudoku)
 
 ## Install
 
-The 2.0 APK is attached to the GitHub release when the `v2.0.0` tag is built (see
-[docs/release.md](docs/release.md)). Android 8.0+.
+[**下载 Paper Sudoku 2.0.0 APK / Download the APK**](https://github.com/hxddh/paper-sudoku/releases/download/v2.0.0-sideload/paper-sudoku-2.0.0-sideload.apk)
+· [release page](https://github.com/hxddh/paper-sudoku/releases/tag/v2.0.0-sideload)
 
-The 1.0 sideload APK was signed with a local debug key, so 2.0 builds signed with the release key
-install alongside it only after uninstalling 1.0 (Android refuses an update with a different
-signature). Play installs are unaffected.
+- Android 8.0+; release build (R8); no `INTERNET` permission.
+- Sideload build signed with a CI debug key, not the Play upload key. Sideload builds do not
+  update each other: uninstall 1.0 (or an earlier sideload) first.
+- A Play-ready build comes from a `v2.0.0` tag once the signing secrets are set
+  (see [docs/release.md](docs/release.md)).
 
 `applicationId`: `com.titpea.papersudoku` — permanent once a build is published.
 

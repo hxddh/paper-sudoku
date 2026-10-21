@@ -22,6 +22,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    val sideload = providers.gradleProperty("paperSudoku.sideload").orNull == "true"
     val releaseKeystore = providers.environmentVariable("PAPER_SUDOKU_KEYSTORE").orNull
     val releaseStorePassword = providers.environmentVariable("PAPER_SUDOKU_STORE_PASSWORD").orNull
     val releaseKeyAlias = providers.environmentVariable("PAPER_SUDOKU_KEY_ALIAS").orNull
@@ -44,7 +45,13 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.findByName("release")
+            // -PpaperSudoku.sideload=true signs with the build machine's debug key, for the
+            // GitHub "-sideload" releases. Play builds use the private upload key above.
+            signingConfig = if (sideload) {
+                signingConfigs.getByName("debug")
+            } else {
+                signingConfigs.findByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

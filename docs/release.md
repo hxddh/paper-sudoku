@@ -41,6 +41,12 @@ upload key separate from the app-signing key.
 
 ## Tagged release (CI)
 
+**Sideload (no secrets needed):** `git tag v2.0.0-sideload && git push origin v2.0.0-sideload`
+publishes an APK signed with the CI runner's debug key. Each sideload build has a different key,
+so testers uninstall before updating. Not for Play.
+
+**Signed (Play-ready):**
+
 Store the upload key as repository secrets, then push a tag:
 
 ```bash
