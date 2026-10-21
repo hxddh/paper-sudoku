@@ -1,5 +1,32 @@
 # Changelog
 
+## 3.0.0
+
+Paper Sudoku is rebuilt around one idea: a notebook of pages.
+
+**New**
+- The notebook is home: today's page, the practice stack, every earlier day (stamped with its time
+  when done) and the technique handbook. On tablets and unfolded foldables the notebook and the
+  open page sit side by side (Material 3 adaptive list-detail), with a shared-element transition
+  between a page's thumbnail and its board and predictive back.
+- Press and slide to aim on the board, with a loupe; the cell is written where the finger lifts.
+- Digit-first input without a long press: tap a digit with nothing to write into to pick it up.
+- The Coach writes in the margin, in the space the tools use, with an ink line to the board.
+- Practice difficulty rises by itself after three clean pages per level.
+- Material 3 Expressive floating toolbar and connected keypad; finished digits shrink to a check.
+- Home-screen widget with today's page.
+- Baseline Profile, Macrobenchmark (cold start, writing frames) and a screenshot matrix in CI.
+
+**Removed**
+- The puzzle picker, the separate journal, Classic difficulty choice, the visible timer, manual
+  pause, the mistake-marking switch, Material You colors and long-press digit lock.
+
+**Changed**
+- Numerals are Fraunces; all other text uses the platform sans.
+- Settings: theme, tidy notes, haptics, and the system's per-app language.
+- Existing 2.0 games, results and settings carry over unchanged.
+
+
 ## 2.0.0
 
 Paper Sudoku becomes a notebook that teaches.

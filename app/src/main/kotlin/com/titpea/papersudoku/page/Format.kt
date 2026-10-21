@@ -1,4 +1,4 @@
-package com.titpea.papersudoku.game
+package com.titpea.papersudoku.page
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
@@ -26,3 +26,16 @@ fun difficultyRes(difficulty: Difficulty): Int = when (difficulty) {
 
 @Composable
 fun difficultyName(difficulty: Difficulty): String = stringResource(difficultyRes(difficulty))
+
+/** Localized "October 21" / "10月21日" (no year). */
+fun monthDay(date: java.time.LocalDate, locale: java.util.Locale): String =
+    date.format(
+        java.time.format.DateTimeFormatter.ofPattern(
+            android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMMd"),
+            locale,
+        ),
+    )
+
+/** Localized weekday, e.g. "Wednesday" / "星期三". */
+fun weekday(date: java.time.LocalDate, locale: java.util.Locale): String =
+    date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, locale)

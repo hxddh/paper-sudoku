@@ -1,0 +1,8 @@
+# Hand-written Baseline Profile rules (ART pre-compiles these at install via profileinstaller).
+# Everything on the launch → today's page → first input path lives in these packages.
+HSPLcom/titpea/papersudoku/**;->**(**)**
+Lcom/titpea/papersudoku/**;
+HSPLcom/titpea/papersudoku/engine/**;->**(**)**
+Lcom/titpea/papersudoku/engine/**;
+HSPLcom/titpea/papersudoku/game/model/**;->**(**)**
+Lcom/titpea/papersudoku/game/model/**;

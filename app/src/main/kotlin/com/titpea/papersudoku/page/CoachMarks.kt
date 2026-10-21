@@ -1,4 +1,4 @@
-package com.titpea.papersudoku.game
+package com.titpea.papersudoku.page
 
 import androidx.compose.runtime.Immutable
 import com.titpea.papersudoku.engine.CoachHint

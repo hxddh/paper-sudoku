@@ -18,3 +18,4 @@ rootProject.name = "PaperSudoku"
 include(":app")
 include(":core:engine")
 include(":core:game")
+include(":benchmark")

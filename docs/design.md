@@ -1,78 +1,77 @@
-# Design · Paper Sudoku 2.0
+# Design · Paper Sudoku 3.0
 
-One idea runs through every screen: **a notebook that teaches**. A page a day, written in ink and
-pencil, stamped when done, with a patient coach at your shoulder.
+**A notebook of pages.** Open it and today's page is in front of you. Turn back and every earlier
+day is there. Finish a page and it is stamped. When you are stuck, the Coach writes in the margin.
 
 ## Principles
 
-1. **Paper first.** The board is a sheet, not a widget. Material 3 Expressive provides structure,
-   motion and components; Paper provides material, type and color.
-2. **Teach, don't tell.** The Coach answers last. Every puzzle is graded by the same techniques the
-   Coach can explain, so "no simple hint" never happens on a generated puzzle.
-3. **Calm by default.** No streaks, no badges, no mistake counter. Mistake marks are opt-in.
-4. **One custom surface.** Only the board is drawn by hand; everything else is a Material
-   component so accessibility, insets and motion behave natively.
+1. **One metaphor, all the way down.** Navigation is turning pages; history is the notebook; the
+   reward is a stamp; help is a margin note. No menus that are not part of the notebook.
+2. **The page is sacred.** Nothing moves the board once a page is open: the work area under it
+   (tools, Coach, solved note) has one fixed height.
+3. **Teach, don't tell.** The Coach answers last, and only with the techniques every generated
+   puzzle is graded with.
+4. **Calm.** No streaks, no visible clock, no red marks unless digits truly clash.
+5. **Native first.** Material 3 / Expressive components and adaptive scaffolds everywhere except
+   the board, the one hand-drawn surface.
+
+## Structure
+
+| Surface | Component |
+|---|---|
+| App | Navigation 3 back stack: Notebook → Settings |
+| Notebook + page | `NavigableListDetailPaneScaffold` (one pane on phones, two on wide windows); predictive back |
+| Notebook | `LargeTopAppBar` (collapsing), today card, practice card, `ListItem` rows, handbook |
+| Page header | small transparent `TopAppBar`: back (one-pane only), weekday · level, date, overflow |
+| Tools | `HorizontalFloatingToolbar`: Undo, Erase, Notes (`FilledIconToggleButton`), Coach (`FilledIconButton`) |
+| Keypad | `ButtonGroup` with connected keys (outer corners round, inner tight, press rounds fully) |
+| Coach | margin note: 2dp ink rule, tag + steps, note in pen italic, two actions |
+| Transitions | shared element thumbnail ↔ board; ink connector drawn by pen (450ms) |
+| Widget | Glance: date, status, page miniature |
+
+## Interaction
+
+- **Aim:** press shows the cell; sliding beyond touch slop opens a 76dp loupe 96dp above the
+  finger and ticks a haptic per cell; lifting commits. A plain tap is a tap.
+- **Write:** with an editable cell selected, a digit writes (again = clear). With nothing to write
+  into, a digit is *picked up* (filled key, status line "Holding 4"); every tap writes it; tap it
+  again or the status line to put it down.
+- **Notes:** the toggle switches the pen to pencil; keys and status line show it.
+- **Coach:** Look tints the unit; Why adds the pattern, crossed-out candidates and the target;
+  Answer shows the digit faintly and offers Place. A wrong digit is pointed out first.
+- **Leaving** a page (back, notebook, background) stops the hidden clock.
 
 ## Writing layers
 
-| Layer | Use | Type | Color role |
-|---|---|---|---|
-| Printed | givens | Fraunces 560, opsz 36, lining + tabular figures | `onSurface` |
-| Pen | player digits | Fraunces Italic 420, SOFT 100 | `secondary` (ink blue) |
-| Pencil | notes | system sans, medium | `onSurfaceVariant` |
-| Correction | conflicts, opt-in mistakes | as above + 2dp underline | `error` |
+| Layer | Type | Color |
+|---|---|---|
+| Printed givens | Fraunces 560, opsz 36 | `onSurface` |
+| Pen | Fraunces Italic 420, SOFT 100 | `secondary` |
+| Pencil | platform sans, medium | `onSurfaceVariant` |
+| Margin (Coach) | platform sans italic | `primary` rule and tag, `secondary` note |
+| Clash | + 2dp underline | `error` |
 
-A written digit lands with a short spring (scale 1.25 → 1, fade in). Conflicts always carry the
-underline, so color is never the only cue.
+Numerals in the notebook (dates, times) are Fraunces; every other word is the platform sans.
 
 ## Color
 
-Every Material 3 role is defined for Paper (light) and Night (dark) in
-`designsystem/Theme.kt`, including all `surfaceContainer*` roles; nothing falls back to the
-baseline palette. Key pairs:
-
-| Role | Paper | Night |
-|---|---|---|
-| background / surface | `#F4EFE5` | `#14130F` |
-| primary (terracotta) | `#A8442F` — 5.2:1 on paper | `#EFA489` |
-| secondary (ink) | `#2D5577` | `#A9C8E8` |
-| tertiary (moss, Coach focus) | `#5E6B3A` | `#C3CF9B` |
-| onSurfaceVariant (pencil) | `#5F574C` — 6.2:1 | `#CFC5B5` |
-| sheet (`surfaceContainerLowest`) | `#FFFDF8` | `#0F0E0A` |
-
-Material You (Android 12+) is offered as an option; the paper grain is drawn only with Paper/Night.
-
-## Board marks (Coach)
-
-| Level | Board | Panel |
-|---|---|---|
-| 1 Look | `tertiaryContainer` tint on the unit(s) | "Look at box 4." + a one-line tip |
-| 2 Why | + `primaryContainer` pattern cells, crossed-out candidates in `error`, target outline for singles | technique name + explanation |
-| 3 Answer | + faint ink digit in the target | "Place 7 at row 3, column 5." + Place |
-
-Selection: `primary` 16% + 2dp outline. Peers: `surfaceVariant` 45%. Same digit:
-`secondaryContainer` 75%, and matching pencil notes turn bold ink.
+Paper (light) and Night (dark) define every Material 3 role (see `designsystem/Theme.kt`); there
+is no dynamic-color variant. Key: paper `#F4EFE5`, terracotta `#A8442F`, ink `#2D5577`, moss
+`#5E6B3A`; night `#14130F` with `#EFA489`, `#A9C8E8`, `#C3CF9B`.
 
 ## Layout
 
-- **Stacked** (window not clearly wider than tall): top bar, board (square, up to 720dp),
-  tool panel (dock + keypad / Coach / Solved) below, max 640dp wide.
-- **Side by side** (width > height and ≥ 560dp): board left, panel right at 40% (320–440dp),
-  scrollable. Covers phone landscape, tablets, unfolded foldables and desktop windows.
-- Insets: `Scaffold` handles system bars; horizontal display-cutout padding in landscape.
+- Phone portrait: header, board (4dp margins for 9×9, 12dp for 6×6), work area of fixed height
+  `max(176dp, toolbar + status + keypad)`.
+- Window wider than tall and ≥ 560dp: board left, work area right (40%, 320–440dp).
+- Wide windows with the notebook expanded: list-detail two panes; the page hides its back button.
 
-Touch: dock items ≥ 56dp tall, keys 60dp tall; Mini cells ≈ 61dp on a 390dp phone. 9×9 cells are
-≈ 41dp on phones — a documented exception, mitigated by digit lock, keyboard input and
-landscape/tablet layouts where cells exceed 48dp.
+9×9 cells on a 390dp phone are ≈ 42dp; aiming with the loupe, digit pick-up and the keyboard make
+precise input independent of finger size. Every other target is ≥ 48dp.
 
 ## Motion and haptics
 
-`MotionScheme.expressive()` for components; panel changes cross-fade and resize; the stamp lands
-with an overshoot spring (damping 0.45). Predictive back scales the Coach card with the gesture.
-Haptics: keyboard tap on writing, reject on a clash, confirm on solving, segment tick on toggles —
-all behind a setting.
-
-## Copy
-
-Short, second person, no exclamation marks. The Coach never says "wrong"; it says
-"Something doesn't fit." Chinese copy is written, not translated word for word.
+`MotionScheme.expressive()`; connected keys animate width and corners; ink settles on write
+(scale 1.25 → 1, spring 0.55); the stamp lands with overshoot; the Coach connector draws in.
+Haptics (setting): keyboard tap on write, reject on a clash, confirm on solve, segment tick on
+toggles and while aiming.

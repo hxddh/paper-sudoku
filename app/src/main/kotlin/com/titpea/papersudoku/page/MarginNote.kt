@@ -1,4 +1,4 @@
-package com.titpea.papersudoku.game
+package com.titpea.papersudoku.page
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -6,16 +6,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,8 +28,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
+import com.titpea.papersudoku.designsystem.PaperTheme
 import com.titpea.papersudoku.engine.CoachHint
 import com.titpea.papersudoku.engine.Elimination
 import com.titpea.papersudoku.engine.Geometry
@@ -38,56 +42,72 @@ import com.titpea.papersudoku.engine.UnitKind
 import com.titpea.papersudoku.engine.UnitRef
 
 /**
- * The Coach teaches in three steps — look, why, answer — and never jumps to the answer unasked.
+ * The Coach writes in the margin: no card, no dialog — a pen rule down the side, the note in ink,
+ * and three steps (look, why, answer). It fills exactly the space the tools use, so the page
+ * never moves when it appears; a long note scrolls.
  */
 @Composable
-fun CoachPanel(
+fun MarginNote(
     coach: CoachUi,
     geometry: Geometry,
-    onEvent: (PlayEvent) -> Unit,
+    onEvent: (PageEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
+    val ink = PaperTheme.ink
     val text = coachText(coach, geometry)
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag("coach-panel"),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = colors.surfaceContainerHigh,
-    ) {
+    Row(modifier.fillMaxWidth().testTag("coach-panel")) {
+        Box(
+            Modifier
+                .padding(vertical = 4.dp)
+                .width(2.dp)
+                .fillMaxHeight()
+                .background(ink.margin),
+        )
         Column(
             Modifier
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-                .semantics { liveRegion = LiveRegionMode.Polite },
+                .weight(1f)
+                .padding(start = 14.dp)
+                .fillMaxHeight(),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .semantics { liveRegion = LiveRegionMode.Polite },
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = text.tag,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = ink.margin,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (coach.hint != null) LevelSteps(coach.level)
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(text.title, style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
+                Spacer(Modifier.height(2.dp))
                 Text(
-                    text = text.tag,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = colors.primary,
-                    modifier = Modifier.weight(1f),
+                    text.body,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                    color = ink.pen,
                 )
-                if (coach.hint != null) LevelSteps(coach.level)
             }
-            Spacer(Modifier.height(6.dp))
-            Text(text.title, style = MaterialTheme.typography.headlineSmall, color = colors.onSurface)
-            Spacer(Modifier.height(6.dp))
-            Text(text.body, style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
-            Spacer(Modifier.height(14.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                Modifier.fillMaxWidth().padding(top = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 TextButton(
-                    onClick = { onEvent(PlayEvent.DismissCoach) },
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    onClick = { onEvent(PageEvent.DismissCoach) },
+                    modifier = Modifier.heightIn(min = 48.dp),
                 ) { Text(stringResource(R.string.coach_not_now)) }
                 val hint = coach.hint
                 if (hint != null) {
                     Button(
-                        onClick = { onEvent(if (coach.level < 3) PlayEvent.CoachDeeper else PlayEvent.CoachApply) },
-                        modifier = Modifier
-                            .weight(1.5f)
-                            .heightIn(min = 48.dp)
-                            .testTag("coach-next"),
+                        onClick = { onEvent(if (coach.level < 3) PageEvent.CoachDeeper else PageEvent.CoachApply) },
+                        modifier = Modifier.heightIn(min = 48.dp).testTag("coach-next"),
                     ) {
                         Text(
                             when {
@@ -156,19 +176,17 @@ private fun coachText(coach: CoachUi, geometry: Geometry): CoachText {
             val placement = hint.placement
             val tag = techniqueName(hint.technique)
             val cell = cellLabel(geometry, placement.index)
+            // The step's anchor stays the same from Look to Why; the tag already names the technique.
+            val lookTitle = if (lesson is Placement && lesson.technique == Technique.NakedSingle) {
+                stringResource(R.string.coach_look_title, cell)
+            } else {
+                stringResource(R.string.coach_look_title, unitLabel(focusUnit(geometry, lesson)))
+            }
             when (coach.level) {
-                1 -> CoachText(
-                    tag = tag,
-                    title = if (lesson is Placement && lesson.technique == Technique.NakedSingle) {
-                        stringResource(R.string.coach_look_title, cell)
-                    } else {
-                        stringResource(R.string.coach_look_title, unitLabel(focusUnit(geometry, lesson)))
-                    },
-                    body = lookTip(lesson.technique),
-                )
+                1 -> CoachText(tag = tag, title = lookTitle, body = lookTip(lesson.technique))
                 2 -> CoachText(
                     tag = tag,
-                    title = techniqueName(lesson.technique),
+                    title = lookTitle,
                     body = whyText(geometry, lesson) +
                         if (lesson is Elimination) " " + stringResource(R.string.coach_then, cell) else "",
                 )
