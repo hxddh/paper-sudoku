@@ -176,19 +176,17 @@ private fun coachText(coach: CoachUi, geometry: Geometry): CoachText {
             val placement = hint.placement
             val tag = techniqueName(hint.technique)
             val cell = cellLabel(geometry, placement.index)
+            // The step's anchor stays the same from Look to Why; the tag already names the technique.
+            val lookTitle = if (lesson is Placement && lesson.technique == Technique.NakedSingle) {
+                stringResource(R.string.coach_look_title, cell)
+            } else {
+                stringResource(R.string.coach_look_title, unitLabel(focusUnit(geometry, lesson)))
+            }
             when (coach.level) {
-                1 -> CoachText(
-                    tag = tag,
-                    title = if (lesson is Placement && lesson.technique == Technique.NakedSingle) {
-                        stringResource(R.string.coach_look_title, cell)
-                    } else {
-                        stringResource(R.string.coach_look_title, unitLabel(focusUnit(geometry, lesson)))
-                    },
-                    body = lookTip(lesson.technique),
-                )
+                1 -> CoachText(tag = tag, title = lookTitle, body = lookTip(lesson.technique))
                 2 -> CoachText(
                     tag = tag,
-                    title = techniqueName(lesson.technique),
+                    title = lookTitle,
                     body = whyText(geometry, lesson) +
                         if (lesson is Elimination) " " + stringResource(R.string.coach_then, cell) else "",
                 )

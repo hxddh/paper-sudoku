@@ -2,6 +2,7 @@ package com.titpea.papersudoku.benchmark
 
 import androidx.benchmark.macro.CompilationMode
 import androidx.benchmark.macro.FrameTimingMetric
+import androidx.benchmark.macro.MacrobenchmarkScope
 import androidx.benchmark.macro.StartupMode
 import androidx.benchmark.macro.StartupTimingMetric
 import androidx.benchmark.macro.junit4.MacrobenchmarkRule
@@ -31,8 +32,7 @@ class StartupBenchmark {
         iterations = 5,
     ) {
         pressHome()
-        startActivityAndWait()
-        device.wait(Until.hasObject(By.res("sudoku-board")), 5_000)
+        launchToTodaysPage()
     }
 
     @Test
@@ -44,7 +44,7 @@ class StartupBenchmark {
         iterations = 3,
         setupBlock = {
             pressHome()
-            startActivityAndWait()
+            launchToTodaysPage()
         },
     ) {
         val board = device.wait(Until.findObject(By.res("sudoku-board")), 5_000) ?: return@measureRepeated
@@ -54,6 +54,16 @@ class StartupBenchmark {
             device.click(b.left + cell / 2 + i * cell, b.top + cell / 2 + i * cell)
             device.waitForIdle()
         }
+    }
+
+    /**
+     * `am start -W` plus waiting for the board, rather than startActivityAndWait(): the latter
+     * confirms launch through gfxinfo frame stats, which the CI emulator does not report. The
+     * startup metric itself still comes from the Perfetto trace.
+     */
+    private fun MacrobenchmarkScope.launchToTodaysPage() {
+        device.executeShellCommand("am start -W -n $PACKAGE/.MainActivity")
+        device.wait(Until.hasObject(By.res("sudoku-board")), 10_000)
     }
 
     private companion object {
