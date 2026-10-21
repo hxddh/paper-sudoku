@@ -14,6 +14,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "SudokuAndroid"
+rootProject.name = "PaperSudoku"
 include(":app")
 include(":core:engine")

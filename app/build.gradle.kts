@@ -6,12 +6,12 @@ plugins {
 }
 
 android {
-    namespace = "com.example.sudoku"
+    namespace = "com.titpea.papersudoku"
     compileSdk = 36
     buildToolsVersion = "36.0.0"
 
     defaultConfig {
-        applicationId = "com.example.sudoku"
+        applicationId = "com.titpea.papersudoku"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

@@ -1,4 +1,4 @@
-package com.example.sudoku.engine
+package com.titpea.papersudoku.engine
 
 /**
  * Immutable puzzle data. `givens` contains 0 for an empty cell; `solution` is a full board.

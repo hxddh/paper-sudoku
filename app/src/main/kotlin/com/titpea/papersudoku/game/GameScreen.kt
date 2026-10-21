@@ -1,4 +1,4 @@
-package com.example.sudoku.game
+package com.titpea.papersudoku.game
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -57,7 +57,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.sudoku.R
+import com.titpea.papersudoku.R
 import kotlinx.coroutines.launch
 
 @Composable

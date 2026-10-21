@@ -1,4 +1,4 @@
-package com.example.sudoku.engine
+package com.titpea.papersudoku.engine
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

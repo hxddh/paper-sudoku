@@ -1,4 +1,4 @@
-package com.example.sudoku.designsystem
+package com.titpea.papersudoku.designsystem
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape

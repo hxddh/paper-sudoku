@@ -1,4 +1,4 @@
-package com.example.sudoku.game
+package com.titpea.papersudoku.game
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -39,7 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.sudoku.R
+import com.titpea.papersudoku.R
 
 /**
  * The board is the one custom-drawn component in the app.

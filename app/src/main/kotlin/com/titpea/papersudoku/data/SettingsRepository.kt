@@ -1,4 +1,4 @@
-package com.example.sudoku.data
+package com.titpea.papersudoku.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore

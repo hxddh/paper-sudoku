@@ -1,6 +1,11 @@
-# Sudoku Android Skeleton
+# Paper Sudoku
 
-A small, buildable Compose skeleton for the Sudoku product direction:
+A calm, teaching-first Sudoku app for Android. The phone-first path is a 6×6 daily mini with a
+light Coach when you are stuck; 9×9 remains available as Classic.
+
+The source lives at [github.com/hxddh/paper-sudoku](https://github.com/hxddh/paper-sudoku).
+
+`applicationId`: `com.titpea.papersudoku` — treat this as permanent once a build is published.
 
 - 6×6 daily mini (default) and 9×9 classic mode
 - Edge-to-edge Material 3 screen with `BottomSheetScaffold` keypad / Coach sheet

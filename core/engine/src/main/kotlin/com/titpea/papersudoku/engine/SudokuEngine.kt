@@ -1,4 +1,4 @@
-package com.example.sudoku.engine
+package com.titpea.papersudoku.engine
 
 /** A single next-step hint: place [digit] at [index]. */
 data class Hint(val index: Int, val digit: Int)

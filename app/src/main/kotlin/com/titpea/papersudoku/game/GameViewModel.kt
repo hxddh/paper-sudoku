@@ -1,4 +1,4 @@
-package com.example.sudoku.game
+package com.titpea.papersudoku.game
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -7,12 +7,12 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.example.sudoku.AppContainer
-import com.example.sudoku.data.GameResult
-import com.example.sudoku.data.Puzzles
-import com.example.sudoku.data.StatsRepository
-import com.example.sudoku.engine.Hint
-import com.example.sudoku.engine.SudokuEngine
+import com.titpea.papersudoku.AppContainer
+import com.titpea.papersudoku.data.GameResult
+import com.titpea.papersudoku.data.Puzzles
+import com.titpea.papersudoku.data.StatsRepository
+import com.titpea.papersudoku.engine.Hint
+import com.titpea.papersudoku.engine.SudokuEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch

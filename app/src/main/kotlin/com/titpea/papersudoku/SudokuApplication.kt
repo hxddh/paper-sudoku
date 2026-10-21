@@ -1,11 +1,11 @@
-package com.example.sudoku
+package com.titpea.papersudoku
 
 import android.app.Application
 import android.content.Context
-import com.example.sudoku.data.RoomStatsRepository
-import com.example.sudoku.data.SettingsRepository
-import com.example.sudoku.data.StatsRepository
-import com.example.sudoku.data.SudokuDatabase
+import com.titpea.papersudoku.data.RoomStatsRepository
+import com.titpea.papersudoku.data.SettingsRepository
+import com.titpea.papersudoku.data.StatsRepository
+import com.titpea.papersudoku.data.SudokuDatabase
 
 interface AppContainer {
     val settingsRepository: SettingsRepository

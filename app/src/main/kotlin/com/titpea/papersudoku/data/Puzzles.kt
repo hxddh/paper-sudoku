@@ -1,6 +1,6 @@
-package com.example.sudoku.data
+package com.titpea.papersudoku.data
 
-import com.example.sudoku.engine.Puzzle
+import com.titpea.papersudoku.engine.Puzzle
 
 /**
  * Bundled starter puzzle bank. Production should generate/validate a larger bank at build time

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Sudoku</string>
+    <string name="app_name">Paper Sudoku</string>
     <string name="daily_mini">Daily Mini</string>
     <string name="classic">Classic</string>
     <string name="mini_format">6 × 6</string>

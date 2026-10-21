@@ -1,4 +1,4 @@
-package com.example.sudoku
+package com.titpea.papersudoku
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -18,10 +18,10 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.sudoku.data.ThemeMode
-import com.example.sudoku.designsystem.SudokuTheme
-import com.example.sudoku.game.GameScreen
-import com.example.sudoku.game.GameViewModel
+import com.titpea.papersudoku.data.ThemeMode
+import com.titpea.papersudoku.designsystem.SudokuTheme
+import com.titpea.papersudoku.game.GameScreen
+import com.titpea.papersudoku.game.GameViewModel
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {

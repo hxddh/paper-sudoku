@@ -1,6 +1,6 @@
 # Android 开发规范 / Checklist
 
-> 适用：Sudoku Android skeleton  
+> 适用：Paper Sudoku（Android）  
 > 基线：`targetSdk 36`、`minSdk 26`、Jetpack Compose + Material 3  
 > 目标：先把“平台合规”和“可访问”做对，再加内容/变现。
 

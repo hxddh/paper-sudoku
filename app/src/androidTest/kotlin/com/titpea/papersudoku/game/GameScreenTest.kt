@@ -1,4 +1,4 @@
-package com.example.sudoku.game
+package com.titpea.papersudoku.game
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
@@ -15,8 +15,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.espresso.accessibility.AccessibilityChecks
-import com.example.sudoku.data.Puzzles
-import com.example.sudoku.designsystem.SudokuTheme
+import com.titpea.papersudoku.data.Puzzles
+import com.titpea.papersudoku.designsystem.SudokuTheme
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule

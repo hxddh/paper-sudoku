@@ -1,9 +1,9 @@
-package com.example.sudoku.game
+package com.titpea.papersudoku.game
 
 import androidx.lifecycle.SavedStateHandle
-import com.example.sudoku.data.GameResult
-import com.example.sudoku.data.Puzzles
-import com.example.sudoku.data.StatsRepository
+import com.titpea.papersudoku.data.GameResult
+import com.titpea.papersudoku.data.Puzzles
+import com.titpea.papersudoku.data.StatsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
