@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">数独</string>
+    <string name="daily_mini">每日 Mini</string>
+    <string name="classic">经典</string>
+    <string name="mini_format">6 × 6</string>
+    <string name="classic_format">9 × 9</string>
+    <string name="more_options">更多选项</string>
+    <string name="switch_to_classic">切换到经典 9×9</string>
+    <string name="switch_to_mini">切换到 Mini 6×6</string>
+    <string name="new_game">新开一局</string>
+    <string name="notes">笔记</string>
+    <string name="undo">撤销</string>
+    <string name="erase">擦除</string>
+    <string name="coach">教练</string>
+    <string name="not_now">暂不</string>
+    <string name="place_digit">填入 %1$d</string>
+    <string name="coach_eyebrow">唯一余数</string>
+    <string name="hint_title">这里只能填 %1$d。</string>
+    <string name="hint_body">这一行、列、宫里其他数字都出现了，只剩一个候选，不需要猜。</string>
+    <string name="no_hint_title">当前没有唯一余数。</string>
+    <string name="no_hint_body">这个局面需要更高阶的技巧，先试试别的格子。</string>
+    <string name="solved">完成。</string>
+    <string name="solved_body">%1$s · 可以开始下一局了。</string>
+    <string name="cell_description">第 %1$d 行，第 %2$d 列，%3$s</string>
+    <string name="cell_empty">空</string>
+    <string name="cell_given">题目数字 %1$d</string>
+    <string name="cell_entered">已填 %1$d</string>
+    <string name="cell_conflict">冲突，%1$d</string>
+    <string name="notes_active">笔记开启</string>
+    <string name="mini_time">2–3 分钟</string>
+    <string name="classic_time">20–40 分钟</string>
+
+    <string name="theme_menu">主题：%1$s</string>
+    <string name="theme_system">跟随系统</string>
+    <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
+    <plurals name="completed_count">
+        <item quantity="other">已完成 %1$d 局</item>
+    </plurals>
+    <string name="select_a_cell">选择一个格子</string>
+</resources>

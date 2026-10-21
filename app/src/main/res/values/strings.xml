@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Sudoku</string>
+    <string name="daily_mini">Daily Mini</string>
+    <string name="classic">Classic</string>
+    <string name="mini_format">6 × 6</string>
+    <string name="classic_format">9 × 9</string>
+    <string name="more_options">More options</string>
+    <string name="switch_to_classic">Switch to Classic 9×9</string>
+    <string name="switch_to_mini">Switch to Mini 6×6</string>
+    <string name="new_game">New game</string>
+    <string name="notes">Notes</string>
+    <string name="undo">Undo</string>
+    <string name="erase">Erase</string>
+    <string name="coach">Coach</string>
+    <string name="not_now">Not now</string>
+    <string name="place_digit">Place %1$d</string>
+    <string name="coach_eyebrow">Naked single</string>
+    <string name="hint_title">Only one candidate: %1$d.</string>
+    <string name="hint_body">Every other digit already appears in this row, column, or box. No guessing — one candidate.</string>
+    <string name="no_hint_title">No naked single right now.</string>
+    <string name="no_hint_body">This position needs a more advanced technique. Try another cell first.</string>
+    <string name="solved">Solved.</string>
+    <string name="solved_body">%1$s · ready for the next one.</string>
+    <string name="cell_description">Row %1$d, column %2$d, %3$s</string>
+    <string name="cell_empty">empty</string>
+    <string name="cell_given">given %1$d</string>
+    <string name="cell_entered">entered %1$d</string>
+    <string name="cell_conflict">conflict, %1$d</string>
+    <string name="notes_active">Notes on</string>
+    <string name="mini_time">2–3 min</string>
+    <string name="classic_time">20–40 min</string>
+
+    <string name="theme_menu">Theme: %1$s</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <plurals name="completed_count">
+        <item quantity="one">%1$d solved</item>
+        <item quantity="other">%1$d solved</item>
+    </plurals>
+    <string name="select_a_cell">Select a cell</string>
+</resources>
