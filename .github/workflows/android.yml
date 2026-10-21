@@ -79,7 +79,7 @@ jobs:
       - name: Run Compose UI and accessibility tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 36
           target: default
           arch: x86_64
           profile: pixel_6
@@ -93,10 +93,14 @@ jobs:
             ./gradlew --no-daemon :app:assembleDebug
             mkdir -p app/build/outputs
             adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb shell settings put secure navigation_mode 2 || true
+            adb shell cmd overlay enable --user 0 com.android.internal.systemui.navbar.gestural || true
+            adb shell killall com.android.systemui || true
+            sleep 2
             adb shell am start -W -n com.titpea.papersudoku/.MainActivity
             sleep 8
             # The headless emulator's launcher can show a Quickstep ANR over the app.
-            # Pixel 6/API 35 places its Wait action here; a no-op if no dialog is present.
+            # Pixel 6 places its Wait action here; a no-op if no dialog is present.
             adb shell input tap 400 1320 || true
             sleep 3
             adb exec-out screencap -p > app/build/outputs/paper-sudoku-default.png

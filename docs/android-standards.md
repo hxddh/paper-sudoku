@@ -122,13 +122,13 @@
 - [x] 题库单测（2 个）：全部唯一解 + 只用两种技巧可解 + 日期轮换
 - [x] Compose UI 测试（4 个）：棋盘语义、选格/键盘/Coach 事件、Stats、Expanded 双栏
 - [x] `AccessibilityChecks.enable()` 已接入 UI 测试
-- [x] Compose UI/无障碍测试实际执行：GitHub API 35 emulator 上 4/4 通过；本地 orb 无 KVM，只做编译
+- [x] Compose UI/无障碍测试实际执行：GitHub Android 16 / API 36、手势导航 emulator 上 4/4 通过；本地 orb 无 KVM，只做编译
 - [ ] 截图测试：light/dark、6×6/9×9、Coach、Solved
 - [ ] TalkBack 手测
 - [ ] Macrobenchmark：启动、棋盘交互
 - [ ] Baseline Profile
 - [x] `lintDebug` 无 Error（保留版本提示/`ObsoleteSdkInt` 警告）
-- [x] GitHub Actions workflow（build/test/lint + API 35 instrumentation job）
+- [x] GitHub Actions workflow（build/test/lint + Android 16 / API 36 instrumentation job）
 - [x] 题库 validator（JVM `PuzzleBankTest`，CI 阻断）
 - [ ] Play 预发布报告、内部测试、staged rollout
 

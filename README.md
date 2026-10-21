@@ -64,8 +64,9 @@ UI tests need a device/emulator:
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-GitHub Actions runs JVM tests, debug/release builds, lint, and a separate API 35 emulator job for
-the Compose/accessibility tests. The instrumentation suite currently passes 4/4 on the emulator.
+GitHub Actions runs JVM tests, debug/release builds, lint, and a separate Android 16 / API 36
+gesture-navigation emulator job for the Compose/accessibility tests. The instrumentation suite
+currently passes 4/4 on the emulator.
 
 ## Implementation
 
@@ -82,8 +83,8 @@ the Compose/accessibility tests. The instrumentation suite currently passes 4/4 
 - Room: local `game_results` history; DataStore: theme.
 
 Tests cover the engine, ViewModel, puzzle bank, and Compose/accessibility UI. The instrumentation
-suite is wired into CI and passes 4/4 on the API 35 emulator; local orb runs cannot execute it
-because the orb has no emulator/KVM.
+suite is wired into CI and passes 4/4 on the Android 16 / API 36 emulator; local orb runs cannot
+execute it because the orb has no emulator/KVM.
 
 ## Not in v1
 
