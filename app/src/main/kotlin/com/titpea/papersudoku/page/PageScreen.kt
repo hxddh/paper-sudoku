@@ -45,12 +45,14 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -83,6 +85,7 @@ import androidx.compose.ui.input.key.utf16CodePoint
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -153,86 +156,88 @@ fun PageScreen(
     var noteBounds by remember { mutableStateOf<Rect?>(null) }
 
     val game = state.game
-    BoxWithConstraints(
-        modifier
-            .fillMaxSize()
-            .onGloballyPositioned { origin = it.boundsInRoot().topLeft }
-            .focusRequester(focusRequester)
-            .onPreviewKeyEvent { handleKey(it, state, onEvent) }
-            .focusable()
-            .testTag("page"),
-    ) {
-        val wide = maxWidth > maxHeight && maxWidth >= 560.dp
-        val panel = (maxWidth * 0.4f).coerceIn(320.dp, 440.dp)
-        Column(Modifier.fillMaxSize()) {
-            PageHeader(
-                state = state,
-                onBack = onBack,
-                onPrint = onPrint,
-                onShare = onShare,
-                onRestart = { confirmRestart = true },
-                onNextPractice = {
-                    if (game != null && !game.solved && game.history.isNotEmpty()) {
-                        confirmNextPractice = true
-                    } else {
-                        onEvent(PageEvent.NextPractice)
+    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+        BoxWithConstraints(
+            modifier
+                .fillMaxSize()
+                .onGloballyPositioned { origin = it.boundsInRoot().topLeft }
+                .focusRequester(focusRequester)
+                .onPreviewKeyEvent { handleKey(it, state, onEvent) }
+                .focusable()
+                .testTag("page"),
+        ) {
+            val wide = maxWidth > maxHeight && maxWidth >= 560.dp
+            val panel = (maxWidth * 0.4f).coerceIn(320.dp, 440.dp)
+            Column(Modifier.fillMaxSize()) {
+                PageHeader(
+                    state = state,
+                    onBack = onBack,
+                    onPrint = onPrint,
+                    onShare = onShare,
+                    onRestart = { confirmRestart = true },
+                    onNextPractice = {
+                        if (game != null && !game.solved && game.history.isNotEmpty()) {
+                            confirmNextPractice = true
+                        } else {
+                            onEvent(PageEvent.NextPractice)
+                        }
+                    },
+                )
+                val content = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                val boardPadding = if (game?.size == 9) 4.dp else 12.dp
+                if (wide) {
+                    Row(content.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                        BoardArea(
+                            state, onEvent, hapticsOn,
+                            Modifier.weight(1f).fillMaxHeight(),
+                            boardModifier.onGloballyPositioned { boardBounds = it.boundsInRoot() },
+                        )
+                        Column(
+                            Modifier.width(panel).fillMaxHeight().verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            WorkArea(
+                                state, onEvent, onBack, onPrint, onShare,
+                                Modifier.onGloballyPositioned { noteBounds = it.boundsInRoot() },
+                            )
+                        }
                     }
-                },
-            )
-            val content = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
-                .windowInsetsPadding(WindowInsets.navigationBars)
-            val boardPadding = if (game?.size == 9) 4.dp else 12.dp
-            if (wide) {
-                Row(content.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    BoardArea(
-                        state, onEvent, hapticsOn,
-                        Modifier.weight(1f).fillMaxHeight(),
-                        boardModifier.onGloballyPositioned { boardBounds = it.boundsInRoot() },
-                    )
-                    Column(
-                        Modifier.width(panel).fillMaxHeight().verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.Center,
-                    ) {
+                } else {
+                    Column(content, horizontalAlignment = Alignment.CenterHorizontally) {
+                        BoardArea(
+                            state, onEvent, hapticsOn,
+                            Modifier.weight(1f).fillMaxWidth().widthIn(max = 720.dp).padding(horizontal = boardPadding),
+                            boardModifier.onGloballyPositioned { boardBounds = it.boundsInRoot() },
+                        )
+                        Spacer(Modifier.height(12.dp))
                         WorkArea(
                             state, onEvent, onBack, onPrint, onShare,
-                            Modifier.onGloballyPositioned { noteBounds = it.boundsInRoot() },
+                            Modifier
+                                .widthIn(max = 640.dp)
+                                .padding(horizontal = 16.dp)
+                                .padding(bottom = 12.dp)
+                                .onGloballyPositioned { noteBounds = it.boundsInRoot() },
                         )
                     }
                 }
-            } else {
-                Column(content, horizontalAlignment = Alignment.CenterHorizontally) {
-                    BoardArea(
-                        state, onEvent, hapticsOn,
-                        Modifier.weight(1f).fillMaxWidth().widthIn(max = 720.dp).padding(horizontal = boardPadding),
-                        boardModifier.onGloballyPositioned { boardBounds = it.boundsInRoot() },
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    WorkArea(
-                        state, onEvent, onBack, onPrint, onShare,
-                        Modifier
-                            .widthIn(max = 640.dp)
-                            .padding(horizontal = 16.dp)
-                            .padding(bottom = 12.dp)
-                            .onGloballyPositioned { noteBounds = it.boundsInRoot() },
-                    )
-                }
             }
-        }
 
-        val coach = state.coach
-        if (game != null && coach != null) {
-            val marks = remember(game.values, coach) { coachMarks(game.spec.geometry, game.values, coach) }
-            InkConnector(
-                focus = marks.focus + marks.pattern + listOfNotNull(marks.target),
-                size = game.size,
-                board = boardBounds?.translate(-origin),
-                note = noteBounds?.translate(-origin),
-                wide = wide,
-                key = coach,
-            )
+            val coach = state.coach
+            if (game != null && coach != null) {
+                val marks = remember(game.values, coach) { coachMarks(game.spec.geometry, game.values, coach) }
+                InkConnector(
+                    focus = marks.focus + marks.pattern + listOfNotNull(marks.target),
+                    size = game.size,
+                    board = boardBounds?.translate(-origin),
+                    note = noteBounds?.translate(-origin),
+                    wide = wide,
+                    key = coach,
+                )
+            }
         }
     }
 
@@ -328,7 +333,9 @@ private fun WorkArea(
         state.coach != null -> WorkMode.Coach
         else -> WorkMode.Play
     }
-    val height = maxOf(NoteHeight, ToolbarHeight + 28.dp + keypadHeight(game.size))
+    // The note grows with the user's font scale so large text never hides the explanation.
+    val fontScale = LocalDensity.current.fontScale.coerceIn(1f, 2f)
+    val height = maxOf(NoteHeight * fontScale, ToolbarHeight + 28.dp + keypadHeight(game.size))
 
     // Predictive back: the note shrinks with the gesture and is put away on commit.
     var backProgress by remember { mutableFloatStateOf(0f) }

@@ -164,6 +164,7 @@ jobs:
         if: always()
         run: |
           find benchmark/build/outputs -name "*benchmarkData.json" -exec cat {} \; || true
+          find benchmark/build/outputs/androidTest-results -name "*.xml" -exec cat {} \; || true
 
       - name: Upload benchmark results
         if: always()

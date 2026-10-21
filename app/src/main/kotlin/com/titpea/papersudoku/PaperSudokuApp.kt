@@ -12,7 +12,9 @@ import androidx.compose.material3.adaptive.layout.PaneAdaptedValue
 import androidx.compose.material3.adaptive.navigation.NavigableListDetailPaneScaffold
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.material3.adaptive.layout.ThreePaneScaffoldDestinationItem
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
@@ -72,30 +74,32 @@ fun PaperSudokuApp(container: AppContainer, versionName: String) {
             // Test tags double as resource ids for UI Automator (Macrobenchmark).
             .semantics { testTagsAsResourceId = true },
     ) {
-        NavDisplay(
-            backStack = backStack,
-            onBack = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
-            entryProvider = { screen ->
-                NavEntry(screen) {
-                    when (screen) {
-                        Screen.Home -> NotebookHome(
-                            pageViewModel = pageViewModel,
-                            notebookViewModel = notebookViewModel,
-                            onOpenSettings = { backStack.add(Screen.Settings) },
-                        )
-                        Screen.Settings -> {
-                            val state by pageViewModel.state.collectAsStateWithLifecycle()
-                            SettingsScreen(
-                                settings = state.settings,
-                                versionName = versionName,
-                                onUpdate = { transform -> scope.launch { container.settingsStore.update(transform) } },
-                                onBack = { backStack.removeAt(backStack.lastIndex) },
+        CompositionLocalProvider(LocalContentColor provides PaperTheme.colors.onBackground) {
+            NavDisplay(
+                backStack = backStack,
+                onBack = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
+                entryProvider = { screen ->
+                    NavEntry(screen) {
+                        when (screen) {
+                            Screen.Home -> NotebookHome(
+                                pageViewModel = pageViewModel,
+                                notebookViewModel = notebookViewModel,
+                                onOpenSettings = { backStack.add(Screen.Settings) },
                             )
+                            Screen.Settings -> {
+                                val state by pageViewModel.state.collectAsStateWithLifecycle()
+                                SettingsScreen(
+                                    settings = state.settings,
+                                    versionName = versionName,
+                                    onUpdate = { transform -> scope.launch { container.settingsStore.update(transform) } },
+                                    onBack = { backStack.removeAt(backStack.lastIndex) },
+                                )
+                            }
                         }
                     }
-                }
-            },
-        )
+                },
+            )
+        }
     }
 }
 
