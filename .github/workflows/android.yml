@@ -172,9 +172,3 @@ jobs:
         with:
           name: paper-sudoku-benchmark
           path: benchmark/build/outputs/
-
-      # TEMP(review): screenshot matrix in the log for remote visual review.
-      - name: Screenshot previews
-        if: always()
-        run: |
-          for f in app/build/outputs/screenshots/*.jpg; do echo "PREVIEW-$(basename "$f")-BEGIN"; base64 -w0 "$f"; echo; echo "PREVIEW-END"; done || true
