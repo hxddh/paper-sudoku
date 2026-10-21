@@ -82,7 +82,12 @@ class NotebookViewModel(
             NotebookUiState(
                 today = day,
                 todayPage = entry(day),
-                practice = PracticeEntry(Practice.level(clean), Practice.remainingToAdvance(clean), practice),
+                // An unfinished page keeps the level it was dealt at, whatever the progression says now.
+                practice = PracticeEntry(
+                    level = practice?.spec?.difficulty ?: Practice.level(clean),
+                    toNextLevel = Practice.remainingToAdvance(clean),
+                    game = practice,
+                ),
                 pastDays = pastDays,
                 pages = (pastDays + day).associateWith(::entry),
                 stamped = days.size,

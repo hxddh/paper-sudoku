@@ -38,6 +38,12 @@ class FakeGameStore : GameStore {
         }
     }
 
+    override suspend fun discardUnsolvedPractice(except: String) {
+        savedFlow.update { map ->
+            map.filter { (key, value) -> key == except || !(value.first.spec.kind == PuzzleKind.Classic && !value.first.solved) }
+        }
+    }
+
     override suspend fun recordOnce(result: GameResult): Boolean {
         if (results.any { it.puzzleKey == result.puzzleKey }) return false
         results += result

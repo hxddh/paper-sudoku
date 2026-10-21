@@ -24,6 +24,7 @@ import org.junit.Test
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZoneOffset
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -31,7 +32,12 @@ class PageViewModelTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
     private val today = LocalDate.of(2026, 10, 21) // a Wednesday: Gentle daily
-    private val clock = Clock.fixed(Instant.parse("2026-10-21T09:00:00Z"), ZoneOffset.UTC)
+    private var instant = Instant.parse("2026-10-21T09:00:00Z")
+    private val clock = object : Clock() {
+        override fun getZone(): ZoneId = ZoneOffset.UTC
+        override fun withZone(zone: ZoneId): Clock = this
+        override fun instant(): Instant = instant
+    }
     private var now = 1_000L
     private val store = FakeGameStore()
     private val settings = FakeSettings()
@@ -225,5 +231,54 @@ class PageViewModelTest {
         advanceUntilIdle()
         assertEquals(PuzzleKind.Classic, vm.game().spec.kind)
         assertEquals(2_000L, store.saved.getValue(daily).first.elapsedMillis)
+    }
+
+    @Test
+    fun `a finished daily left open past midnight turns to the new day`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.solveFully()
+        advanceUntilIdle()
+        assertTrue(vm.game().solved)
+        vm.onEvent(PageEvent.Background)
+        instant = Instant.parse("2026-10-22T07:00:00Z")
+        vm.onEvent(PageEvent.Foreground)
+        advanceUntilIdle()
+        assertEquals(Catalog.dailyKey(today.toEpochDay() + 1), vm.game().spec.key)
+    }
+
+    @Test
+    fun `an unfinished daily stays open past midnight`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.Background)
+        instant = Instant.parse("2026-10-22T07:00:00Z")
+        vm.onEvent(PageEvent.Foreground)
+        advanceUntilIdle()
+        assertEquals(Catalog.dailyKey(today.toEpochDay()), vm.game().spec.key)
+    }
+
+    @Test
+    fun `a practice page set aside is not offered again`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.OpenPractice)
+        advanceUntilIdle()
+        val setAside = vm.game().spec
+        vm.onEvent(PageEvent.NextPractice)
+        advanceUntilIdle()
+        val replacement = vm.game().spec
+        assertEquals((setAside.number ?: 0) + 1, replacement.number)
+        assertFalse(store.saved.containsKey(setAside.key))
+
+        vm.solveFully()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.OpenDaily(today.toEpochDay()))
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.OpenPractice)
+        advanceUntilIdle()
+        val next = vm.game().spec
+        assertTrue(next.key != setAside.key && next.key != replacement.key)
+        assertEquals((replacement.number ?: 0) + 1, next.number)
     }
 }

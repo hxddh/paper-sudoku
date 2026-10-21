@@ -248,7 +248,14 @@ class PageViewModel(
     private fun onForeground() {
         foreground = true
         val today = today()
+        val previous = _state.value
         _state.update { it.copy(today = today) }
+        // Left open on a finished daily past midnight: the new day's page is the one to show.
+        val game = previous.game
+        if (today > previous.today && game != null && game.solved && game.spec.epochDay == previous.today) {
+            openDaily(today)
+            return
+        }
         _state.update {
             if (it.game != null && !it.game.solved && !it.loading && it.runningSince == null) {
                 it.copy(runningSince = ticker())
@@ -303,7 +310,11 @@ class PageViewModel(
     }
 
     private fun nextPractice() {
-        load { newPractice() }
+        // A page set aside unfinished is dropped, so the notebook never offers it again.
+        saveJob?.cancel()
+        load(keepPrevious = false) {
+            newPractice().also { store.discardUnsolvedPractice(except = it.spec.key) }
+        }
     }
 
     private suspend fun newPractice(): GameState {
@@ -312,16 +323,16 @@ class PageViewModel(
         return GameState.new(withContext(generatorDispatcher) { Catalog.classic(level, number) })
     }
 
-    private fun load(source: suspend () -> GameState) {
+    private fun load(keepPrevious: Boolean = true, source: suspend () -> GameState) {
         loadJob?.cancel()
         // Stop the current page's clock now: preparing the next page is not time spent on it.
         _state.update { it.copy(game = foldClock(it), runningSince = null, loading = true, coach = null) }
-        loadJob = viewModelScope.launch { show(source()) }
+        loadJob = viewModelScope.launch { show(source(), keepPrevious) }
     }
 
-    private suspend fun show(next: GameState) {
+    private suspend fun show(next: GameState, keepPrevious: Boolean) {
         val previous = _state.value.game
-        if (previous != null && previous.spec.key != next.spec.key) persist(previous)
+        if (keepPrevious && previous != null && previous.spec.key != next.spec.key) persist(previous)
         _state.update {
             it.copy(
                 loading = false,

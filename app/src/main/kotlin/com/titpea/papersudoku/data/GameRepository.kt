@@ -25,6 +25,9 @@ interface GameStore {
     suspend fun nextClassicNumber(difficulty: Difficulty): Int
     suspend fun pruneUnsolvedDailies(beforeEpochDay: Long)
 
+    /** Drops unfinished practice pages other than [except]; numbering continues past them. */
+    suspend fun discardUnsolvedPractice(except: String)
+
     /** Records the first completion of a puzzle; later replays are ignored. */
     suspend fun recordOnce(result: GameResult): Boolean
 
@@ -72,6 +75,9 @@ class RoomGameStore(
 
     override suspend fun pruneUnsolvedDailies(beforeEpochDay: Long) =
         savedGames.pruneUnsolvedDailies(beforeEpochDay)
+
+    override suspend fun discardUnsolvedPractice(except: String) =
+        savedGames.discardUnsolvedPractice(except)
 
     override suspend fun recordOnce(result: GameResult): Boolean {
         if (results.exists(result.puzzleKey)) return false
