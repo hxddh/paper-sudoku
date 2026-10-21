@@ -73,7 +73,7 @@
 ## 4. 返回、Insets、系统栏
 
 - [x] `enableEdgeToEdge`；`targetSdk 36` 不 opt-out
-- [x] `TopAppBar` 处理状态栏；sheet 内容 `navigationBarsPadding()`，peek = 64dp + 导航栏高度
+- [x] `TopAppBar` 处理状态栏；sheet 内容 `navigationBarsPadding()`；Mini peek = 248dp + 导航栏高度（键盘常驻），Classic peek = 64dp
 - [x] 不画假状态栏/Home indicator
 - [x] 主题切换同步系统栏图标明暗（`WindowCompat` side effect）
 - [x] 返回键：sheet 展开时先收起；再返回退出

@@ -591,7 +591,10 @@ private fun GameDock(
                 .weight(1f)
                 .heightIn(min = 48.dp),
         ) {
-            Text(stringResource(R.string.undo))
+            Text(
+                text = stringResource(R.string.undo),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         TextButton(
             onClick = { onEvent(GameEvent.Erase) },
@@ -599,7 +602,10 @@ private fun GameDock(
                 .weight(1f)
                 .heightIn(min = 48.dp),
         ) {
-            Text(stringResource(R.string.erase))
+            Text(
+                text = stringResource(R.string.erase),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         Button(
             onClick = { onEvent(GameEvent.Coach) },
