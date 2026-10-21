@@ -5,6 +5,14 @@ light Coach when you are stuck; 9×9 remains available as Classic.
 
 The source lives at [github.com/hxddh/paper-sudoku](https://github.com/hxddh/paper-sudoku).
 
+## 安装 / Install
+
+[**下载 Paper Sudoku 1.0.0 APK / Download the APK**](https://github.com/hxddh/paper-sudoku/releases/download/v1.0.0-sideload/paper-sudoku-1.0.0-sideload.apk)
+
+- Android 8.0+; release build; no `INTERNET` permission.
+- The APK is signed with the Android debug key for sideload testing, not the Play upload key.
+- GitHub also has the [release page](https://github.com/hxddh/paper-sudoku/releases/tag/v1.0.0-sideload) and the APK under **Releases** (not in the source tree).
+
 `applicationId`: `com.titpea.papersudoku` — permanent once a build is published.
 
 ## v1 product scope
