@@ -1,106 +1,102 @@
-# Paper Sudoku
+# Paper Sudoku · 纸上数独
 
-A calm, teaching-first Sudoku app for Android. The phone-first path is a 6×6 daily mini with a
-light Coach when you are stuck; 9×9 remains available as Classic.
+A calm Sudoku notebook for Android that teaches. One 6×6 page a day, Classic 9×9 when you have
+time, and a Coach that shows you *where to look* and *why* before it ever gives an answer.
 
-The source lives at [github.com/hxddh/paper-sudoku](https://github.com/hxddh/paper-sudoku).
+一本会教你的数独练习本：每天一页 6×6，有空再做 9×9；教练先告诉你“看哪里”“为什么”，最后才给答案。
 
-## 安装 / Install
+Source: [github.com/hxddh/paper-sudoku](https://github.com/hxddh/paper-sudoku)
 
-[**下载 Paper Sudoku 1.0.0 APK / Download the APK**](https://github.com/hxddh/paper-sudoku/releases/download/v1.0.0-sideload/paper-sudoku-1.0.0-sideload.apk)
+## What makes it different
 
-- Android 8.0+; release build; no `INTERNET` permission.
-- The APK is signed with the Android debug key for sideload testing, not the Play upload key.
-- GitHub also has the [release page](https://github.com/hxddh/paper-sudoku/releases/tag/v1.0.0-sideload) and the APK under **Releases** (not in the source tree).
+- **A Coach that teaches, in three steps.** *Look* tints the row, column or box to study. *Why*
+  draws the pattern and crosses out the candidates it removes. *Answer* writes the digit only when
+  you ask. If one of your digits is wrong, the Coach says so before anything else.
+- **Every puzzle can be explained.** Puzzles are generated on the device and graded by the same
+  technique ladder the Coach teaches: hidden/naked singles, pointing, claiming, naked and hidden
+  pairs, X-Wing. Nothing needs guessing.
+- **Paper, not a feed.** Printed givens (Fraunces), your digits in ink-blue italic, pencil notes,
+  a faint paper grain, and an ink stamp when a page is done. The journal stamps solved days —
+  filled for a clean page, a ring when the Coach gave an answer. There is no streak.
+- **Literally paper.** Print any puzzle (or save it as PDF) through the system print service.
+- **Private by construction.** No `INTERNET` permission, accounts, ads or analytics. The same date
+  gives everyone the same Daily, offline.
+
+## Features
+
+- Daily Mini 6×6 (Gentle on weekdays, Steady on weekends); any past day is playable from the journal
+- Classic 9×9 in Gentle / Steady / Tricky, with an unlimited, numbered sequence per difficulty
+- Autosave of every game; resume after closing, rebooting or updating
+- Notes with tidy-up, undo, erase, same-digit highlight, remaining-digit counts
+- Digit lock: long-press a key, then tap cells to write it
+- Honest timer: counts only while the board is on screen; tap to pause (the board is hidden)
+- Optional mistake marks (off by default), conflicts always underlined (not color alone)
+- Journal: stamped calendar, pages and solved counts, best times (Coach answers excluded), technique handbook
+- Paper and Night themes, optional Material You colors, haptics
+- Adaptive layout: tools beside the board on wide windows (landscape, tablets, desktop)
+- TalkBack semantics with notes and custom actions; hardware keyboard with a shortcuts helper
+- English and 简体中文
+
+## Install
+
+The 2.0 APK is attached to the GitHub release when the `v2.0.0` tag is built (see
+[docs/release.md](docs/release.md)). Android 8.0+.
+
+The 1.0 sideload APK was signed with a local debug key, so 2.0 builds signed with the release key
+install alongside it only after uninstalling 1.0 (Android refuses an update with a different
+signature). Play installs are unaffected.
 
 `applicationId`: `com.titpea.papersudoku` — permanent once a build is published.
-
-## v1 product scope
-
-- 61 daily 6×6 puzzles, rotating deterministically by local date
-- 31 Classic 9×9 puzzles; “New game” advances through the Classic bank
-- Coach teaches naked single and hidden single, with technique-specific copy
-- Notes, undo, erase, timer, solved overlay with elapsed time, local stats (completed + best)
-- Paper light/dark theme; saved theme; edge-to-edge Material 3 Expressive layout
-- Expanded (≥840dp) two-pane layout: board + dock / keypad / Coach rail
-- Hardware keyboard: arrows move, digits enter, Backspace erases, N notes, H coach
-- TalkBack cell semantics plus Notes / Erase / Coach custom actions
-- `SavedStateHandle` in-progress restore; Room history; DataStore settings
-- No accounts, ads, analytics, notifications, billing, or `INTERNET` permission
-
-The platform checklist is in [docs/android-standards.md](docs/android-standards.md). Release and
-store procedures are in [docs/release.md](docs/release.md) and
-[docs/store-listing.md](docs/store-listing.md). The privacy policy draft is [PRIVACY.md](PRIVACY.md).
 
 ## Requirements
 
 - JDK 17
 - Android SDK platform 37.0 + build-tools 37.0.0
 - Gradle wrapper included (`9.6`)
-- `compileSdk 37` is required by Material 3 `1.5.0-beta01`; `targetSdk` remains 36
-- `local.properties` with your SDK path:
+- `compileSdk 37` (required by Material 3 `1.5.0-beta01`), `targetSdk 36`, `minSdk 26`
+- `local.properties` with `sdk.dir=/path/to/Android/Sdk`
 
-```properties
-sdk.dir=/path/to/Android/Sdk
-```
-
-## Build / verify
+## Build and verify
 
 ```bash
 ./gradlew --no-daemon \
-  :core:engine:test \
+  :core:engine:test :core:game:test \
   :app:testDebugUnitTest \
-  :app:assembleDebug \
-  :app:assembleDebugAndroidTest \
+  :app:assembleDebug :app:assembleDebugAndroidTest \
   :app:lintDebug
-```
 
-Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
-
-Release R8/resource shrinking can be checked without keys:
-
-```bash
-./gradlew --no-daemon :app:assembleRelease
-# or with the four PAPER_SUDOKU_* signing variables from docs/release.md:
-./gradlew --no-daemon :app:bundleRelease
-```
-
-An unsigned release artifact is not a Play upload. See [docs/release.md](docs/release.md).
-
-UI tests need a device/emulator:
-
-```bash
+# Compose UI, accessibility and Room migration tests (device or emulator):
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-GitHub Actions runs JVM tests, debug/release builds, lint, and a separate Android 16 / API 36
-gesture-navigation emulator job for the Compose/accessibility tests. The instrumentation suite
-currently passes 4/4 on the emulator.
+The two `:core` modules are plain Kotlin/JVM and need no Android SDK.
 
-## Implementation
+## Architecture
 
-- `MainActivity`: edge-to-edge Compose, DataStore theme, system bar appearance, stats collection.
-- `GameViewModel`: unidirectional state, daily/Classic selection, notes, undo, erase, Coach,
-  timer persistence, one completion record per game.
-- `Puzzles`: compact, validated daily/Classic bank. `PuzzleBankTest` proves every entry has one
-  solution and is solvable with the two Coach techniques.
-- `SudokuEngine`: candidates, naked/hidden singles, conflicts, solved check.
-- `SudokuBoard`: Canvas grid + Text digits, collection semantics, custom actions, test tags.
-- `GameScreen`: compact `BottomSheetScaffold` and expanded two-pane layouts; ButtonGroup keypad;
-  timer; stats dialog; keyboard handling; solved overlay.
-- `SudokuTheme`: Paper light/dark tokens, expressive motion, type, shapes.
-- Room: local `game_results` history; DataStore: theme.
+```
+:core:engine   pure Kotlin  geometry, techniques, logical + backtracking solvers, generator, grader, Coach hints
+:core:game     pure Kotlin  PuzzleSpec + Catalog (deterministic dailies/classics), GameState (serializable, undo)
+:app           Android      Room + DataStore, GameViewModel, Compose UI (play, journal, settings), print/share
+```
 
-Tests cover the engine, ViewModel, puzzle bank, and Compose/accessibility UI. The instrumentation
-suite is wired into CI and passes 4/4 on the Android 16 / API 36 emulator; local orb runs cannot
-execute it because the orb has no emulator/KVM.
+- `GameState` is immutable; every move is a pure function, saved as JSON in Room (`saved_games`).
+- `GameViewModel` owns the active puzzle, the clock (monotonic, foreground-only), the Coach session
+  and one-off haptic effects. Results are recorded once per puzzle key.
+- Room schema 2 (exported under `app/schemas`) migrates v1 results in place.
+- UI: Navigation 3 back stack (Play → Journal / Settings), Material 3 Expressive theme, one
+  custom-drawn surface (the board).
 
-## Not in v1
+Docs: [design](docs/design.md) · [Android checklist](docs/android-standards.md) ·
+[release](docs/release.md) · [store listing](docs/store-listing.md) · [privacy](PRIVACY.md) ·
+[changelog](CHANGELOG.md)
 
-- Accounts, cloud sync, ads, analytics, notifications, billing/IAP
-- Streak systems or social features
-- A larger technique curriculum beyond naked/hidden single
-- Medium-width (600–839dp) two-pane layout; it keeps the bottom sheet to preserve board size
-- Bundled custom display fonts (uses platform serif/sans)
-- Play publication itself: the upload key, Play Console, hosted privacy URL, and store assets
-  require the app owner
+## Not in 2.0
+
+- Accounts, sync, ads, analytics, notifications, billing, leaderboards, streaks
+- Techniques beyond X-Wing (chains, swordfish); puzzles needing them are never generated
+- A home-screen widget and stylus handwriting (candidates for 2.1)
+
+## License notes
+
+Fraunces is © Undercase Type, licensed under the SIL Open Font License 1.1
+([third_party/fraunces/OFL.txt](third_party/fraunces/OFL.txt)); the app bundles a Latin subset.
