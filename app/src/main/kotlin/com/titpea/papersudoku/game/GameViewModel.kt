@@ -354,7 +354,10 @@ class GameViewModel(
 
     private fun load(source: suspend () -> GameState) {
         loadJob?.cancel()
-        _state.update { it.copy(loading = true, picker = null, coach = null) }
+        // Stop the current puzzle's clock now: generating the next one is not time spent on it.
+        _state.update {
+            it.copy(game = foldClock(it), runningSince = null, loading = true, picker = null, coach = null)
+        }
         loadJob = viewModelScope.launch { show(source()) }
     }
 

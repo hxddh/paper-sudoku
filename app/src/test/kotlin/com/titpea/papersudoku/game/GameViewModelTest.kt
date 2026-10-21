@@ -8,6 +8,7 @@ import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.PuzzleKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -209,6 +210,22 @@ class GameViewModelTest {
         val relaunched = viewModel()
         advanceUntilIdle()
         assertEquals(classic.spec.key, relaunched.game().spec.key)
+    }
+
+    @Test
+    fun `generating the next puzzle is not charged to the current one`() = test {
+        val generator = StandardTestDispatcher(testScheduler)
+        val vm = GameViewModel(store, settings, clock, ticker = { now }, generatorDispatcher = generator)
+        advanceUntilIdle()
+        val daily = vm.game().spec.key
+        vm.onEvent(PlayEvent.Foreground)
+        now = 3_000
+        vm.onEvent(PlayEvent.OpenClassic(Difficulty.Gentle)) // generation is queued, not yet run
+        assertTrue(vm.state.value.loading)
+        now = 50_000
+        advanceUntilIdle()
+        assertEquals(PuzzleKind.Classic, vm.game().spec.kind)
+        assertEquals(2_000L, store.saved.getValue(daily).first.elapsedMillis)
     }
 
     @Test
