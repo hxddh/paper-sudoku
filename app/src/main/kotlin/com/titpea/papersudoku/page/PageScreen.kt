@@ -163,6 +163,7 @@ fun PageScreen(
             .testTag("page"),
     ) {
         val wide = maxWidth > maxHeight && maxWidth >= 560.dp
+        val panel = (maxWidth * 0.4f).coerceIn(320.dp, 440.dp)
         Column(Modifier.fillMaxSize()) {
             PageHeader(
                 state = state,
@@ -185,7 +186,6 @@ fun PageScreen(
                 .windowInsetsPadding(WindowInsets.navigationBars)
             val boardPadding = if (game?.size == 9) 4.dp else 12.dp
             if (wide) {
-                val panel = (maxWidth * 0.4f).coerceIn(320.dp, 440.dp)
                 Row(content.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                     BoardArea(
                         state, onEvent, hapticsOn,

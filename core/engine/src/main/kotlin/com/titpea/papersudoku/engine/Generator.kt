@@ -54,7 +54,7 @@ class PuzzleGenerator(private val geometry: Geometry) {
         repeat(maxAttempts) {
             val candidate = carve(random, difficulty)
             if (candidate.grade.difficulty == difficulty) return candidate
-            if (best == null || candidate.grade.hardest.tier > best!!.grade.hardest.tier) best = candidate
+            if (best == null || candidate.grade.hardest.tier > best.grade.hardest.tier) best = candidate
         }
         return checkNotNull(best)
     }
