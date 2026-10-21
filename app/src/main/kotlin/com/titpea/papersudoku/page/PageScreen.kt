@@ -1,0 +1,691 @@
+package com.titpea.papersudoku.page
+
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.utf16CodePoint
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import com.titpea.papersudoku.R
+import com.titpea.papersudoku.designsystem.InkStamp
+import com.titpea.papersudoku.designsystem.PaperTheme
+import com.titpea.papersudoku.game.model.GameState
+import com.titpea.papersudoku.game.model.PuzzleKind
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import java.time.LocalDate
+
+private enum class WorkMode { Play, Coach, Solved }
+
+/** Minimum height of the work area under the board; the Coach and the solved note use the same. */
+private val NoteHeight: Dp = 176.dp
+
+/**
+ * One page: a slim header, the board as large as the window allows, and the work area — tools,
+ * the Coach's margin note, or the solved note — which always keeps the same size so the page never
+ * jumps. On a window clearly wider than tall the work area sits beside the board.
+ *
+ * [onBack] is null when the notebook is already visible next to the page.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PageScreen(
+    state: PageUiState,
+    onEvent: (PageEvent) -> Unit,
+    onBack: (() -> Unit)?,
+    onPrint: (GameState) -> Unit,
+    onShare: (GameState) -> Unit,
+    modifier: Modifier = Modifier,
+    effects: Flow<PageEffect> = emptyFlow(),
+    boardModifier: Modifier = Modifier,
+) {
+    val haptics = LocalHapticFeedback.current
+    val hapticsOn by rememberUpdatedState(state.settings.haptics)
+    LaunchedEffect(effects) {
+        effects.collect { effect ->
+            if (!hapticsOn) return@collect
+            haptics.performHapticFeedback(
+                when (effect) {
+                    PageEffect.Placed -> HapticFeedbackType.KeyboardTap
+                    PageEffect.Conflict -> HapticFeedbackType.Reject
+                    PageEffect.Solved -> HapticFeedbackType.Confirm
+                    PageEffect.Toggled -> HapticFeedbackType.SegmentTick
+                },
+            )
+        }
+    }
+
+    var confirmRestart by rememberSaveable { mutableStateOf(false) }
+    var confirmNextPractice by rememberSaveable { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+
+    // Ink connector between the Coach's note and the board, in this screen's coordinates.
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    var boardBounds by remember { mutableStateOf<Rect?>(null) }
+    var noteBounds by remember { mutableStateOf<Rect?>(null) }
+
+    val game = state.game
+    BoxWithConstraints(
+        modifier
+            .fillMaxSize()
+            .onGloballyPositioned { origin = it.boundsInRoot().topLeft }
+            .focusRequester(focusRequester)
+            .onPreviewKeyEvent { handleKey(it, state, onEvent) }
+            .focusable()
+            .testTag("page"),
+    ) {
+        val wide = maxWidth > maxHeight && maxWidth >= 560.dp
+        Column(Modifier.fillMaxSize()) {
+            PageHeader(
+                state = state,
+                onBack = onBack,
+                onPrint = onPrint,
+                onShare = onShare,
+                onRestart = { confirmRestart = true },
+                onNextPractice = {
+                    if (game != null && !game.solved && game.history.isNotEmpty()) {
+                        confirmNextPractice = true
+                    } else {
+                        onEvent(PageEvent.NextPractice)
+                    }
+                },
+            )
+            val content = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
+                .windowInsetsPadding(WindowInsets.navigationBars)
+            val boardPadding = if (game?.size == 9) 4.dp else 12.dp
+            if (wide) {
+                val panel = (maxWidth * 0.4f).coerceIn(320.dp, 440.dp)
+                Row(content.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    BoardArea(
+                        state, onEvent, hapticsOn,
+                        Modifier.weight(1f).fillMaxHeight(),
+                        boardModifier.onGloballyPositioned { boardBounds = it.boundsInRoot() },
+                    )
+                    Column(
+                        Modifier.width(panel).fillMaxHeight().verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        WorkArea(
+                            state, onEvent, onBack, onPrint, onShare,
+                            Modifier.onGloballyPositioned { noteBounds = it.boundsInRoot() },
+                        )
+                    }
+                }
+            } else {
+                Column(content, horizontalAlignment = Alignment.CenterHorizontally) {
+                    BoardArea(
+                        state, onEvent, hapticsOn,
+                        Modifier.weight(1f).fillMaxWidth().widthIn(max = 720.dp).padding(horizontal = boardPadding),
+                        boardModifier.onGloballyPositioned { boardBounds = it.boundsInRoot() },
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    WorkArea(
+                        state, onEvent, onBack, onPrint, onShare,
+                        Modifier
+                            .widthIn(max = 640.dp)
+                            .padding(horizontal = 16.dp)
+                            .padding(bottom = 12.dp)
+                            .onGloballyPositioned { noteBounds = it.boundsInRoot() },
+                    )
+                }
+            }
+        }
+
+        val coach = state.coach
+        if (game != null && coach != null) {
+            val marks = remember(game.values, coach) { coachMarks(game.spec.geometry, game.values, coach) }
+            InkConnector(
+                focus = marks.focus + marks.pattern + listOfNotNull(marks.target),
+                size = game.size,
+                board = boardBounds?.translate(-origin),
+                note = noteBounds?.translate(-origin),
+                wide = wide,
+                key = coach,
+            )
+        }
+    }
+
+    if (confirmRestart) {
+        ConfirmDialog(
+            title = R.string.restart_title,
+            body = R.string.restart_body,
+            confirm = R.string.restart_confirm,
+            onConfirm = {
+                confirmRestart = false
+                onEvent(PageEvent.Restart)
+            },
+            onDismiss = { confirmRestart = false },
+        )
+    }
+    if (confirmNextPractice) {
+        ConfirmDialog(
+            title = R.string.next_practice_title,
+            body = R.string.next_practice_body,
+            confirm = R.string.next_practice_confirm,
+            onConfirm = {
+                confirmNextPractice = false
+                onEvent(PageEvent.NextPractice)
+            },
+            onDismiss = { confirmNextPractice = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun BoardArea(
+    state: PageUiState,
+    onEvent: (PageEvent) -> Unit,
+    hapticsOn: Boolean,
+    modifier: Modifier,
+    boardModifier: Modifier,
+) {
+    val haptics = LocalHapticFeedback.current
+    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+        val side = minOf(maxWidth, maxHeight).coerceAtMost(720.dp)
+        Box(Modifier.size(side), contentAlignment = Alignment.Center) {
+            val game = state.game
+            if (game != null) {
+                val marks = remember(game.values, state.coach) {
+                    coachMarks(game.spec.geometry, game.values, state.coach)
+                }
+                Board(
+                    game = game,
+                    conflicts = state.conflicts,
+                    marks = marks,
+                    onTap = { onEvent(PageEvent.Tap(it)) },
+                    onCellAction = { index, action ->
+                        onEvent(PageEvent.Select(index))
+                        onEvent(
+                            when (action) {
+                                BoardAction.Notes -> PageEvent.ToggleNotes
+                                BoardAction.Erase -> PageEvent.Erase
+                                BoardAction.Coach -> PageEvent.Coach
+                            },
+                        )
+                    },
+                    onAimMove = { if (hapticsOn) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick) },
+                    modifier = Modifier.fillMaxSize().then(boardModifier),
+                )
+                if (game.solved) {
+                    InkStamp(
+                        title = stringResource(R.string.stamp_title),
+                        caption = formatElapsed(game.elapsedMillis / 1_000),
+                        animate = state.justSolved,
+                        size = (side * 0.5f).coerceAtMost(220.dp),
+                        modifier = Modifier.testTag("solved-stamp"),
+                    )
+                }
+            }
+            if (state.loading) LoadingIndicator(Modifier.testTag("loading"))
+        }
+    }
+}
+
+@Composable
+private fun WorkArea(
+    state: PageUiState,
+    onEvent: (PageEvent) -> Unit,
+    onBack: (() -> Unit)?,
+    onPrint: (GameState) -> Unit,
+    onShare: (GameState) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val game = state.game ?: return
+    val mode = when {
+        game.solved -> WorkMode.Solved
+        state.coach != null -> WorkMode.Coach
+        else -> WorkMode.Play
+    }
+    val height = maxOf(NoteHeight, ToolbarHeight + 28.dp + keypadHeight(game.size))
+
+    // Predictive back: the note shrinks with the gesture and is put away on commit.
+    var backProgress by remember { mutableFloatStateOf(0f) }
+    PredictiveBackHandler(enabled = mode == WorkMode.Coach) { progress ->
+        try {
+            progress.collect { backProgress = it.progress }
+            onEvent(PageEvent.DismissCoach)
+        } catch (e: CancellationException) {
+            throw e
+        } finally {
+            backProgress = 0f
+        }
+    }
+
+    AnimatedContent(
+        targetState = mode,
+        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        modifier = modifier.fillMaxWidth().heightIn(min = height).height(height).testTag("work-area"),
+        label = "work-area",
+    ) { target ->
+        when (target) {
+            WorkMode.Play -> Column(
+                Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Bottom,
+            ) {
+                PageToolbar(game, onEvent)
+                StatusLine(game, onEvent)
+                Keypad(game, onEvent)
+            }
+            WorkMode.Coach -> state.coach?.let { coach ->
+                MarginNote(
+                    coach = coach,
+                    geometry = game.spec.geometry,
+                    onEvent = onEvent,
+                    modifier = Modifier.fillMaxSize().graphicsLayer {
+                        val s = 1f - 0.06f * backProgress
+                        scaleX = s
+                        scaleY = s
+                        alpha = 1f - 0.4f * backProgress
+                    },
+                )
+            } ?: Spacer(Modifier)
+            WorkMode.Solved -> SolvedNote(
+                game = game,
+                onShare = { onShare(game) },
+                onPrint = { onPrint(game) },
+                onNext = {
+                    when {
+                        game.spec.kind == PuzzleKind.Classic -> onEvent(PageEvent.NextPractice)
+                        onBack != null -> onBack()
+                        else -> onEvent(PageEvent.OpenPractice)
+                    }
+                },
+                nextLabel = when {
+                    game.spec.kind == PuzzleKind.Classic -> stringResource(R.string.solved_next_practice)
+                    onBack != null -> stringResource(R.string.solved_back_to_notebook)
+                    else -> stringResource(R.string.solved_open_practice)
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+/** One quiet line between the tools and the digits that says which mode the pen is in. */
+@Composable
+private fun StatusLine(game: GameState, onEvent: (PageEvent) -> Unit) {
+    val held = game.lockedDigit
+    val text = when {
+        held != null -> stringResource(R.string.status_holding, held)
+        game.notesMode -> stringResource(R.string.status_pencil)
+        else -> ""
+    }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(28.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (held != null) {
+            TextButton(onClick = { onEvent(PageEvent.ClearLock) }, modifier = Modifier.testTag("status-holding")) {
+                Text(text, style = MaterialTheme.typography.labelMedium)
+            }
+        } else if (text.isNotEmpty()) {
+            Text(text, style = MaterialTheme.typography.labelMedium, color = PaperTheme.ink.pencil)
+        }
+    }
+}
+
+@Composable
+private fun SolvedNote(
+    game: GameState,
+    onShare: () -> Unit,
+    onPrint: () -> Unit,
+    onNext: () -> Unit,
+    nextLabel: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.testTag("solved-panel"), verticalArrangement = Arrangement.Center) {
+        Text(
+            stringResource(R.string.solved_line, formatElapsed(game.elapsedMillis / 1_000)),
+            style = MaterialTheme.typography.headlineSmall,
+        )
+        Text(
+            coachUsageLine(game.coach.deepest),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onShare) {
+                Icon(Icons.Default.Share, contentDescription = stringResource(R.string.action_share))
+            }
+            IconButton(onClick = onPrint) {
+                Icon(painterResource(R.drawable.ic_print), contentDescription = stringResource(R.string.action_print))
+            }
+            Spacer(Modifier.weight(1f))
+            Button(onClick = onNext, modifier = Modifier.heightIn(min = 48.dp).testTag("solved-next")) { Text(nextLabel) }
+        }
+    }
+}
+
+@Composable
+fun coachUsageLine(deepest: Int): String = stringResource(
+    when (deepest) {
+        0 -> R.string.coach_usage_none
+        1 -> R.string.coach_usage_look
+        2 -> R.string.coach_usage_why
+        else -> R.string.coach_usage_answer
+    },
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PageHeader(
+    state: PageUiState,
+    onBack: (() -> Unit)?,
+    onPrint: (GameState) -> Unit,
+    onShare: (GameState) -> Unit,
+    onRestart: () -> Unit,
+    onNextPractice: () -> Unit,
+) {
+    val game = state.game
+    var menuOpen by remember { mutableStateOf(false) }
+    val locale = LocalConfiguration.current.locales[0]
+    TopAppBar(
+        navigationIcon = {
+            if (onBack != null) {
+                IconButton(onClick = onBack, modifier = Modifier.testTag("page-back")) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.notebook))
+                }
+            }
+        },
+        title = {
+            if (game != null) {
+                val spec = game.spec
+                val day = spec.epochDay
+                Column {
+                    Text(
+                        text = if (spec.kind == PuzzleKind.Daily && day != null) {
+                            weekday(LocalDate.ofEpochDay(day), locale) + " · " + difficultyName(spec.difficulty)
+                        } else {
+                            stringResource(R.string.practice) + " · " + difficultyName(spec.difficulty)
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                    Text(
+                        text = if (spec.kind == PuzzleKind.Daily && day != null) {
+                            monthDay(LocalDate.ofEpochDay(day), locale)
+                        } else {
+                            stringResource(R.string.practice_page, (spec.number ?: 0) + 1)
+                        },
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 1,
+                    )
+                }
+            }
+        },
+        actions = {
+            if (game != null) {
+                Box {
+                    IconButton(onClick = { menuOpen = true }, modifier = Modifier.testTag("page-menu")) {
+                        Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more_options))
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.menu_restart)) },
+                            onClick = {
+                                menuOpen = false
+                                onRestart()
+                            },
+                        )
+                        if (game.spec.kind == PuzzleKind.Classic) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.menu_next_practice)) },
+                                onClick = {
+                                    menuOpen = false
+                                    onNextPractice()
+                                },
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.action_print)) },
+                            leadingIcon = { Icon(painterResource(R.drawable.ic_print), contentDescription = null) },
+                            onClick = {
+                                menuOpen = false
+                                onPrint(game)
+                            },
+                        )
+                        if (game.solved) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.action_share)) },
+                                leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                                onClick = {
+                                    menuOpen = false
+                                    onShare(game)
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Color.Transparent,
+            scrolledContainerColor = Color.Transparent,
+        ),
+    )
+}
+
+/**
+ * A fine ink line from the Coach's note to what it is talking about, drawn as if by pen each time
+ * the note changes.
+ */
+@Composable
+private fun InkConnector(
+    focus: Collection<Int>,
+    size: Int,
+    board: Rect?,
+    note: Rect?,
+    wide: Boolean,
+    key: Any,
+) {
+    if (board == null || note == null || focus.isEmpty()) return
+    val color = PaperTheme.ink.margin
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(key) {
+        progress.snapTo(0f)
+        progress.animateTo(1f, tween(durationMillis = 450))
+    }
+    Canvas(Modifier.fillMaxSize().testTag("ink-connector")) {
+        val cell = board.width / size
+        val rows = focus.map { it / size }
+        val cols = focus.map { it % size }
+        val box = Rect(
+            left = board.left + cols.min() * cell,
+            top = board.top + rows.min() * cell,
+            right = board.left + (cols.max() + 1) * cell,
+            bottom = board.top + (rows.max() + 1) * cell,
+        )
+        val start: Offset
+        val end: Offset
+        val path = Path()
+        if (wide) {
+            start = Offset(note.left, note.top + 24.dp.toPx())
+            end = Offset(box.right, box.center.y)
+            path.moveTo(start.x, start.y)
+            path.cubicTo((start.x + end.x) / 2f, start.y, (start.x + end.x) / 2f, end.y, end.x, end.y)
+        } else {
+            start = Offset(note.left + 1.dp.toPx(), note.top)
+            end = Offset(box.center.x, box.bottom)
+            path.moveTo(start.x, start.y)
+            path.cubicTo(start.x, (start.y + end.y) / 2f, end.x, (start.y + end.y) / 2f, end.x, end.y)
+        }
+        val measure = PathMeasure().apply { setPath(path, false) }
+        val partial = Path()
+        measure.getSegment(0f, measure.length * progress.value, partial, true)
+        drawPath(partial, color.copy(alpha = 0.8f), style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round))
+        if (progress.value >= 1f) drawCircle(color, radius = 3.dp.toPx(), center = end)
+    }
+}
+
+@Composable
+private fun ConfirmDialog(title: Int, body: Int, confirm: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(title)) },
+        text = { Text(stringResource(body)) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(confirm)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+private fun handleKey(event: KeyEvent, state: PageUiState, onEvent: (PageEvent) -> Unit): Boolean {
+    if (event.type != KeyEventType.KeyDown) return false
+    val game = state.game ?: return false
+    if (event.key == Key.Escape) {
+        return when {
+            state.coach != null -> {
+                onEvent(PageEvent.DismissCoach)
+                true
+            }
+            game.lockedDigit != null -> {
+                onEvent(PageEvent.ClearLock)
+                true
+            }
+            else -> false
+        }
+    }
+    if (state.boardLocked) return false
+    val size = game.size
+    val current = game.selected ?: game.values.indexOfFirst { it == 0 }.coerceAtLeast(0)
+    val row = current / size
+    val column = current % size
+
+    fun moveTo(r: Int, c: Int): Boolean {
+        if (r !in 0 until size || c !in 0 until size) return false
+        onEvent(PageEvent.Select(r * size + c))
+        return true
+    }
+
+    return when (event.key) {
+        Key.DirectionUp -> moveTo(row - 1, column)
+        Key.DirectionDown -> moveTo(row + 1, column)
+        Key.DirectionLeft -> moveTo(row, column - 1)
+        Key.DirectionRight -> moveTo(row, column + 1)
+        Key.Backspace, Key.Delete -> {
+            onEvent(PageEvent.Erase)
+            true
+        }
+        Key.Z -> if (event.isCtrlPressed) {
+            onEvent(PageEvent.Undo)
+            true
+        } else {
+            false
+        }
+        Key.N -> {
+            onEvent(PageEvent.ToggleNotes)
+            true
+        }
+        Key.H -> {
+            onEvent(if (state.coach == null) PageEvent.Coach else PageEvent.CoachDeeper)
+            true
+        }
+        else -> {
+            val digit = event.utf16CodePoint - '0'.code
+            if (digit in 1..size) {
+                if (game.selected == null && game.lockedDigit == null) onEvent(PageEvent.Select(current))
+                onEvent(PageEvent.Digit(digit))
+                true
+            } else {
+                false
+            }
+        }
+    }
+}

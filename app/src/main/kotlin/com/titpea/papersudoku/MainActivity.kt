@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.Light -> false
                 ThemeMode.Dark -> true
             }
-            SudokuTheme(darkTheme = darkTheme, dynamicColor = settings.dynamicColor) {
+            SudokuTheme(darkTheme = darkTheme) {
                 SideEffect {
                     WindowCompat.getInsetsController(window, window.decorView).apply {
                         isAppearanceLightStatusBars = !darkTheme
@@ -66,7 +66,7 @@ class MainActivity : ComponentActivity() {
                 item(R.string.shortcut_undo, KeyEvent.KEYCODE_Z, KeyEvent.META_CTRL_ON),
                 item(R.string.shortcut_notes, KeyEvent.KEYCODE_N),
                 item(R.string.shortcut_coach, KeyEvent.KEYCODE_H),
-                item(R.string.shortcut_pause, KeyEvent.KEYCODE_P),
+                item(R.string.shortcut_put_down, KeyEvent.KEYCODE_ESCAPE),
             ),
         )
     }

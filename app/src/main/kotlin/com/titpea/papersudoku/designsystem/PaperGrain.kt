@@ -29,10 +29,10 @@ private const val GRAIN_AGSL = """
     }
 """
 
-/** Null where the grain is not drawn (before Android 13, or with Material You colors). */
+/** Null where the grain is not drawn (before Android 13). */
 @Composable
 fun rememberPaperGrain(ink: PaperInk, strength: Float = 0.045f): ShaderBrush? =
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || !ink.isPaper) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
         null
     } else {
         remember(ink.grain, strength) { grainBrush(ink, strength) }

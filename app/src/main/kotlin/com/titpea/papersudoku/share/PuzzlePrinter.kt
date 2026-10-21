@@ -15,7 +15,7 @@ import android.print.PrintManager
 import android.print.pdf.PrintedPdfDocument
 import androidx.core.content.res.ResourcesCompat
 import com.titpea.papersudoku.R
-import com.titpea.papersudoku.game.difficultyRes
+import com.titpea.papersudoku.page.difficultyRes
 import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.PuzzleKind
 import java.io.FileOutputStream

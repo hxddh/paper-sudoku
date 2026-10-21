@@ -1,4 +1,4 @@
-package com.titpea.papersudoku.game
+package com.titpea.papersudoku.page
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -10,11 +10,12 @@ import com.titpea.papersudoku.data.GameResult
 import com.titpea.papersudoku.data.GameStore
 import com.titpea.papersudoku.data.SettingsStore
 import com.titpea.papersudoku.data.UserSettings
+import com.titpea.papersudoku.data.latestUnsolvedPractice
 import com.titpea.papersudoku.engine.CoachHint
-import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.engine.SudokuEngine
 import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.GameState
+import com.titpea.papersudoku.game.model.Practice
 import com.titpea.papersudoku.game.model.PuzzleKind
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -33,84 +34,79 @@ import kotlinx.coroutines.withContext
 import java.time.Clock
 import java.time.LocalDate
 
+/** Stable identity of what the page pane shows, used by the list-detail navigator. */
+object PageKeys {
+    const val PRACTICE = "practice"
+    fun daily(epochDay: Long): String = Catalog.dailyKey(epochDay)
+    fun of(game: GameState): String =
+        if (game.spec.kind == PuzzleKind.Daily) game.spec.key else PRACTICE
+}
+
 /** A Coach session: what it found and how far the player has asked it to go (1 look, 2 why, 3 answer). */
 data class CoachUi(val hint: CoachHint?, val level: Int)
 
-enum class SlotStatus { New, InProgress, Solved }
-
-data class PickerUi(
-    val today: Long,
-    val daily: SlotStatus,
-    /** For each difficulty, the number of an unfinished Classic, if any. */
-    val classicInProgress: Map<Difficulty, Int?>,
-)
-
-data class PlayUiState(
+data class PageUiState(
     val loading: Boolean = true,
     val game: GameState? = null,
     val coach: CoachUi? = null,
     val conflicts: Set<Int> = emptySet(),
-    val mistakes: Set<Int> = emptySet(),
-    val userPaused: Boolean = false,
-    /** Monotonic time the clock started running, or null while it is stopped. */
+    /** Monotonic time the hidden clock started, or null while it is stopped. */
     val runningSince: Long? = null,
     val settings: UserSettings = UserSettings(),
     val today: Long = 0,
-    val picker: PickerUi? = null,
-    /** True only right after the solving move, so the stamp animates once. */
+    /** True only right after the solving move, so the stamp lands once. */
     val justSolved: Boolean = false,
 ) {
-    val boardLocked: Boolean get() = loading || userPaused || game?.solved != false
+    val boardLocked: Boolean get() = loading || game?.solved != false
 }
 
-sealed interface PlayEvent {
-    data class Tap(val index: Int) : PlayEvent
-    data class Select(val index: Int) : PlayEvent
-    data class Digit(val digit: Int) : PlayEvent
-    data class Lock(val digit: Int) : PlayEvent
-    data object Erase : PlayEvent
-    data object Undo : PlayEvent
-    data object ToggleNotes : PlayEvent
-    data object Coach : PlayEvent
-    data object CoachDeeper : PlayEvent
-    data object CoachApply : PlayEvent
-    data object DismissCoach : PlayEvent
-    data object TogglePause : PlayEvent
-    data object Foreground : PlayEvent
-    data object Background : PlayEvent
-    data object Restart : PlayEvent
-    data object NextClassic : PlayEvent
-    data class OpenDaily(val epochDay: Long) : PlayEvent
-    data class OpenClassic(val difficulty: Difficulty) : PlayEvent
-    data object OpenPicker : PlayEvent
-    data object ClosePicker : PlayEvent
+sealed interface PageEvent {
+    data class Tap(val index: Int) : PageEvent
+    data class Select(val index: Int) : PageEvent
+    data class Digit(val digit: Int) : PageEvent
+    data object ClearLock : PageEvent
+    data object Erase : PageEvent
+    data object Undo : PageEvent
+    data object ToggleNotes : PageEvent
+    data object Coach : PageEvent
+    data object CoachDeeper : PageEvent
+    data object CoachApply : PageEvent
+    data object DismissCoach : PageEvent
+    data object Foreground : PageEvent
+    data object Background : PageEvent
+    data object Restart : PageEvent
+    data class OpenDaily(val epochDay: Long) : PageEvent
+    data object OpenPractice : PageEvent
+    data object NextPractice : PageEvent
 }
 
 /** One-off feedback for haptics. */
-enum class PlayEffect { Placed, Conflict, Solved, Toggled }
+enum class PageEffect { Placed, Conflict, Solved, Toggled }
 
 /**
- * Owns the puzzle on the desk.
+ * Owns the page on the desk.
  *
- * - Every change is saved (debounced) as JSON in Room, so a game survives process death, a swipe
- *   from Recents, a reboot, and an update.
- * - The clock only runs while the screen is visible and not paused; time is folded into the
- *   game whenever it stops.
- * - Results are recorded once per puzzle.
+ * - Every change is saved (debounced) as JSON in Room; a page survives process death, a swipe from
+ *   Recents, a reboot and an update.
+ * - The clock is hidden and only runs while the page is on screen; it surfaces on the stamp.
+ * - Digits: with an editable cell selected a digit is written; otherwise the digit is picked up
+ *   and every tap on the board writes it (digit-first), until it is put down again.
+ * - Practice difficulty follows clean solves ([Practice]).
  */
-class GameViewModel(
+class PageViewModel(
     private val store: GameStore,
     private val settingsStore: SettingsStore,
     private val clock: Clock,
     private val ticker: () -> Long,
     private val generatorDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val onDailySaved: () -> Unit = {},
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(PlayUiState(today = today()))
-    val state: StateFlow<PlayUiState> = _state.asStateFlow()
+    private val _state = MutableStateFlow(PageUiState(today = today()))
+    val state: StateFlow<PageUiState> = _state.asStateFlow()
 
-    private val _effects = Channel<PlayEffect>(Channel.BUFFERED)
-    val effects: Flow<PlayEffect> = _effects.receiveAsFlow()
+    private val _effects = Channel<PageEffect>(Channel.BUFFERED)
+    val effects: Flow<PageEffect> = _effects.receiveAsFlow()
 
     private var engine: SudokuEngine? = null
     private var engineKey: String? = null
@@ -120,51 +116,56 @@ class GameViewModel(
 
     init {
         viewModelScope.launch {
-            settingsStore.settings.collect { settings ->
-                _state.update { it.copy(settings = settings).withDerived() }
-            }
+            settingsStore.settings.collect { settings -> _state.update { it.copy(settings = settings) } }
         }
         viewModelScope.launch {
-            val initial = settingsStore.settings.first()
-            val today = today()
-            store.pruneUnsolvedDailies(today - KEEP_UNFINISHED_DAILY_DAYS)
-            val active = initial.activeKey
-            val resumed = active
-                ?.takeIf { it.startsWith("classic-") }
-                ?.let { store.load(it) }
-            if (resumed != null) show(resumed) else openDaily(today)
+            store.pruneUnsolvedDailies(today() - KEEP_UNFINISHED_DAILY_DAYS)
         }
+        openDaily(today())
     }
 
-    fun onEvent(event: PlayEvent) {
+    fun onEvent(event: PageEvent) {
         val settings = _state.value.settings
         when (event) {
-            is PlayEvent.Tap -> mutate { it.tap(event.index, settings.autoClearNotes) }
-            is PlayEvent.Select -> mutate { it.select(event.index) }
-            is PlayEvent.Digit -> mutate { it.input(event.digit, settings.autoClearNotes) }
-            is PlayEvent.Lock -> mutate(effect = PlayEffect.Toggled) { it.toggleLock(event.digit) }
-            PlayEvent.Erase -> mutate { it.erase() }
-            PlayEvent.Undo -> mutate { it.undo() }
-            PlayEvent.ToggleNotes -> mutate(effect = PlayEffect.Toggled) { it.toggleNotesMode() }
-            PlayEvent.Coach -> openCoach()
-            PlayEvent.CoachDeeper -> deepenCoach()
-            PlayEvent.CoachApply -> applyCoach()
-            PlayEvent.DismissCoach -> _state.update { it.copy(coach = null) }
-            PlayEvent.TogglePause -> togglePause()
-            PlayEvent.Foreground -> onForeground()
-            PlayEvent.Background -> onBackground()
-            PlayEvent.Restart -> restart()
-            PlayEvent.NextClassic -> nextClassic()
-            is PlayEvent.OpenDaily -> openDaily(event.epochDay)
-            is PlayEvent.OpenClassic -> openClassic(event.difficulty)
-            PlayEvent.OpenPicker -> openPicker()
-            PlayEvent.ClosePicker -> _state.update { it.copy(picker = null) }
+            is PageEvent.Tap -> mutate { it.tap(event.index, settings.autoClearNotes) }
+            is PageEvent.Select -> mutate { it.select(event.index) }
+            is PageEvent.Digit -> digit(event.digit)
+            PageEvent.ClearLock -> mutate(PageEffect.Toggled) { g -> g.lockedDigit?.let { g.toggleLock(it) } ?: g }
+            PageEvent.Erase -> mutate { it.erase() }
+            PageEvent.Undo -> mutate { it.undo() }
+            PageEvent.ToggleNotes -> mutate(PageEffect.Toggled) { it.toggleNotesMode() }
+            PageEvent.Coach -> openCoach()
+            PageEvent.CoachDeeper -> deepenCoach()
+            PageEvent.CoachApply -> applyCoach()
+            PageEvent.DismissCoach -> _state.update { it.copy(coach = null) }
+            PageEvent.Foreground -> onForeground()
+            PageEvent.Background -> onBackground()
+            PageEvent.Restart -> restart()
+            is PageEvent.OpenDaily -> openDaily(event.epochDay)
+            PageEvent.OpenPractice -> openPractice()
+            PageEvent.NextPractice -> nextPractice()
         }
     }
 
     // region Board
 
-    private fun mutate(effect: PlayEffect? = null, block: (GameState) -> GameState) {
+    /**
+     * Write into the selected cell, or pick the digit up (digit-first) when there is nothing to
+     * write into. A picked-up digit is put down by tapping it again; another digit swaps it.
+     */
+    private fun digit(digit: Int) {
+        val game = _state.value.game ?: return
+        val autoClear = _state.value.settings.autoClearNotes
+        val selected = game.selected
+        when {
+            // Holding a digit: tapping it again puts it down, another digit swaps it.
+            game.lockedDigit != null -> mutate(PageEffect.Toggled) { it.toggleLock(digit) }
+            selected != null && game.isEditable(selected) -> mutate { it.input(digit, autoClear) }
+            else -> mutate(PageEffect.Toggled) { it.toggleLock(digit) }
+        }
+    }
+
+    private fun mutate(effect: PageEffect? = null, block: (GameState) -> GameState) {
         val current = _state.value
         val before = current.game ?: return
         if (current.boardLocked) return
@@ -178,13 +179,13 @@ class GameViewModel(
             running?.let { after = after.addElapsed(ticker() - it) }
             running = null
             after = after.settle(clock.millis())
-            feedback = PlayEffect.Solved
+            feedback = PageEffect.Solved
             record(after)
         } else if (after.values != before.values) {
             val placed = after.values.indices.firstOrNull { after.values[it] != before.values[it] && after.values[it] != 0 }
             if (placed != null) {
                 val conflicts = engineFor(after).conflicts(after.values.toIntArray())
-                feedback = if (placed in conflicts) PlayEffect.Conflict else PlayEffect.Placed
+                feedback = if (placed in conflicts) PageEffect.Conflict else PageEffect.Placed
             }
         }
         _state.update {
@@ -244,30 +245,12 @@ class GameViewModel(
 
     // region Clock
 
-    private fun togglePause() {
-        val current = _state.value
-        val game = current.game ?: return
-        if (game.solved || current.loading) return
-        if (current.userPaused) {
-            _state.update { it.copy(userPaused = false, runningSince = if (foreground) ticker() else null) }
-        } else {
-            _state.update { it.copy(game = foldClock(it), userPaused = true, runningSince = null, coach = null) }
-            saveNow()
-        }
-    }
-
     private fun onForeground() {
         foreground = true
         val today = today()
         _state.update { it.copy(today = today) }
-        val game = _state.value.game
-        val day = game?.spec?.epochDay
-        if (game != null && game.solved && day != null && day < today) {
-            openDaily(today)
-            return
-        }
         _state.update {
-            if (it.game != null && !it.game.solved && !it.userPaused && it.runningSince == null) {
+            if (it.game != null && !it.game.solved && !it.loading && it.runningSince == null) {
                 it.copy(runningSince = ticker())
             } else {
                 it
@@ -281,7 +264,7 @@ class GameViewModel(
         saveNow()
     }
 
-    private fun foldClock(state: PlayUiState): GameState? {
+    private fun foldClock(state: PageUiState): GameState? {
         val game = state.game ?: return null
         val since = state.runningSince ?: return game
         return game.addElapsed(ticker() - since)
@@ -289,7 +272,7 @@ class GameViewModel(
 
     // endregion
 
-    // region Puzzles
+    // region Pages
 
     private fun restart() {
         val game = _state.value.game ?: return
@@ -297,7 +280,6 @@ class GameViewModel(
             it.copy(
                 game = game.restart(),
                 coach = null,
-                userPaused = false,
                 runningSince = if (foreground) ticker() else null,
                 justSolved = false,
             ).withDerived()
@@ -305,78 +287,51 @@ class GameViewModel(
         saveNow()
     }
 
-    private fun nextClassic() {
-        val difficulty = _state.value.game?.spec?.difficulty ?: Difficulty.Gentle
-        load {
-            val number = store.nextClassicNumber(difficulty)
-            GameState.new(withContext(generatorDispatcher) { Catalog.classic(difficulty, number) })
-        }
-    }
-
     private fun openDaily(epochDay: Long) {
+        val current = _state.value.game
+        if (current != null && current.spec.key == Catalog.dailyKey(epochDay) && !_state.value.loading) return
         load {
             store.load(Catalog.dailyKey(epochDay))
                 ?: GameState.new(withContext(generatorDispatcher) { Catalog.daily(epochDay) })
         }
     }
 
-    private fun openClassic(difficulty: Difficulty) {
+    private fun openPractice() {
         val current = _state.value.game
-        if (current != null && current.spec.kind == PuzzleKind.Classic &&
-            current.spec.difficulty == difficulty && !current.solved
-        ) {
-            _state.update { it.copy(picker = null) }
-            return
-        }
-        load {
-            store.latestUnsolvedClassic(difficulty) ?: run {
-                val number = store.nextClassicNumber(difficulty)
-                GameState.new(withContext(generatorDispatcher) { Catalog.classic(difficulty, number) })
-            }
-        }
+        if (current != null && current.spec.kind == PuzzleKind.Classic && !current.solved) return
+        load { store.latestUnsolvedPractice() ?: newPractice() }
     }
 
-    private fun openPicker() {
-        viewModelScope.launch {
-            val today = today()
-            val daily = store.load(Catalog.dailyKey(today))
-            val status = when {
-                daily == null -> SlotStatus.New
-                daily.solved -> SlotStatus.Solved
-                else -> SlotStatus.InProgress
-            }
-            val classic = Difficulty.entries.associateWith { d ->
-                store.latestUnsolvedClassic(d)?.spec?.number
-            }
-            _state.update { it.copy(picker = PickerUi(today, status, classic)) }
-        }
+    private fun nextPractice() {
+        load { newPractice() }
+    }
+
+    private suspend fun newPractice(): GameState {
+        val level = Practice.level(store.cleanPractice.first())
+        val number = store.nextClassicNumber(level)
+        return GameState.new(withContext(generatorDispatcher) { Catalog.classic(level, number) })
     }
 
     private fun load(source: suspend () -> GameState) {
         loadJob?.cancel()
-        // Stop the current puzzle's clock now: generating the next one is not time spent on it.
-        _state.update {
-            it.copy(game = foldClock(it), runningSince = null, loading = true, picker = null, coach = null)
-        }
+        // Stop the current page's clock now: preparing the next page is not time spent on it.
+        _state.update { it.copy(game = foldClock(it), runningSince = null, loading = true, coach = null) }
         loadJob = viewModelScope.launch { show(source()) }
     }
 
     private suspend fun show(next: GameState) {
-        val previous = foldClock(_state.value)
-        if (previous != null && previous.spec.key != next.spec.key) store.save(previous, clock.millis())
+        val previous = _state.value.game
+        if (previous != null && previous.spec.key != next.spec.key) persist(previous)
         _state.update {
             it.copy(
                 loading = false,
                 game = next,
                 coach = null,
-                picker = null,
-                userPaused = false,
                 runningSince = if (foreground && !next.solved) ticker() else null,
                 justSolved = false,
             ).withDerived()
         }
-        store.save(next, clock.millis())
-        settingsStore.update { it.copy(activeKey = next.spec.key) }
+        persist(next)
     }
 
     // endregion
@@ -384,7 +339,7 @@ class GameViewModel(
     private fun record(game: GameState) {
         val spec = game.spec
         viewModelScope.launch {
-            store.save(game, clock.millis())
+            persist(game)
             store.recordOnce(
                 GameResult(
                     puzzleKey = spec.key,
@@ -401,18 +356,23 @@ class GameViewModel(
         }
     }
 
+    private suspend fun persist(game: GameState) {
+        store.save(game, clock.millis())
+        if (game.spec.kind == PuzzleKind.Daily) onDailySaved()
+    }
+
     private fun scheduleSave() {
         saveJob?.cancel()
         saveJob = viewModelScope.launch {
             delay(SAVE_DEBOUNCE_MILLIS)
-            _state.value.game?.let { store.save(foldClock(_state.value) ?: it, clock.millis()) }
+            foldClock(_state.value)?.let { persist(it) }
         }
     }
 
     private fun saveNow() {
         saveJob?.cancel()
         val game = _state.value.game ?: return
-        saveJob = viewModelScope.launch { store.save(game, clock.millis()) }
+        saveJob = viewModelScope.launch { persist(game) }
     }
 
     private fun engineFor(game: GameState): SudokuEngine {
@@ -424,29 +384,25 @@ class GameViewModel(
         }
     }
 
-    private fun PlayUiState.withDerived(): PlayUiState {
+    private fun PageUiState.withDerived(): PageUiState {
         val game = game ?: return this
-        val values = game.values.toIntArray()
-        val engine = engineFor(game)
-        return copy(
-            conflicts = engine.conflicts(values),
-            mistakes = if (settings.showMistakes && !game.solved) engine.mistakes(values) else emptySet(),
-        )
+        return copy(conflicts = engineFor(game).conflicts(game.values.toIntArray()))
     }
 
     private fun today(): Long = LocalDate.now(clock).toEpochDay()
 
     companion object {
         private const val SAVE_DEBOUNCE_MILLIS = 400L
-        private const val KEEP_UNFINISHED_DAILY_DAYS = 60L
+        private const val KEEP_UNFINISHED_DAILY_DAYS = 365L
 
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                GameViewModel(
+                PageViewModel(
                     store = container.gameStore,
                     settingsStore = container.settingsStore,
                     clock = container.clock,
                     ticker = container.ticker,
+                    onDailySaved = container.onDailySaved,
                 )
             }
         }

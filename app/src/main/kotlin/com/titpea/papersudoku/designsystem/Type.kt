@@ -14,10 +14,10 @@ import androidx.compose.ui.unit.sp
 import com.titpea.papersudoku.R
 
 /*
- * Fraunces (SIL OFL 1.1, see third_party/fraunces) is the printed voice: titles and the digits a
- * puzzle is printed with. The italic, softened instance is the pen the player writes with.
- * Everything else uses the platform sans so system text settings and CJK fallback behave natively.
- * Both font files are subset to Latin and pinned to WONK=0; opsz and wght stay variable.
+ * Two voices only. Fraunces (SIL OFL 1.1, third_party/fraunces) is reserved for numerals: the
+ * digits on the page and the dates on its corner. Everything you read is the platform sans, so
+ * system text settings, CJK and the device's own typeface behave natively. The Fraunces files are
+ * Latin subsets pinned to WONK=0 with opsz and wght still variable.
  */
 private fun fraunces(weight: Int, opticalSize: Float, italic: Boolean = false) = Font(
     resId = if (italic) R.font.fraunces_italic else R.font.fraunces,
@@ -29,35 +29,55 @@ private fun fraunces(weight: Int, opticalSize: Float, italic: Boolean = false) =
     ),
 )
 
-/** Display and headline face. */
-val FrauncesDisplay = FontFamily(
-    fraunces(400, 72f),
-    fraunces(500, 72f),
-    fraunces(600, 72f),
-)
-
-/** Printed digits on the board (givens). */
+/** Printed digits on the board (givens) and page numbers. */
 val FrauncesPrinted = FontFamily(fraunces(560, 36f))
 
-/** Handwritten-feeling digits (the player's pen). */
+/** The player's pen. */
 val FrauncesPen = FontFamily(fraunces(420, 36f, italic = true))
+
+/** Large dates and figures. */
+val FrauncesDisplay = FontFamily(fraunces(400, 96f), fraunces(600, 96f))
+
+object PaperType {
+    /** The date on a page corner, e.g. "21". */
+    val pageNumeral = TextStyle(
+        fontFamily = FrauncesDisplay,
+        fontWeight = FontWeight.Normal,
+        fontSize = 44.sp,
+        lineHeight = 44.sp,
+        letterSpacing = (-0.5).sp,
+        fontFeatureSettings = "lnum, tnum",
+    )
+
+    /** Figures in the notebook (stamped pages, times). */
+    val figure = TextStyle(
+        fontFamily = FrauncesDisplay,
+        fontWeight = FontWeight.Normal,
+        fontSize = 32.sp,
+        lineHeight = 36.sp,
+        fontFeatureSettings = "lnum, tnum",
+    )
+}
 
 private val Sans = FontFamily.Default
 
-val PaperTypography = Typography(
-    displayLarge = TextStyle(fontFamily = FrauncesDisplay, fontWeight = FontWeight.Normal, fontSize = 57.sp, lineHeight = 64.sp, letterSpacing = (-0.25).sp),
-    displayMedium = TextStyle(fontFamily = FrauncesDisplay, fontWeight = FontWeight.Normal, fontSize = 45.sp, lineHeight = 52.sp),
-    displaySmall = TextStyle(fontFamily = FrauncesDisplay, fontWeight = FontWeight.Normal, fontSize = 36.sp, lineHeight = 44.sp),
-    headlineLarge = TextStyle(fontFamily = FrauncesDisplay, fontWeight = FontWeight.Medium, fontSize = 32.sp, lineHeight = 40.sp),
-    headlineMedium = TextStyle(fontFamily = FrauncesDisplay, fontWeight = FontWeight.Medium, fontSize = 28.sp, lineHeight = 36.sp),
-    headlineSmall = TextStyle(fontFamily = FrauncesDisplay, fontWeight = FontWeight.Medium, fontSize = 24.sp, lineHeight = 32.sp),
-    titleLarge = TextStyle(fontFamily = FrauncesDisplay, fontWeight = FontWeight.Medium, fontSize = 22.sp, lineHeight = 28.sp),
-    titleMedium = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.15.sp),
-    titleSmall = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.1.sp),
-    bodyLarge = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.5.sp),
-    bodyMedium = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.25.sp),
-    bodySmall = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Normal, fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.4.sp),
-    labelLarge = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.1.sp),
-    labelMedium = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.5.sp),
-    labelSmall = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Medium, fontSize = 11.sp, lineHeight = 16.sp, letterSpacing = 0.5.sp),
-)
+/** The Material 3 type scale in the platform sans. */
+val PaperTypography = Typography().let { base ->
+    Typography(
+        displayLarge = base.displayLarge.copy(fontFamily = Sans),
+        displayMedium = base.displayMedium.copy(fontFamily = Sans),
+        displaySmall = base.displaySmall.copy(fontFamily = Sans),
+        headlineLarge = base.headlineLarge.copy(fontFamily = Sans, fontWeight = FontWeight.Medium),
+        headlineMedium = base.headlineMedium.copy(fontFamily = Sans, fontWeight = FontWeight.Medium),
+        headlineSmall = base.headlineSmall.copy(fontFamily = Sans, fontWeight = FontWeight.Medium),
+        titleLarge = base.titleLarge.copy(fontFamily = Sans, fontWeight = FontWeight.Medium),
+        titleMedium = base.titleMedium.copy(fontFamily = Sans),
+        titleSmall = base.titleSmall.copy(fontFamily = Sans),
+        bodyLarge = base.bodyLarge.copy(fontFamily = Sans),
+        bodyMedium = base.bodyMedium.copy(fontFamily = Sans),
+        bodySmall = base.bodySmall.copy(fontFamily = Sans),
+        labelLarge = base.labelLarge.copy(fontFamily = Sans),
+        labelMedium = base.labelMedium.copy(fontFamily = Sans),
+        labelSmall = base.labelSmall.copy(fontFamily = Sans),
+    )
+}

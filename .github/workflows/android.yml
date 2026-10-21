@@ -42,7 +42,7 @@ jobs:
         run: ./gradlew --no-daemon :core:engine:test :core:game:test :app:testDebugUnitTest
 
       - name: Build debug APKs and release APK
-        run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease -PpaperSudoku.sideload=true
+        run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease :benchmark:assembleBenchmark -PpaperSudoku.sideload=true
 
       - name: Run lint
         run: ./gradlew --no-daemon :app:lintDebug
@@ -73,7 +73,7 @@ jobs:
 
   instrumentation:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 50
     if: github.event_name == 'push' || github.event_name == 'pull_request'
 
     steps:
@@ -140,7 +140,9 @@ jobs:
             adb shell settings put system user_rotation 1; sleep 5
             adb exec-out screencap -p > app/build/outputs/paper-sudoku-landscape.png
             adb shell settings put system user_rotation 0; sleep 2
-            ./gradlew --no-daemon :app:connectedDebugAndroidTest
+            ./gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true
+            adb pull /sdcard/Android/data/com.titpea.papersudoku/files/screenshots app/build/outputs/screenshots || true
+            ./gradlew --no-daemon :benchmark:connectedBenchmarkAndroidTest
 
       - name: Upload instrumentation report
         if: always()
@@ -154,4 +156,24 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: paper-sudoku-screenshots
-          path: app/build/outputs/paper-sudoku-*.png
+          path: |
+            app/build/outputs/paper-sudoku-*.png
+            app/build/outputs/screenshots/
+
+      - name: Benchmark results
+        if: always()
+        run: |
+          find benchmark/build/outputs -name "*benchmarkData.json" -exec cat {} \; || true
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: paper-sudoku-benchmark
+          path: benchmark/build/outputs/
+
+      # TEMP(review): screenshot matrix in the log for remote visual review.
+      - name: Screenshot previews
+        if: always()
+        run: |
+          for f in app/build/outputs/screenshots/*.jpg; do echo "PREVIEW-$(basename "$f")-BEGIN"; base64 -w0 "$f"; echo; echo "PREVIEW-END"; done || true

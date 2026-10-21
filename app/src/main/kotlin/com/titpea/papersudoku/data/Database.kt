@@ -59,6 +59,11 @@ data class StatsRow(
     val bestSeconds: Long?,
 )
 
+data class DifficultyCount(
+    val difficulty: String,
+    val solved: Int,
+)
+
 data class DayResult(
     val epochDay: Long,
     val coachLevel: Int,
@@ -92,6 +97,15 @@ interface GameResultDao {
 
     @Query("SELECT COUNT(*) FROM game_results")
     suspend fun count(): Int
+
+    /** Practice (9×9) solves without the Coach's answer, per difficulty. */
+    @Query(
+        """
+        SELECT difficulty, COUNT(*) AS solved FROM game_results
+        WHERE mode = 'classic' AND coachLevel < 3 AND difficulty != '' GROUP BY difficulty
+        """,
+    )
+    fun observeCleanPractice(): Flow<List<DifficultyCount>>
 }
 
 @Dao
@@ -102,13 +116,11 @@ interface SavedGameDao {
     @Query("SELECT * FROM saved_games WHERE puzzleKey = :puzzleKey")
     suspend fun get(puzzleKey: String): SavedGameEntity?
 
-    @Query(
-        """
-        SELECT * FROM saved_games WHERE kind = 'Classic' AND difficulty = :difficulty AND solved = 0
-        ORDER BY updatedAt DESC LIMIT 1
-        """,
-    )
-    suspend fun latestUnsolvedClassic(difficulty: String): SavedGameEntity?
+    @Query("SELECT * FROM saved_games WHERE kind = 'Classic' AND solved = 0 ORDER BY updatedAt DESC LIMIT 1")
+    fun observeLatestUnsolvedPractice(): Flow<SavedGameEntity?>
+
+    @Query("SELECT * FROM saved_games WHERE kind = 'Daily' AND epochDay >= :fromEpochDay ORDER BY epochDay DESC")
+    fun observeDailies(fromEpochDay: Long): Flow<List<SavedGameEntity>>
 
     @Query("SELECT MAX(number) FROM saved_games WHERE kind = 'Classic' AND difficulty = :difficulty")
     suspend fun maxClassicNumber(difficulty: String): Int?

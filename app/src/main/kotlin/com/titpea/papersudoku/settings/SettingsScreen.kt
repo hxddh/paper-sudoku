@@ -1,6 +1,10 @@
 package com.titpea.papersudoku.settings
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -89,13 +94,23 @@ fun SettingsScreen(
                     }
                 }
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 item {
-                    SwitchRow(
-                        title = stringResource(R.string.settings_dynamic_color),
-                        body = stringResource(R.string.settings_dynamic_color_desc),
-                        checked = settings.dynamicColor,
-                        onChange = { v -> onUpdate { it.copy(dynamicColor = v) } },
+                    val context = LocalContext.current
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.settings_language)) },
+                        supportingContent = { Text(stringResource(R.string.settings_language_desc)) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        modifier = Modifier
+                            .widthIn(max = 640.dp)
+                            .fillMaxWidth()
+                            .clickable {
+                                // The system's per-app language screen (Android 13+).
+                                context.startActivity(
+                                    Intent(Settings.ACTION_APP_LOCALE_SETTINGS)
+                                        .setData(Uri.fromParts("package", context.packageName, null)),
+                                )
+                            },
                     )
                 }
             }
@@ -106,15 +121,6 @@ fun SettingsScreen(
                     body = stringResource(R.string.settings_auto_clear_desc),
                     checked = settings.autoClearNotes,
                     onChange = { v -> onUpdate { it.copy(autoClearNotes = v) } },
-                )
-            }
-            item {
-                SwitchRow(
-                    title = stringResource(R.string.settings_mistakes),
-                    body = stringResource(R.string.settings_mistakes_desc),
-                    checked = settings.showMistakes,
-                    onChange = { v -> onUpdate { it.copy(showMistakes = v) } },
-                    modifier = Modifier.testTag("setting-mistakes"),
                 )
             }
             item {

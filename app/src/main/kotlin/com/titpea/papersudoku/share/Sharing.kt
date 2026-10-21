@@ -3,8 +3,8 @@ package com.titpea.papersudoku.share
 import android.content.Context
 import android.content.Intent
 import com.titpea.papersudoku.R
-import com.titpea.papersudoku.game.difficultyRes
-import com.titpea.papersudoku.game.formatElapsed
+import com.titpea.papersudoku.page.difficultyRes
+import com.titpea.papersudoku.page.formatElapsed
 import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.PuzzleKind
 import java.time.LocalDate

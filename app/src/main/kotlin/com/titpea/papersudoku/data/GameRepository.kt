@@ -4,6 +4,8 @@ import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.PuzzleKind
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 
 data class GameResult(
     val puzzleKey: String,
@@ -16,20 +18,30 @@ data class GameResult(
     val epochDay: Long?,
 )
 
-/** Saved boards and finished results. An interface so ViewModel tests can use a fake. */
+/** Saved pages and finished results. An interface so ViewModel tests can use a fake. */
 interface GameStore {
     suspend fun load(puzzleKey: String): GameState?
     suspend fun save(state: GameState, now: Long)
-    suspend fun latestUnsolvedClassic(difficulty: Difficulty): GameState?
     suspend fun nextClassicNumber(difficulty: Difficulty): Int
     suspend fun pruneUnsolvedDailies(beforeEpochDay: Long)
 
     /** Records the first completion of a puzzle; later replays are ignored. */
     suspend fun recordOnce(result: GameResult): Boolean
 
+    /** Daily pages saved on or after [fromEpochDay], newest first. */
+    fun dailies(fromEpochDay: Long): Flow<List<GameState>>
+
+    /** The practice page to continue, if one is unfinished. */
+    val unfinishedPractice: Flow<GameState?>
+
+    /** Practice solves without the Coach's answer, per difficulty. */
+    val cleanPractice: Flow<Map<Difficulty, Int>>
+
     val stats: Flow<List<StatsRow>>
     val days: Flow<List<DayResult>>
 }
+
+suspend fun GameStore.latestUnsolvedPractice(): GameState? = unfinishedPractice.first()
 
 class RoomGameStore(
     private val savedGames: SavedGameDao,
@@ -55,9 +67,6 @@ class RoomGameStore(
         )
     }
 
-    override suspend fun latestUnsolvedClassic(difficulty: Difficulty): GameState? =
-        savedGames.latestUnsolvedClassic(difficulty.name)?.json?.let(GameState::decode)
-
     override suspend fun nextClassicNumber(difficulty: Difficulty): Int =
         (savedGames.maxClassicNumber(difficulty.name) ?: -1) + 1
 
@@ -79,6 +88,18 @@ class RoomGameStore(
             ),
         )
         return true
+    }
+
+    override fun dailies(fromEpochDay: Long): Flow<List<GameState>> =
+        savedGames.observeDailies(fromEpochDay).map { rows -> rows.mapNotNull { GameState.decode(it.json) } }
+
+    override val unfinishedPractice: Flow<GameState?> =
+        savedGames.observeLatestUnsolvedPractice().map { it?.json?.let(GameState::decode) }
+
+    override val cleanPractice: Flow<Map<Difficulty, Int>> = results.observeCleanPractice().map { rows ->
+        rows.mapNotNull { row ->
+            Difficulty.entries.firstOrNull { it.name == row.difficulty }?.let { it to row.solved }
+        }.toMap()
     }
 
     override val stats: Flow<List<StatsRow>> = results.observeStats()

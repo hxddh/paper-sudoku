@@ -59,7 +59,8 @@ class DatabaseMigrationTest {
             val game = GameState.new(Catalog.classic(Difficulty.Gentle, 0))
             store.save(game, now = 5)
             assertEquals(game, store.load(game.spec.key))
-            assertEquals(game, store.latestUnsolvedClassic(Difficulty.Gentle))
+            assertEquals(game, store.unfinishedPractice.first())
+            assertEquals(listOf<GameState>(), store.dailies(0).first())
             assertEquals(1, store.nextClassicNumber(Difficulty.Gentle))
 
             val result = GameResult(game.spec.key, PuzzleKind.Classic, Difficulty.Gentle, 300, 0, 0, 10, null)

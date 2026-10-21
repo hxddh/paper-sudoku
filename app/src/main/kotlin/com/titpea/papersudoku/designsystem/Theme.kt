@@ -1,6 +1,5 @@
 package com.titpea.papersudoku.designsystem
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
@@ -9,15 +8,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
 /**
@@ -120,14 +116,15 @@ data class PaperInk(
     val boxLine: Color,
     val sheet: Color,
     val grain: Color,
-    val isPaper: Boolean,
+    /** Coach marks and margin notes. */
+    val margin: Color,
 )
 
 val LocalPaperInk = staticCompositionLocalOf {
-    PaperInk(Color.Black, Color.Blue, Color.Gray, Color.Gray, Color.Black, Color.White, Color.Black, true)
+    PaperInk(Color.Black, Color.Blue, Color.Gray, Color.Gray, Color.Black, Color.White, Color.Black, Color.Red)
 }
 
-private fun inkFor(scheme: ColorScheme, dark: Boolean, isPaper: Boolean) = PaperInk(
+private fun inkFor(scheme: ColorScheme, dark: Boolean) = PaperInk(
     printed = scheme.onSurface,
     pen = scheme.secondary,
     pencil = scheme.onSurfaceVariant,
@@ -135,23 +132,17 @@ private fun inkFor(scheme: ColorScheme, dark: Boolean, isPaper: Boolean) = Paper
     boxLine = scheme.outline,
     sheet = scheme.surfaceContainerLowest,
     grain = if (dark) Color.White else Color(0xFF3B2A14),
-    isPaper = isPaper,
+    margin = scheme.primary,
 )
 
+/** Paper is the product's look: there is no dynamic-color variant. */
 @Composable
 fun SudokuTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val useDynamic = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-    val scheme = when {
-        useDynamic && darkTheme -> dynamicDarkColorScheme(LocalContext.current)
-        useDynamic -> dynamicLightColorScheme(LocalContext.current)
-        darkTheme -> Night
-        else -> Paper
-    }
-    CompositionLocalProvider(LocalPaperInk provides inkFor(scheme, darkTheme, isPaper = !useDynamic)) {
+    val scheme = if (darkTheme) Night else Paper
+    CompositionLocalProvider(LocalPaperInk provides inkFor(scheme, darkTheme)) {
         MaterialExpressiveTheme(
             colorScheme = scheme,
             motionScheme = MotionScheme.expressive(),
