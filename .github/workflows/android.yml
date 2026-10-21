@@ -95,6 +95,17 @@ jobs:
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb shell am start -W -n com.titpea.papersudoku/.MainActivity
             sleep 8
+            # The headless emulator's launcher can show a Quickstep ANR over the app.
+            # Dismiss it by tapping the Wait button if uiautomator can see it.
+            if adb shell uiautomator dump /sdcard/window.xml >/dev/null 2>&1; then
+              BOUNDS="$(adb shell cat /sdcard/window.xml | tr -d '\r' | grep -o 'text="Wait"[^>]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | head -1)"
+              if [ -n "$BOUNDS" ]; then
+                COORDS="$(echo "$BOUNDS" | sed -E 's/.*bounds="\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]".*/\1 \2 \3 \4/')"
+                set -- $COORDS
+                adb shell input tap $((($1 + $3) / 2)) $((($2 + $4) / 2))
+                sleep 3
+              fi
+            fi
             adb exec-out screencap -p > app/build/outputs/paper-sudoku-default.png
             ./gradlew --no-daemon :app:connectedDebugAndroidTest
 
