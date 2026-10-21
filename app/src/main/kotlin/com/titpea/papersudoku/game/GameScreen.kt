@@ -58,6 +58,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
+import com.titpea.papersudoku.engine.Technique
 import kotlinx.coroutines.launch
 
 @Composable
@@ -486,13 +487,24 @@ private fun CoachContent(
             .padding(bottom = 12.dp),
     ) {
         Text(
-            text = stringResource(R.string.coach_eyebrow),
+            text = when (hint?.technique) {
+                Technique.NakedSingle -> stringResource(R.string.technique_naked_single)
+                Technique.HiddenSingle -> stringResource(R.string.technique_hidden_single)
+                null -> stringResource(R.string.coach_label)
+            },
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
         )
         Text(
             text = if (hint != null) {
-                stringResource(R.string.hint_title, hint.digit)
+                stringResource(
+                    if (hint.technique == Technique.NakedSingle) {
+                        R.string.hint_title_naked
+                    } else {
+                        R.string.hint_title_hidden
+                    },
+                    hint.digit,
+                )
             } else {
                 stringResource(R.string.no_hint_title)
             },
@@ -501,7 +513,13 @@ private fun CoachContent(
         Spacer(Modifier.height(4.dp))
         Text(
             text = if (hint != null) {
-                stringResource(R.string.hint_body)
+                stringResource(
+                    if (hint.technique == Technique.NakedSingle) {
+                        R.string.hint_body_naked
+                    } else {
+                        R.string.hint_body_hidden
+                    },
+                )
             } else {
                 stringResource(R.string.no_hint_body)
             },

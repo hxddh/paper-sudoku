@@ -13,6 +13,7 @@ import com.titpea.papersudoku.data.Puzzles
 import com.titpea.papersudoku.data.StatsRepository
 import com.titpea.papersudoku.engine.Hint
 import com.titpea.papersudoku.engine.SudokuEngine
+import com.titpea.papersudoku.engine.Technique
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -23,7 +24,7 @@ data class CellUi(
     val notes: Set<Int>,
 )
 
-data class HintUi(val index: Int, val digit: Int)
+data class HintUi(val index: Int, val digit: Int, val technique: Technique)
 
 enum class Sheet { None, Keypad, Coach }
 
@@ -163,7 +164,7 @@ class GameViewModel(
     }
 
     private fun coach() {
-        hint = engine.findNakedSingle(values)
+        hint = engine.findNextHint(values)
         if (hint != null) hintsUsed += 1
         selected = null
         sheet = Sheet.Coach
@@ -242,7 +243,7 @@ class GameViewModel(
             selected = selected,
             notesMode = notesMode,
             sheet = sheet,
-            hint = hint?.let { HintUi(it.index, it.digit) },
+            hint = hint?.let { HintUi(it.index, it.digit, it.technique) },
             conflicts = engine.conflicts(values),
             solved = engine.isSolved(values),
         )

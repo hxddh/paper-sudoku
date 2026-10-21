@@ -11,7 +11,7 @@ The source lives at [github.com/hxddh/paper-sudoku](https://github.com/hxddh/pap
 - Edge-to-edge Material 3 screen with `BottomSheetScaffold` keypad / Coach sheet
 - Expanded (≥840dp) two-pane layout: board + 360dp dock / keypad / Coach rail
 - Custom board with `CollectionInfo` / `CollectionItemInfo` semantics
-- Pure Kotlin engine: candidates, naked single, conflicts, solved
+- Pure Kotlin engine: candidates, naked single, hidden single, conflicts, solved
 - Paper light/dark theme with accessible accent/muted tokens
 - Notes, undo, erase, Coach, Place, solved overlay
 - `SavedStateHandle` in-progress restore; Room completion stats; DataStore theme
@@ -59,7 +59,8 @@ The 3 Compose UI tests need a connected device/emulator:
 - `SudokuTheme`: Paper light/dark color roles, typography, shapes.
 - English + Simplified Chinese strings; `localeConfig`.
 - Manifest: target 36, no orientation lock, `enableOnBackInvokedCallback`, no network.
-- Tests: 5 engine + 7 ViewModel JVM tests pass; 3 Compose UI tests (AccessibilityChecks) compile.
+- Tests: 6 engine + 7 ViewModel JVM tests pass; 3 Compose UI tests (AccessibilityChecks) compile.
+- GitHub Actions builds, tests, and lints on pushes and pull requests to `main`.
 
 ## Intentionally not implemented yet
 

@@ -99,7 +99,7 @@
 - [x] `:core:engine` 纯 Kotlin，无 Android 依赖
 - [x] `GameViewModel` + `StateFlow<GameUiState>`；UI 只发事件
 - [x] 不可变 `CellUi` / `GameUiState`
-- [x] 引擎：候选数、naked single、冲突、完成判定
+- [x] 引擎：候选数、naked single、hidden single、冲突、完成判定
 - [x] `SavedStateHandle` 保存当前局（棋盘、笔记、选中格、模式、计时起点、已记录标记）
 - [x] Room 2.8.5 记录完成局；DataStore 保存主题
 - [ ] 进程死亡恢复的设备级验证（当前只有 JVM `SavedStateHandle` 单测）
@@ -116,7 +116,7 @@
 
 ## 7. 测试与 CI
 
-- [x] 引擎单测（5 个）：候选、naked single、完成、冲突
+- [x] 引擎单测（6 个）：候选、naked single、hidden single、完成、冲突
 - [x] ViewModel 单测（7 个）：选格、填数、笔记/撤销、Coach/Place、模式切换、SavedStateHandle 恢复、完成只记一次
 - [x] Compose UI 测试（3 个，已编译）：棋盘语义、选格/键盘/Coach 事件、Expanded 双栏
 - [x] `AccessibilityChecks.enable()` 已接入 UI 测试
@@ -126,6 +126,7 @@
 - [ ] Macrobenchmark：启动、棋盘交互
 - [ ] Baseline Profile
 - [x] `lintDebug` 无 Error（保留版本提示/`ObsoleteSdkInt` 警告）
+- [x] GitHub Actions workflow（`.github/workflows/android.yml`）
 - [ ] 题库 validator Gradle task
 - [ ] Play 预发布报告、内部测试、staged rollout
 

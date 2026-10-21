@@ -1,12 +1,18 @@
 package com.titpea.papersudoku.engine
 
+enum class Technique { NakedSingle, HiddenSingle }
+
 /** A single next-step hint: place [digit] at [index]. */
-data class Hint(val index: Int, val digit: Int)
+data class Hint(
+    val index: Int,
+    val digit: Int,
+    val technique: Technique,
+)
 
 /**
  * Small, pure Kotlin engine for the skeleton.
  *
- * It currently covers naked singles, candidate lists, conflict detection, and completion checks.
+ * It covers naked/hidden singles, candidate lists, conflict detection, and completion checks.
  * The production engine should add the techniques the product teaches (pairs, pointing, box-line,
  * X-Wing, ...), a difficulty grader, and a full puzzle validator.
  */
@@ -40,10 +46,59 @@ class SudokuEngine(private val puzzle: Puzzle) {
             if (values[index] != 0) continue
             val candidates = candidates(values, index)
             if (candidates.size == 1) {
-                return Hint(index = index, digit = candidates.first())
+                return Hint(index, candidates.first(), Technique.NakedSingle)
             }
         }
         return null
+    }
+
+    /**
+     * Returns a digit with exactly one possible empty cell inside a row, column, or box.
+     * This is the next step after naked singles: the cell may have several candidates, but the
+     * digit has nowhere else to go in that unit.
+     */
+    fun findHiddenSingle(values: IntArray): Hint? {
+        require(values.size == puzzle.size * puzzle.size) { "values must contain size * size cells" }
+
+        for (unit in units()) {
+            for (digit in 1..puzzle.size) {
+                val spots = unit.filter { index ->
+                    values[index] == 0 && digit in candidates(values, index)
+                }
+                if (spots.size == 1) {
+                    return Hint(spots.first(), digit, Technique.HiddenSingle)
+                }
+            }
+        }
+        return null
+    }
+
+    /** Prefer the simplest technique available. */
+    fun findNextHint(values: IntArray): Hint? =
+        findNakedSingle(values) ?: findHiddenSingle(values)
+
+    private fun units(): List<List<Int>> = buildList {
+        for (r in 0 until puzzle.size) {
+            add((0 until puzzle.size).map { c -> r * puzzle.size + c })
+        }
+        for (c in 0 until puzzle.size) {
+            add((0 until puzzle.size).map { r -> r * puzzle.size + c })
+        }
+        var boxRow = 0
+        while (boxRow < puzzle.size) {
+            var boxCol = 0
+            while (boxCol < puzzle.size) {
+                val unit = mutableListOf<Int>()
+                for (r in boxRow until boxRow + puzzle.boxRows) {
+                    for (c in boxCol until boxCol + puzzle.boxCols) {
+                        unit += r * puzzle.size + c
+                    }
+                }
+                add(unit)
+                boxCol += puzzle.boxCols
+            }
+            boxRow += puzzle.boxRows
+        }
     }
 
     /** Indices that participate in a duplicate in a row, column, or box. */
@@ -51,31 +106,7 @@ class SudokuEngine(private val puzzle: Puzzle) {
         require(values.size == puzzle.size * puzzle.size) { "values must contain size * size cells" }
 
         val result = mutableSetOf<Int>()
-        val units = buildList {
-            for (r in 0 until puzzle.size) {
-                add((0 until puzzle.size).map { c -> r * puzzle.size + c })
-            }
-            for (c in 0 until puzzle.size) {
-                add((0 until puzzle.size).map { r -> r * puzzle.size + c })
-            }
-            var boxRow = 0
-            while (boxRow < puzzle.size) {
-                var boxCol = 0
-                while (boxCol < puzzle.size) {
-                    val unit = mutableListOf<Int>()
-                    for (r in boxRow until boxRow + puzzle.boxRows) {
-                        for (c in boxCol until boxCol + puzzle.boxCols) {
-                            unit += r * puzzle.size + c
-                        }
-                    }
-                    add(unit)
-                    boxCol += puzzle.boxCols
-                }
-                boxRow += puzzle.boxRows
-            }
-        }
-
-        for (unit in units) {
+        for (unit in units()) {
             val byValue = unit
                 .filter { values[it] != 0 }
                 .groupBy { values[it] }

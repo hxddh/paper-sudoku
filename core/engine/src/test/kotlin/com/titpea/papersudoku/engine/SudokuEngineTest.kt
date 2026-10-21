@@ -3,6 +3,7 @@ package com.titpea.papersudoku.engine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -85,6 +86,39 @@ class SudokuEngineTest {
 
         assertNotNull(hint)
         assertEquals(classic.solution[hint!!.index], hint.digit)
+    }
+
+    @Test
+    fun `hidden single is used when no naked single exists`() {
+        val hiddenOnly = Puzzle(
+            size = 9,
+            boxRows = 3,
+            boxCols = 3,
+            givens = listOf(
+                5, 3, 0, 0, 7, 0, 0, 1, 0,
+                0, 7, 0, 1, 0, 0, 3, 0, 8,
+                0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 9, 7, 6, 1, 0, 2, 3,
+                0, 2, 0, 0, 0, 0, 7, 0, 1,
+                0, 0, 0, 0, 0, 4, 0, 5, 6,
+                9, 6, 1, 0, 0, 7, 2, 0, 0,
+                0, 0, 7, 0, 0, 9, 0, 3, 0,
+                0, 4, 0, 0, 0, 0, 0, 0, 9,
+            ),
+            solution = classic.solution,
+        )
+        val engine = SudokuEngine(hiddenOnly)
+        val values = hiddenOnly.givens.toIntArray()
+
+        assertNull(engine.findNakedSingle(values))
+
+        val hint = engine.findNextHint(values)
+
+        assertNotNull(hint)
+        assertEquals(Technique.HiddenSingle, hint!!.technique)
+        assertEquals(28, hint.index)
+        assertEquals(5, hint.digit)
+        assertEquals(hiddenOnly.solution[hint.index], hint.digit)
     }
 
     @Test
