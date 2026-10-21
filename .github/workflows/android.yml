@@ -39,10 +39,10 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0"
 
       - name: Run unit tests
-        run: ./gradlew --no-daemon :core:engine:test :app:testDebugUnitTest
+        run: ./gradlew --no-daemon :core:engine:test :core:game:test :app:testDebugUnitTest
 
       - name: Build debug APKs and release APK
-        run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease
+        run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease -PpaperSudoku.sideload=true
 
       - name: Run lint
         run: ./gradlew --no-daemon :app:lintDebug
@@ -52,6 +52,24 @@ jobs:
         with:
           name: paper-sudoku-debug
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: paper-sudoku-unit-test-reports
+          path: |
+            core/*/build/reports/tests/
+            app/build/reports/tests/
+            app/build/reports/lint-results-debug.html
+
+      # Room exports its schema at build time; a schema change must be committed with the
+      # migration that handles it.
+      - name: Room schema is committed
+        run: |
+          for f in app/schemas/*/*.json; do echo "== $f"; cat "$f"; done
+          git status --porcelain app/schemas
+          test -z "$(git status --porcelain app/schemas)"
 
   instrumentation:
     runs-on: ubuntu-latest
@@ -114,6 +132,14 @@ jobs:
             adb shell input tap 400 1320 || true
             sleep 3
             adb exec-out screencap -p > app/build/outputs/paper-sudoku-default.png
+            # Night and landscape captures for visual review (uploaded below).
+            adb shell cmd uimode night yes; sleep 4
+            adb exec-out screencap -p > app/build/outputs/paper-sudoku-night.png
+            adb shell cmd uimode night no
+            adb shell settings put system accelerometer_rotation 0
+            adb shell settings put system user_rotation 1; sleep 5
+            adb exec-out screencap -p > app/build/outputs/paper-sudoku-landscape.png
+            adb shell settings put system user_rotation 0; sleep 2
             ./gradlew --no-daemon :app:connectedDebugAndroidTest
 
       - name: Upload instrumentation report
@@ -123,9 +149,9 @@ jobs:
           name: paper-sudoku-instrumentation
           path: app/build/reports/androidTests/
 
-      - name: Upload device screenshot
+      - name: Upload device screenshots
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: paper-sudoku-screenshot
-          path: app/build/outputs/paper-sudoku-default.png
+          name: paper-sudoku-screenshots
+          path: app/build/outputs/paper-sudoku-*.png

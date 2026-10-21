@@ -1,24 +1,26 @@
 # Paper Sudoku — Store Listing Draft
 
-## Short description (80 characters max)
+## Short description (80 characters max — this one is 80)
 
-A calm daily Sudoku with a coach when you are stuck. 6×6 in two minutes, 9×9 when you have time.
+A calm Sudoku notebook with a Coach that teaches. One page a day, fully offline.
 
 ## Full description
 
-**A quieter daily Sudoku.**
+**A Sudoku notebook that teaches.**
 
-Paper Sudoku gives you one small 6×6 puzzle each day, designed to fit a coffee break. When you
-need a nudge, Coach explains the next logical step instead of handing you the answer. No accounts,
-no ads, no notifications, no streak guilt.
+Paper Sudoku gives you one small 6×6 page each day, sized for a coffee break, and Classic 9×9
+when you have longer. When you are stuck, the Coach shows you where to look, then why, and only
+then the answer — so next time you won't need it. No accounts, no ads, no notifications, no
+streak guilt.
 
-- Daily 6×6 Mini, with a new puzzle every day
-- Classic 9×9 puzzles for longer sessions
-- Notes, undo, erase, and a light two-technique Coach
-- Paper and Night themes
-- Local stats for completed games and best time
-- Hardware keyboard support and TalkBack actions
-- Fully offline; no `INTERNET` permission
+- Daily Mini 6×6, the same page for everyone each day, fully offline
+- Classic 9×9 in Gentle, Steady and Tricky, never-ending
+- A three-step Coach: hidden and naked singles, pointing, claiming, pairs, X-Wing
+- A journal that stamps each page you finish; play any past day
+- Printed digits, ink and pencil — and you can print any puzzle on real paper
+- Notes, undo, digit lock, pause, Paper and Night themes
+- TalkBack, hardware keyboard, tablets and foldables
+- No `INTERNET` permission
 
 Paper Sudoku is for people who like the ritual of solving, not another feed to check.
 
@@ -37,11 +39,11 @@ privacy/data-safety updates must be designed before release.
 
 Capture on a phone and a tablet:
 
-1. Daily Mini, fresh board, timer visible
-2. Daily Mini with notes and a selected cell
-3. Coach showing a hidden single explanation
-4. Solved state with elapsed time
-5. Classic 9×9 on a tablet / expanded layout
+1. Daily Mini, fresh page, timer visible
+2. Coach at "Why", with the pattern and crossed-out candidates on the board
+3. Solved page with the ink stamp
+4. Journal calendar with stamped days and the technique handbook
+5. Classic 9×9 on a tablet / landscape, tools beside the board
 6. Night theme
 
 Use real puzzle data and no personal information. The Android status bar and navigation bar are

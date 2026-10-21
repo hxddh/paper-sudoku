@@ -4,12 +4,13 @@
 
 - App name: **Paper Sudoku** / **纸上数独**
 - `applicationId`: `com.titpea.papersudoku`
-- Version: `1.0.0` (`versionCode 1`)
+- Version: `2.0.0` (`versionCode 2`)
 - Minimum SDK: 26
 - Target SDK: 36
 - Compile SDK: 37 (required by Material 3 Expressive `1.5.0-beta01`)
 - Material 3 `1.5.0-beta01`: current public Expressive API; replace with 1.5 stable before rollout if available
 - No `INTERNET`, billing, ads, analytics, or account permissions
+- Android backup: Room database + DataStore only (`xml/data_extraction_rules.xml`)
 
 ## Signed AAB
 
@@ -38,11 +39,35 @@ Without those variables, `assembleRelease` still verifies R8/resource shrinking 
 unsigned artifact. A Play upload must use the signed AAB. Enroll in Play App Signing and keep the
 upload key separate from the app-signing key.
 
+## Tagged release (CI)
+
+**Sideload (no secrets needed):** `git tag v2.0.0-sideload && git push origin v2.0.0-sideload`
+publishes an APK signed with the CI runner's debug key. Each sideload build has a different key,
+so testers uninstall before updating. Not for Play.
+
+**Signed (Play-ready):**
+
+Store the upload key as repository secrets, then push a tag:
+
+```bash
+base64 -w0 paper-sudoku-upload.jks   # → PAPER_SUDOKU_KEYSTORE_BASE64
+# also: PAPER_SUDOKU_STORE_PASSWORD, PAPER_SUDOKU_KEY_ALIAS, PAPER_SUDOKU_KEY_PASSWORD
+git tag v2.0.0 && git push origin v2.0.0
+```
+
+`.github/workflows/release.yml` runs the tests and lint, builds the signed APK and AAB, and
+attaches both to a GitHub release with `CHANGELOG.md` as notes. Without the secrets the workflow
+stops with an error instead of publishing an unsigned or debug-signed build.
+
+Upgrading from the 1.0 sideload APK: that APK was signed with a local debug key. Android will not
+update it with a release-signed 2.0 build; users must uninstall 1.0 first (its local stats are
+lost unless restored from an Android backup).
+
 ## Preflight
 
 ```bash
 ./gradlew --no-daemon \
-  :core:engine:test \
+  :core:engine:test :core:game:test \
   :app:testDebugUnitTest \
   :app:assembleDebug \
   :app:assembleDebugAndroidTest \
@@ -76,5 +101,6 @@ substitute for a signed release check.
 - [ ] `versionCode` increased and `versionName` updated
 - [ ] Signed AAB verified with the upload key
 - [ ] TalkBack, 200% font, dark theme, rotation, and process-death restore checked on a device
-- [ ] Daily puzzle bank validator and unit tests pass
+- [ ] Engine/game/ViewModel tests pass; Room schema committed (CI checks)
+- [ ] Upgrade test: install the previous Play build, play, then update; journal and in-progress game survive
 - [ ] Store screenshots and descriptions match the shipped UI

@@ -1,5 +1,8 @@
 package com.titpea.papersudoku.game
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,16 +15,21 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -36,95 +44,113 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.titpea.papersudoku.R
+import com.titpea.papersudoku.designsystem.FrauncesPen
+import com.titpea.papersudoku.designsystem.FrauncesPrinted
+import com.titpea.papersudoku.designsystem.PaperTheme
+import com.titpea.papersudoku.engine.DigitMask
+import com.titpea.papersudoku.game.model.GameState
 
 enum class BoardAction { Notes, Erase, Coach }
 
 /**
- * The board is the one custom-drawn component in the app.
+ * The board: the one custom-drawn surface in the app.
  *
- * Grid lines are drawn once in a Canvas; each cell remains a real semantics node with a
- * CollectionItemInfo so TalkBack can announce its row/column/value. Digits are Text, not
- * Canvas text, so they are selectable/readable by accessibility services.
+ * Grid lines are a Canvas; each cell is a real semantics node (row/column, value, notes, state)
+ * with custom actions, and digits are Text so accessibility services read them.
  *
- * 9×9 cells are 43.3dp on a 390dp phone, below the 48dp touch-target guideline. Production must
- * either use 6×6 on phones, offer a keyboard/row-column picker, or treat this as a documented
- * exception. 6×6 cells are 65dp and meet the guideline.
+ * Three writing layers: printed givens (Fraunces), the player's pen (Fraunces italic, ink blue),
+ * and pencil notes (system sans). Conflicts get a second, non-color cue: an underline.
  */
 @Composable
 fun SudokuBoard(
-    state: GameUiState,
-    onCellSelected: (Int) -> Unit,
+    game: GameState,
+    conflicts: Set<Int>,
+    mistakes: Set<Int>,
+    marks: CoachMarks,
+    hidden: Boolean,
+    onTap: (Int) -> Unit,
     onCellAction: (Int, BoardAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val lineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)
-    val strongLineColor = MaterialTheme.colorScheme.outline
-    val boardShape = RoundedCornerShape(3.dp)
+    val ink = PaperTheme.ink
+    val size = game.size
+    val geometry = game.spec.geometry
+    val selected = game.selected
+    val highlightDigit = game.lockedDigit ?: selected?.let { game.values[it] }?.takeIf { it != 0 }
+    val boardDescription = stringResource(R.string.board_description, size)
 
     BoxWithConstraints(
         modifier = modifier
-            .fillMaxWidth()
-            .widthIn(max = 640.dp)
-            .padding(horizontal = 2.dp)
             .testTag("sudoku-board")
-            .semantics { collectionInfo = CollectionInfo(state.size, state.size) },
+            .semantics {
+                contentDescription = boardDescription
+                collectionInfo = CollectionInfo(size, size)
+            },
         contentAlignment = Alignment.Center,
     ) {
-        val boardSize = minOf(maxWidth, maxHeight)
-        val cellSize = boardSize / state.size
-
+        val cellSize = minOf(maxWidth, maxHeight) / size
         Box(
-            modifier = Modifier
-                .size(boardSize)
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.72f), boardShape),
+            Modifier
+                .fillMaxSize()
+                .background(ink.sheet, RoundedCornerShape(6.dp))
+                .border(1.5.dp, ink.boxLine, RoundedCornerShape(6.dp)),
         ) {
-            Canvas(Modifier.fillMaxSize()) {
-                val cell = size.width / state.size
-                for (i in 0..state.size) {
-                    val verticalStroke = if (i % state.boxCols == 0) 2.dp.toPx() else 1.dp.toPx()
-                    val horizontalStroke = if (i % state.boxRows == 0) 2.dp.toPx() else 1.dp.toPx()
-                    // Keep the outer stroke inside the Canvas; a line centered on x=0 loses half
-                    // its width to clipping and the board looks borderless at the screen edge.
-                    val x = (i * cell).coerceIn(verticalStroke / 2f, size.width - verticalStroke / 2f)
-                    val y = (i * cell).coerceIn(horizontalStroke / 2f, size.height - horizontalStroke / 2f)
-                    drawLine(
-                        color = if (i % state.boxCols == 0) strongLineColor else lineColor,
-                        start = Offset(x, 0f),
-                        end = Offset(x, size.height),
-                        strokeWidth = verticalStroke,
-                    )
-                    drawLine(
-                        color = if (i % state.boxRows == 0) strongLineColor else lineColor,
-                        start = Offset(0f, y),
-                        end = Offset(size.width, y),
-                        strokeWidth = horizontalStroke,
-                    )
-                }
-            }
-
             Column(Modifier.fillMaxSize()) {
-                for (row in 0 until state.size) {
+                for (row in 0 until size) {
                     Row(Modifier.weight(1f).fillMaxWidth()) {
-                        for (column in 0 until state.size) {
-                            val index = row * state.size + column
+                        for (column in 0 until size) {
+                            val index = row * size + column
+                            val related = selected != null && selected != index && geometry.sees(selected, index)
                             BoardCell(
-                                state = state,
                                 index = index,
                                 row = row,
                                 column = column,
+                                value = if (hidden) 0 else game.values[index],
+                                notes = if (hidden) 0 else game.notes[index],
+                                given = game.isGiven(index),
+                                size = size,
                                 cellSize = cellSize,
-                                onCellSelected = onCellSelected,
+                                isSelected = selected == index,
+                                related = related && !hidden,
+                                sameDigit = !hidden && highlightDigit != null && game.values[index] == highlightDigit,
+                                highlightDigit = highlightDigit,
+                                conflict = index in conflicts && !hidden,
+                                mistake = index in mistakes && !hidden,
+                                marks = marks,
+                                enabled = !hidden && !game.solved,
+                                onTap = onTap,
                                 onCellAction = onCellAction,
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                             )
                         }
                     }
+                }
+            }
+            Canvas(Modifier.fillMaxSize()) {
+                val cell = this.size.width / size
+                for (i in 1 until size) {
+                    val verticalBox = i % game.spec.boxCols == 0
+                    val horizontalBox = i % game.spec.boxRows == 0
+                    drawLine(
+                        color = if (verticalBox) ink.boxLine else ink.gridLine,
+                        start = Offset(i * cell, 0f),
+                        end = Offset(i * cell, this.size.height),
+                        strokeWidth = if (verticalBox) 2.dp.toPx() else 1.dp.toPx(),
+                    )
+                    drawLine(
+                        color = if (horizontalBox) ink.boxLine else ink.gridLine,
+                        start = Offset(0f, i * cell),
+                        end = Offset(this.size.width, i * cell),
+                        strokeWidth = if (horizontalBox) 2.dp.toPx() else 1.dp.toPx(),
+                    )
                 }
             }
         }
@@ -133,101 +159,143 @@ fun SudokuBoard(
 
 @Composable
 private fun BoardCell(
-    state: GameUiState,
     index: Int,
     row: Int,
     column: Int,
+    value: Int,
+    notes: Int,
+    given: Boolean,
+    size: Int,
     cellSize: Dp,
-    onCellSelected: (Int) -> Unit,
+    isSelected: Boolean,
+    related: Boolean,
+    sameDigit: Boolean,
+    highlightDigit: Int?,
+    conflict: Boolean,
+    mistake: Boolean,
+    marks: CoachMarks,
+    enabled: Boolean,
+    onTap: (Int) -> Unit,
     onCellAction: (Int, BoardAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val cell = state.cells[index]
-    val isSelected = state.selected == index
-    val isRelated = isRelated(state, index)
-    val isHintPeer = state.hint?.let { isRelatedTo(it.index, state, index) } == true
-    val isHintFocus = state.hint?.index == index
-    val isConflict = index in state.conflicts
+    val colors = MaterialTheme.colorScheme
+    val ink = PaperTheme.ink
+    val isTarget = marks.target == index
+    val inPattern = index in marks.pattern
+    val inFocus = index in marks.focus
+    val removed = marks.removals[index].orEmpty()
 
     val background = when {
-        isHintFocus -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-        isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-        isHintPeer -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-        isRelated -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+        isTarget -> colors.primary.copy(alpha = 0.20f)
+        isSelected -> colors.primary.copy(alpha = 0.16f)
+        inPattern -> colors.primaryContainer.copy(alpha = 0.85f)
+        inFocus -> colors.tertiaryContainer.copy(alpha = 0.55f)
+        sameDigit -> colors.secondaryContainer.copy(alpha = 0.75f)
+        related -> colors.surfaceVariant.copy(alpha = 0.45f)
         else -> Color.Transparent
     }
+    val wrong = conflict || mistake
     val digitColor = when {
-        isConflict -> MaterialTheme.colorScheme.error
-        cell.given -> MaterialTheme.colorScheme.onSurface
-        else -> MaterialTheme.colorScheme.secondary
+        wrong -> colors.error
+        given -> ink.printed
+        else -> ink.pen
     }
+
     val density = LocalDensity.current
-    val digitSize = with(density) {
-        (cellSize.toPx() * 0.46f).toSp()
+    val digitSize: TextUnit = with(density) { (cellSize.toPx() * 0.56f).toSp() }
+    val noteSize: TextUnit = with(density) { (cellSize.toPx() / 3f * 0.66f).toSp() }
+
+    // Ink lands with a small settle when the player writes a digit.
+    val appear = remember { Animatable(1f) }
+    var lastValue by remember { mutableIntStateOf(value) }
+    LaunchedEffect(value) {
+        if (value != 0 && value != lastValue && !given) {
+            appear.snapTo(0f)
+            appear.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium))
+        }
+        lastValue = value
     }
-    val valueText = when {
-        isConflict && cell.value != 0 -> stringResource(R.string.cell_conflict, cell.value)
-        cell.given -> stringResource(R.string.cell_given, cell.value)
-        cell.value != 0 -> stringResource(R.string.cell_entered, cell.value)
-        else -> stringResource(R.string.cell_empty)
-    }
-    val description = stringResource(R.string.cell_description, row + 1, column + 1, valueText)
+
+    val description = cellDescription(row, column, value, notes, given, conflict, mistake)
     val notesLabel = stringResource(R.string.notes)
     val eraseLabel = stringResource(R.string.erase)
     val coachLabel = stringResource(R.string.coach)
-    val shape = RoundedCornerShape(2.dp)
+    val outline = colors.primary
 
     Box(
         modifier = modifier
             .testTag("cell-$index")
             .background(background)
             .then(
-                if (isSelected || isHintFocus) {
-                    Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape)
+                if (isSelected || isTarget) {
+                    Modifier.border(2.dp, outline, RoundedCornerShape(2.dp))
                 } else {
                     Modifier
                 },
             )
             .semantics {
-                collectionItemInfo = CollectionItemInfo(row, column, 1, 1)
+                collectionItemInfo = CollectionItemInfo(row, 1, column, 1)
                 role = Role.Button
                 contentDescription = description
                 selected = isSelected
-                customActions = listOf(
-                    CustomAccessibilityAction(notesLabel) {
-                        onCellAction(index, BoardAction.Notes)
-                        true
-                    },
-                    CustomAccessibilityAction(eraseLabel) {
-                        onCellAction(index, BoardAction.Erase)
-                        true
-                    },
-                    CustomAccessibilityAction(coachLabel) {
-                        onCellAction(index, BoardAction.Coach)
-                        true
-                    },
-                )
+                if (enabled) {
+                    customActions = listOf(
+                        CustomAccessibilityAction(notesLabel) { onCellAction(index, BoardAction.Notes); true },
+                        CustomAccessibilityAction(eraseLabel) { onCellAction(index, BoardAction.Erase); true },
+                        CustomAccessibilityAction(coachLabel) { onCellAction(index, BoardAction.Coach); true },
+                    )
+                }
             }
-            .clickable { onCellSelected(index) },
+            .clickable(enabled = enabled) { onTap(index) },
         contentAlignment = Alignment.Center,
     ) {
-        if (cell.value != 0) {
-            Text(
-                text = cell.value.toString(),
+        when {
+            value != 0 -> Text(
+                text = value.toString(),
                 color = digitColor,
-                fontSize = digitSize,
-                fontWeight = if (cell.given) FontWeight.SemiBold else FontWeight.Normal,
                 textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.headlineSmall.copy(
+                style = TextStyle(
+                    fontFamily = if (given) FrauncesPrinted else FrauncesPen,
                     fontSize = digitSize,
-                    fontFeatureSettings = "tnum",
+                    fontWeight = if (given) FontWeight.SemiBold else FontWeight.Normal,
+                    fontFeatureSettings = "lnum, tnum",
                 ),
+                modifier = Modifier
+                    .graphicsLayer {
+                        val s = 1.25f - 0.25f * appear.value
+                        scaleX = s
+                        scaleY = s
+                        alpha = appear.value
+                    }
+                    .then(
+                        if (wrong) {
+                            Modifier.drawBehind {
+                                val y = this.size.height * 0.92f
+                                drawLine(
+                                    color = digitColor,
+                                    start = Offset(this.size.width * 0.15f, y),
+                                    end = Offset(this.size.width * 0.85f, y),
+                                    strokeWidth = 2.dp.toPx(),
+                                )
+                            }
+                        } else {
+                            Modifier
+                        },
+                    ),
             )
-        } else if (cell.notes.isNotEmpty()) {
-            NoteGrid(
-                notes = cell.notes,
-                size = state.size,
-                cellSize = cellSize,
+            isTarget && marks.ghost != null -> Text(
+                text = marks.ghost.toString(),
+                color = colors.primary.copy(alpha = 0.55f),
+                textAlign = TextAlign.Center,
+                style = TextStyle(fontFamily = FrauncesPen, fontSize = digitSize),
+            )
+            notes != 0 || removed.isNotEmpty() -> NoteGrid(
+                notes = notes,
+                removed = removed,
+                size = size,
+                noteSize = noteSize,
+                highlightDigit = highlightDigit,
             )
         }
     }
@@ -235,33 +303,39 @@ private fun BoardCell(
 
 @Composable
 private fun NoteGrid(
-    notes: Set<Int>,
+    notes: Int,
+    removed: Set<Int>,
     size: Int,
-    cellSize: Dp,
+    noteSize: TextUnit,
+    highlightDigit: Int?,
 ) {
     val columns = 3
     val rows = if (size == 6) 2 else 3
-    val density = LocalDensity.current
-    val noteSize = with(density) {
-        (cellSize.toPx() * 0.14f).toSp()
-    }
-
-    Column(Modifier.fillMaxSize().padding(2.dp)) {
-        repeat(rows) { row ->
+    val ink = PaperTheme.ink
+    val colors = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxSize().padding(1.dp)) {
+        repeat(rows) { r ->
             Row(Modifier.weight(1f).fillMaxWidth()) {
-                repeat(columns) { column ->
-                    val digit = row * columns + column + 1
-                    Box(
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (digit <= size && digit in notes) {
+                repeat(columns) { c ->
+                    val digit = r * columns + c + 1
+                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                        val struck = digit in removed
+                        val noted = DigitMask.contains(notes, digit)
+                        if (digit <= size && (noted || struck)) {
+                            val emphasised = digit == highlightDigit
                             Text(
                                 text = digit.toString(),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = noteSize,
-                                fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center,
+                                color = when {
+                                    struck -> colors.error
+                                    emphasised -> colors.secondary
+                                    else -> ink.pencil
+                                },
+                                style = TextStyle(
+                                    fontSize = noteSize,
+                                    fontWeight = if (emphasised) FontWeight.Bold else FontWeight.Medium,
+                                    textDecoration = if (struck) TextDecoration.LineThrough else null,
+                                    textAlign = TextAlign.Center,
+                                ),
                             )
                         }
                     }
@@ -271,21 +345,29 @@ private fun NoteGrid(
     }
 }
 
-private fun isRelated(state: GameUiState, index: Int): Boolean {
-    val selected = state.selected ?: return false
-    if (selected == index) return false
-    return isRelatedTo(selected, state, index)
-}
-
-private fun isRelatedTo(anchor: Int, state: GameUiState, index: Int): Boolean {
-    if (anchor == index) return false
-    val size = state.size
-    val anchorRow = anchor / size
-    val anchorColumn = anchor % size
-    val row = index / size
-    val column = index % size
-    val sameBox =
-        row / state.boxRows == anchorRow / state.boxRows &&
-            column / state.boxCols == anchorColumn / state.boxCols
-    return row == anchorRow || column == anchorColumn || sameBox
+@Composable
+private fun cellDescription(
+    row: Int,
+    column: Int,
+    value: Int,
+    notes: Int,
+    given: Boolean,
+    conflict: Boolean,
+    mistake: Boolean,
+): String {
+    val state = when {
+        value == 0 && notes != 0 -> stringResource(
+            R.string.cell_notes,
+            DigitMask.digits(notes).joinToString(" "),
+        )
+        value == 0 -> stringResource(R.string.cell_empty)
+        given -> stringResource(R.string.cell_given, value)
+        else -> stringResource(R.string.cell_entered, value)
+    }
+    val suffix = when {
+        conflict -> ", " + stringResource(R.string.cell_conflict)
+        mistake -> ", " + stringResource(R.string.cell_mistake)
+        else -> ""
+    }
+    return stringResource(R.string.cell_description, row + 1, column + 1, state) + suffix
 }

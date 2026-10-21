@@ -1,0 +1,84 @@
+name: Release
+
+# Push a tag to publish a GitHub release:
+# - v2.0.0           → signed with the private upload key (APK + AAB). Requires the secrets
+#                      PAPER_SUDOKU_KEYSTORE_BASE64, PAPER_SUDOKU_STORE_PASSWORD,
+#                      PAPER_SUDOKU_KEY_ALIAS, PAPER_SUDOKU_KEY_PASSWORD (see docs/release.md).
+# - v2.0.0-sideload  → APK signed with the runner's debug key, for sideload testing only.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Install Android SDK 37
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0"
+
+      - name: Test and lint
+        run: ./gradlew --no-daemon :core:engine:test :core:game:test :app:testDebugUnitTest :app:lintDebug
+
+      - name: Build sideload APK
+        if: endsWith(github.ref_name, '-sideload')
+        run: |
+          ./gradlew --no-daemon :app:assembleRelease -PpaperSudoku.sideload=true
+          version="${GITHUB_REF_NAME#v}"
+          cp app/build/outputs/apk/release/app-release.apk "paper-sudoku-$version.apk"
+          {
+            echo "**Sideload build.** Signed with a build-machine debug key for testing outside Google Play."
+            echo "To update from an earlier sideload build (including 1.0), uninstall it first."
+            echo
+            cat CHANGELOG.md
+          } > release-notes.md
+
+      - name: Restore upload key
+        if: ${{ !endsWith(github.ref_name, '-sideload') }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.PAPER_SUDOKU_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::PAPER_SUDOKU_KEYSTORE_BASE64 is not set; see docs/release.md, or tag vX.Y.Z-sideload"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+          echo "PAPER_SUDOKU_KEYSTORE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+
+      - name: Build signed APK and AAB
+        if: ${{ !endsWith(github.ref_name, '-sideload') }}
+        env:
+          PAPER_SUDOKU_STORE_PASSWORD: ${{ secrets.PAPER_SUDOKU_STORE_PASSWORD }}
+          PAPER_SUDOKU_KEY_ALIAS: ${{ secrets.PAPER_SUDOKU_KEY_ALIAS }}
+          PAPER_SUDOKU_KEY_PASSWORD: ${{ secrets.PAPER_SUDOKU_KEY_PASSWORD }}
+        run: |
+          ./gradlew --no-daemon :app:assembleRelease :app:bundleRelease
+          version="${GITHUB_REF_NAME#v}"
+          cp app/build/outputs/apk/release/app-release.apk "paper-sudoku-$version.apk"
+          cp app/build/outputs/bundle/release/app-release.aab "paper-sudoku-$version.aab"
+          cp CHANGELOG.md release-notes.md
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" paper-sudoku-"$version".* \
+            --title "Paper Sudoku $version" --notes-file release-notes.md

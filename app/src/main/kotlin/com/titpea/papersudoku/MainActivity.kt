@@ -1,91 +1,73 @@
 package com.titpea.papersudoku
 
 import android.os.Bundle
+import android.view.KeyEvent
+import android.view.KeyboardShortcutGroup
+import android.view.KeyboardShortcutInfo
+import android.view.Menu
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
-import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.titpea.papersudoku.data.ThemeMode
+import com.titpea.papersudoku.data.UserSettings
 import com.titpea.papersudoku.designsystem.SudokuTheme
-import com.titpea.papersudoku.game.GameScreen
-import com.titpea.papersudoku.game.GameViewModel
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
-    @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         val container = (application as SudokuApplication).container
+        val versionName = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
 
         setContent {
-            val windowSizeClass = calculateWindowSizeClass(this)
-            val themeMode by container.settingsRepository.themeMode
-                .collectAsStateWithLifecycle(initialValue = ThemeMode.System)
-            val completedCount by container.statsRepository.completedCount
-                .collectAsStateWithLifecycle(initialValue = 0)
-            val bestSeconds by container.statsRepository.bestSeconds
-                .collectAsStateWithLifecycle(initialValue = null)
-
-            val darkTheme = when (themeMode) {
+            val settings by container.settingsStore.settings
+                .collectAsStateWithLifecycle(initialValue = UserSettings())
+            val darkTheme = when (settings.theme) {
                 ThemeMode.System -> isSystemInDarkTheme()
                 ThemeMode.Light -> false
                 ThemeMode.Dark -> true
             }
-            val themeLabel = stringResource(
-                when (themeMode) {
-                    ThemeMode.System -> R.string.theme_system
-                    ThemeMode.Light -> R.string.theme_light
-                    ThemeMode.Dark -> R.string.theme_dark
-                },
-            )
-
-            SudokuTheme(darkTheme = darkTheme) {
+            SudokuTheme(darkTheme = darkTheme, dynamicColor = settings.dynamicColor) {
                 SideEffect {
                     WindowCompat.getInsetsController(window, window.decorView).apply {
                         isAppearanceLightStatusBars = !darkTheme
                         isAppearanceLightNavigationBars = !darkTheme
                     }
                 }
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background,
-                ) {
-                    val viewModel: GameViewModel = viewModel(
-                        factory = GameViewModel.factory(container),
-                    )
-                    val state by viewModel.uiState.collectAsStateWithLifecycle()
-
-                    GameScreen(
-                        state = state,
-                        onEvent = viewModel::onEvent,
-                        widthSizeClass = windowSizeClass.widthSizeClass,
-                        completedCount = completedCount,
-                        bestSeconds = bestSeconds,
-                        themeLabel = themeLabel,
-                        onCycleTheme = {
-                            lifecycleScope.launch {
-                                container.settingsRepository.setThemeMode(themeMode.next())
-                            }
-                        },
-                    )
-                }
+                PaperSudokuApp(container, versionName)
             }
         }
+    }
+
+    /** Lists the hardware-keyboard shortcuts in the system helper (Meta + /). */
+    override fun onProvideKeyboardShortcuts(
+        data: MutableList<KeyboardShortcutGroup>,
+        menu: Menu?,
+        deviceId: Int,
+    ) {
+        super.onProvideKeyboardShortcuts(data, menu, deviceId)
+        fun item(label: Int, keyCode: Int, modifiers: Int = 0) =
+            KeyboardShortcutInfo(getString(label), keyCode, modifiers)
+        data += KeyboardShortcutGroup(
+            getString(R.string.app_name),
+            listOf(
+                item(R.string.shortcut_move, KeyEvent.KEYCODE_DPAD_UP),
+                item(R.string.shortcut_digit, KeyEvent.KEYCODE_1),
+                item(R.string.shortcut_erase, KeyEvent.KEYCODE_DEL),
+                item(R.string.shortcut_undo, KeyEvent.KEYCODE_Z, KeyEvent.META_CTRL_ON),
+                item(R.string.shortcut_notes, KeyEvent.KEYCODE_N),
+                item(R.string.shortcut_coach, KeyEvent.KEYCODE_H),
+                item(R.string.shortcut_pause, KeyEvent.KEYCODE_P),
+            ),
+        )
     }
 }

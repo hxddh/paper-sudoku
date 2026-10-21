@@ -1,388 +1,454 @@
 package com.titpea.papersudoku.game
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.titpea.papersudoku.AppContainer
 import com.titpea.papersudoku.data.GameResult
-import com.titpea.papersudoku.data.Puzzles
-import com.titpea.papersudoku.data.StatsRepository
-import com.titpea.papersudoku.engine.Hint
+import com.titpea.papersudoku.data.GameStore
+import com.titpea.papersudoku.data.SettingsStore
+import com.titpea.papersudoku.data.UserSettings
+import com.titpea.papersudoku.engine.CoachHint
+import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.engine.SudokuEngine
-import com.titpea.papersudoku.engine.Technique
+import com.titpea.papersudoku.game.model.Catalog
+import com.titpea.papersudoku.game.model.GameState
+import com.titpea.papersudoku.game.model.PuzzleKind
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Clock
 import java.time.LocalDate
 
-data class CellUi(
-    val value: Int,
-    val given: Boolean,
-    val notes: Set<Int>,
+/** A Coach session: what it found and how far the player has asked it to go (1 look, 2 why, 3 answer). */
+data class CoachUi(val hint: CoachHint?, val level: Int)
+
+enum class SlotStatus { New, InProgress, Solved }
+
+data class PickerUi(
+    val today: Long,
+    val daily: SlotStatus,
+    /** For each difficulty, the number of an unfinished Classic, if any. */
+    val classicInProgress: Map<Difficulty, Int?>,
 )
 
-data class HintUi(val index: Int, val digit: Int, val technique: Technique)
-
-enum class Sheet { None, Keypad, Coach }
-
-data class GameUiState(
-    val size: Int,
-    val boxRows: Int,
-    val boxCols: Int,
-    val cells: List<CellUi>,
-    val selected: Int?,
-    val notesMode: Boolean,
-    val sheet: Sheet,
-    val hint: HintUi?,
-    val conflicts: Set<Int>,
-    val solved: Boolean,
-    val startedAt: Long = 0L,
-    val puzzleDate: LocalDate? = null,
+data class PlayUiState(
+    val loading: Boolean = true,
+    val game: GameState? = null,
+    val coach: CoachUi? = null,
+    val conflicts: Set<Int> = emptySet(),
+    val mistakes: Set<Int> = emptySet(),
+    val userPaused: Boolean = false,
+    /** Monotonic time the clock started running, or null while it is stopped. */
+    val runningSince: Long? = null,
+    val settings: UserSettings = UserSettings(),
+    val today: Long = 0,
+    val picker: PickerUi? = null,
+    /** True only right after the solving move, so the stamp animates once. */
+    val justSolved: Boolean = false,
 ) {
-    val isMini: Boolean get() = size == 6
+    val boardLocked: Boolean get() = loading || userPaused || game?.solved != false
 }
 
-sealed interface GameEvent {
-    data class SelectCell(val index: Int) : GameEvent
-    data class Digit(val digit: Int) : GameEvent
-    data object Undo : GameEvent
-    data object Erase : GameEvent
-    data object ToggleNotes : GameEvent
-    data object Coach : GameEvent
-    data object PlaceHint : GameEvent
-    data object DismissSheet : GameEvent
-    data object NewGame : GameEvent
-    data object ToggleMode : GameEvent
+sealed interface PlayEvent {
+    data class Tap(val index: Int) : PlayEvent
+    data class Select(val index: Int) : PlayEvent
+    data class Digit(val digit: Int) : PlayEvent
+    data class Lock(val digit: Int) : PlayEvent
+    data object Erase : PlayEvent
+    data object Undo : PlayEvent
+    data object ToggleNotes : PlayEvent
+    data object Coach : PlayEvent
+    data object CoachDeeper : PlayEvent
+    data object CoachApply : PlayEvent
+    data object DismissCoach : PlayEvent
+    data object TogglePause : PlayEvent
+    data object Foreground : PlayEvent
+    data object Background : PlayEvent
+    data object Restart : PlayEvent
+    data object NextClassic : PlayEvent
+    data class OpenDaily(val epochDay: Long) : PlayEvent
+    data class OpenClassic(val difficulty: Difficulty) : PlayEvent
+    data object OpenPicker : PlayEvent
+    data object ClosePicker : PlayEvent
 }
+
+/** One-off feedback for haptics. */
+enum class PlayEffect { Placed, Conflict, Solved, Toggled }
 
 /**
- * State holder for the game.
+ * Owns the puzzle on the desk.
  *
- * - `SavedStateHandle` persists the in-progress board, notes, selection, mode, and counters across
- *   process death / rotation.
- * - `StatsRepository` (Room) records completed games exactly once.
- * - `GameViewModel.factory` wires both through the app container; tests pass a fake repository.
+ * - Every change is saved (debounced) as JSON in Room, so a game survives process death, a swipe
+ *   from Recents, a reboot, and an update.
+ * - The clock only runs while the screen is visible and not paused; time is folded into the
+ *   game whenever it stops.
+ * - Results are recorded once per puzzle.
  */
 class GameViewModel(
-    private val savedStateHandle: SavedStateHandle,
-    private val statsRepository: StatsRepository,
-    private val clock: Clock = Clock.systemDefaultZone(),
+    private val store: GameStore,
+    private val settingsStore: SettingsStore,
+    private val clock: Clock,
+    private val ticker: () -> Long,
+    private val generatorDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
 
-    private val today: LocalDate get() = LocalDate.now(clock)
-    private var puzzle = Puzzles.dailyMiniFor(today)
-    private var puzzleIndex = Math.floorMod(today.toEpochDay(), Puzzles.dailyMini.size.toLong()).toInt()
-    private var puzzleDate: LocalDate? = today
-    private var engine = SudokuEngine(puzzle)
-    private var values = puzzle.givens.toIntArray()
-    private var notes = MutableList(puzzle.givens.size) { mutableSetOf<Int>() }
-    private var selected: Int? = null
-    private var notesMode = false
-    private var sheet = Sheet.Keypad
-    private var hint: Hint? = null
-    private val history = ArrayDeque<Snapshot>()
+    private val _state = MutableStateFlow(PlayUiState(today = today()))
+    val state: StateFlow<PlayUiState> = _state.asStateFlow()
 
-    private var startedAt: Long = savedStateHandle.get<Long>(KEY_STARTED_AT) ?: clock.millis()
-    private var hintsUsed: Int = savedStateHandle.get<Int>(KEY_HINTS) ?: 0
-    private var recorded: Boolean = savedStateHandle.get<Boolean>(KEY_RECORDED) ?: false
+    private val _effects = Channel<PlayEffect>(Channel.BUFFERED)
+    val effects: Flow<PlayEffect> = _effects.receiveAsFlow()
 
-    private val _uiState = MutableStateFlow(buildState())
-    val uiState = _uiState.asStateFlow()
+    private var engine: SudokuEngine? = null
+    private var engineKey: String? = null
+    private var foreground = false
+    private var saveJob: Job? = null
+    private var loadJob: Job? = null
 
     init {
-        if (!restore()) {
-            resetBoard()
-        }
-    }
-
-    fun onEvent(event: GameEvent) {
-        when (event) {
-            is GameEvent.SelectCell -> selectCell(event.index)
-            is GameEvent.Digit -> enterDigit(event.digit)
-            GameEvent.Undo -> undo()
-            GameEvent.Erase -> erase()
-            GameEvent.ToggleNotes -> {
-                notesMode = !notesMode
-                publish()
-            }
-            GameEvent.Coach -> coach()
-            GameEvent.PlaceHint -> placeHint()
-            GameEvent.DismissSheet -> dismissSheet()
-            GameEvent.NewGame -> newGame()
-            GameEvent.ToggleMode -> toggleMode()
-        }
-    }
-
-    private fun selectCell(index: Int) {
-        if (index !in values.indices) return
-        selected = index
-        hint = null
-        sheet = if (puzzle.givens[index] != 0) {
-            if (puzzle.size == 6) Sheet.Keypad else Sheet.None
-        } else {
-            Sheet.Keypad
-        }
-        publish()
-    }
-
-    private fun enterDigit(digit: Int) {
-        if (digit !in 1..puzzle.size) return
-        val index = selected ?: return
-        if (puzzle.givens[index] != 0) return
-
-        if (notesMode) {
-            if (values[index] != 0) return
-            pushHistory()
-            val candidates = notes[index]
-            if (!candidates.add(digit)) candidates.remove(digit)
-        } else {
-            pushHistory()
-            values[index] = digit
-            notes[index].clear()
-        }
-        hint = null
-        sheet = Sheet.Keypad
-        publish()
-    }
-
-    private fun undo() {
-        val snapshot = history.removeLastOrNull() ?: return
-        values = snapshot.values.copyOf()
-        notes = snapshot.notes.map { it.toMutableSet() }.toMutableList()
-        selected = snapshot.selected
-        hint = null
-        sheet = if (puzzle.size == 6) Sheet.Keypad else Sheet.None
-        publish()
-    }
-
-    private fun erase() {
-        val index = selected ?: return
-        if (puzzle.givens[index] != 0) return
-        if (values[index] == 0 && notes[index].isEmpty()) return
-        pushHistory()
-        values[index] = 0
-        notes[index].clear()
-        hint = null
-        publish()
-    }
-
-    private fun coach() {
-        hint = engine.findNextHint(values)
-        if (hint != null) hintsUsed += 1
-        selected = null
-        sheet = Sheet.Coach
-        publish()
-    }
-
-    private fun placeHint() {
-        val current = hint ?: return
-        pushHistory()
-        values[current.index] = current.digit
-        notes[current.index].clear()
-        hint = null
-        selected = null
-        sheet = Sheet.Keypad
-        publish()
-    }
-
-    private fun dismissSheet() {
-        hint = null
-        selected = null
-        sheet = if (puzzle.size == 6) Sheet.Keypad else Sheet.None
-        publish()
-    }
-
-    private fun resetBoard() {
-        values = puzzle.givens.toIntArray()
-        notes = MutableList(puzzle.givens.size) { mutableSetOf() }
-        selected = null
-        notesMode = false
-        hint = null
-        history.clear()
-        sheet = if (puzzle.size == 6) Sheet.Keypad else Sheet.None
-        startedAt = clock.millis()
-        hintsUsed = 0
-        recorded = false
-        publish()
-    }
-
-    private fun newGame() {
-        if (puzzle.size == 6) {
-            // The daily mini is one puzzle per day: restart or load today's if the day changed.
-            if (puzzleDate != today) selectMini(today) else resetBoard()
-        } else {
-            selectClassic(puzzleIndex + 1, today)
-        }
-    }
-
-    private fun toggleMode() {
-        if (puzzle.size == 6) {
-            selectClassic(0, today)
-        } else {
-            selectMini(today)
-        }
-    }
-
-    private fun selectMini(date: LocalDate) {
-        puzzleIndex = Math.floorMod(date.toEpochDay(), Puzzles.dailyMini.size.toLong()).toInt()
-        puzzle = Puzzles.dailyMini[puzzleIndex]
-        puzzleDate = date
-        engine = SudokuEngine(puzzle)
-        resetBoard()
-    }
-
-    private fun selectClassic(index: Int, date: LocalDate) {
-        puzzleIndex = Math.floorMod(index.toLong(), Puzzles.classic.size.toLong()).toInt()
-        puzzle = Puzzles.classic[puzzleIndex]
-        puzzleDate = date
-        engine = SudokuEngine(puzzle)
-        resetBoard()
-    }
-
-    private fun pushHistory() {
-        history.addLast(
-            Snapshot(
-                values = values.copyOf(),
-                notes = notes.map { it.toSet() },
-                selected = selected,
-            ),
-        )
-        if (history.size > 100) history.removeFirst()
-    }
-
-    private fun publish() {
-        val next = buildState()
-        _uiState.value = next
-        persist()
-        maybeRecord(next)
-    }
-
-    private fun buildState(): GameUiState {
-        val cells = values.indices.map { index ->
-            CellUi(
-                value = values[index],
-                given = puzzle.givens[index] != 0,
-                notes = notes[index].toSet(),
-            )
-        }
-        return GameUiState(
-            size = puzzle.size,
-            boxRows = puzzle.boxRows,
-            boxCols = puzzle.boxCols,
-            cells = cells,
-            selected = selected,
-            notesMode = notesMode,
-            sheet = sheet,
-            hint = hint?.let { HintUi(it.index, it.digit, it.technique) },
-            conflicts = engine.conflicts(values),
-            solved = engine.isSolved(values),
-            startedAt = startedAt,
-            puzzleDate = puzzleDate,
-        )
-    }
-
-    private fun persist() {
-        savedStateHandle[KEY_MODE] = if (puzzle.size == 6) MODE_MINI else MODE_CLASSIC
-        savedStateHandle[KEY_PUZZLE_INDEX] = puzzleIndex
-        savedStateHandle[KEY_PUZZLE_DAY] = puzzleDate?.toEpochDay()
-        savedStateHandle[KEY_VALUES] = ArrayList(values.toList())
-        savedStateHandle[KEY_NOTES] = ArrayList(notes.map { it.joinToString(",") })
-        savedStateHandle[KEY_SELECTED] = selected
-        savedStateHandle[KEY_NOTES_MODE] = notesMode
-        savedStateHandle[KEY_HINTS] = hintsUsed
-        savedStateHandle[KEY_STARTED_AT] = startedAt
-        savedStateHandle[KEY_RECORDED] = recorded
-    }
-
-    private fun maybeRecord(state: GameUiState) {
-        if (!state.solved || recorded) return
-        recorded = true
-        savedStateHandle[KEY_RECORDED] = true
-        val mode = if (puzzle.size == 6) MODE_MINI else MODE_CLASSIC
-        val completedAt = clock.millis()
-        val duration = ((completedAt - startedAt) / 1000L).coerceAtLeast(0L)
         viewModelScope.launch {
-            statsRepository.record(
+            settingsStore.settings.collect { settings ->
+                _state.update { it.copy(settings = settings).withDerived() }
+            }
+        }
+        viewModelScope.launch {
+            val initial = settingsStore.settings.first()
+            val today = today()
+            store.pruneUnsolvedDailies(today - KEEP_UNFINISHED_DAILY_DAYS)
+            val active = initial.activeKey
+            val resumed = active
+                ?.takeIf { it.startsWith("classic-") }
+                ?.let { store.load(it) }
+            if (resumed != null) show(resumed) else openDaily(today)
+        }
+    }
+
+    fun onEvent(event: PlayEvent) {
+        val settings = _state.value.settings
+        when (event) {
+            is PlayEvent.Tap -> mutate { it.tap(event.index, settings.autoClearNotes) }
+            is PlayEvent.Select -> mutate { it.select(event.index) }
+            is PlayEvent.Digit -> mutate { it.input(event.digit, settings.autoClearNotes) }
+            is PlayEvent.Lock -> mutate(effect = PlayEffect.Toggled) { it.toggleLock(event.digit) }
+            PlayEvent.Erase -> mutate { it.erase() }
+            PlayEvent.Undo -> mutate { it.undo() }
+            PlayEvent.ToggleNotes -> mutate(effect = PlayEffect.Toggled) { it.toggleNotesMode() }
+            PlayEvent.Coach -> openCoach()
+            PlayEvent.CoachDeeper -> deepenCoach()
+            PlayEvent.CoachApply -> applyCoach()
+            PlayEvent.DismissCoach -> _state.update { it.copy(coach = null) }
+            PlayEvent.TogglePause -> togglePause()
+            PlayEvent.Foreground -> onForeground()
+            PlayEvent.Background -> onBackground()
+            PlayEvent.Restart -> restart()
+            PlayEvent.NextClassic -> nextClassic()
+            is PlayEvent.OpenDaily -> openDaily(event.epochDay)
+            is PlayEvent.OpenClassic -> openClassic(event.difficulty)
+            PlayEvent.OpenPicker -> openPicker()
+            PlayEvent.ClosePicker -> _state.update { it.copy(picker = null) }
+        }
+    }
+
+    // region Board
+
+    private fun mutate(effect: PlayEffect? = null, block: (GameState) -> GameState) {
+        val current = _state.value
+        val before = current.game ?: return
+        if (current.boardLocked) return
+        var after = block(before)
+        if (after == before) return
+
+        val boardChanged = after.values != before.values || after.notes != before.notes
+        var running = current.runningSince
+        var feedback = effect
+        if (after.values == after.spec.solution) {
+            running?.let { after = after.addElapsed(ticker() - it) }
+            running = null
+            after = after.settle(clock.millis())
+            feedback = PlayEffect.Solved
+            record(after)
+        } else if (after.values != before.values) {
+            val placed = after.values.indices.firstOrNull { after.values[it] != before.values[it] && after.values[it] != 0 }
+            if (placed != null) {
+                val conflicts = engineFor(after).conflicts(after.values.toIntArray())
+                feedback = if (placed in conflicts) PlayEffect.Conflict else PlayEffect.Placed
+            }
+        }
+        _state.update {
+            it.copy(
+                game = after,
+                runningSince = running,
+                coach = if (boardChanged) null else it.coach,
+                justSolved = after.solved && !before.solved,
+            ).withDerived()
+        }
+        scheduleSave()
+        feedback?.let { _effects.trySend(it) }
+    }
+
+    // endregion
+
+    // region Coach
+
+    private fun openCoach() {
+        val current = _state.value
+        val game = current.game ?: return
+        if (current.boardLocked) return
+        val hint = engineFor(game).hint(game.values.toIntArray())
+        val updated = if (hint != null) game.coachAsked() else game
+        _state.update { it.copy(game = updated, coach = CoachUi(hint, level = 1)) }
+        scheduleSave()
+    }
+
+    private fun deepenCoach() {
+        val current = _state.value
+        val coach = current.coach ?: return
+        val game = current.game ?: return
+        if (coach.hint == null || coach.level >= 3) return
+        val level = coach.level + 1
+        _state.update { it.copy(game = game.coachReached(level), coach = coach.copy(level = level)) }
+        val hint = coach.hint
+        if (level >= 2 && hint is CoachHint.Next) {
+            viewModelScope.launch {
+                settingsStore.update { it.copy(techniquesMet = it.techniquesMet + hint.technique) }
+            }
+        }
+        scheduleSave()
+    }
+
+    private fun applyCoach() {
+        val coach = _state.value.coach ?: return
+        if (coach.level < 3) return
+        val autoClear = _state.value.settings.autoClearNotes
+        when (val hint = coach.hint) {
+            is CoachHint.Next -> mutate { it.placeHint(hint.placement.index, hint.placement.digit, autoClear) }
+            is CoachHint.Mistake -> mutate { it.select(hint.index).erase() }
+            null -> Unit
+        }
+    }
+
+    // endregion
+
+    // region Clock
+
+    private fun togglePause() {
+        val current = _state.value
+        val game = current.game ?: return
+        if (game.solved || current.loading) return
+        if (current.userPaused) {
+            _state.update { it.copy(userPaused = false, runningSince = if (foreground) ticker() else null) }
+        } else {
+            _state.update { it.copy(game = foldClock(it), userPaused = true, runningSince = null, coach = null) }
+            saveNow()
+        }
+    }
+
+    private fun onForeground() {
+        foreground = true
+        val today = today()
+        _state.update { it.copy(today = today) }
+        val game = _state.value.game
+        val day = game?.spec?.epochDay
+        if (game != null && game.solved && day != null && day < today) {
+            openDaily(today)
+            return
+        }
+        _state.update {
+            if (it.game != null && !it.game.solved && !it.userPaused && it.runningSince == null) {
+                it.copy(runningSince = ticker())
+            } else {
+                it
+            }
+        }
+    }
+
+    private fun onBackground() {
+        foreground = false
+        _state.update { it.copy(game = foldClock(it), runningSince = null) }
+        saveNow()
+    }
+
+    private fun foldClock(state: PlayUiState): GameState? {
+        val game = state.game ?: return null
+        val since = state.runningSince ?: return game
+        return game.addElapsed(ticker() - since)
+    }
+
+    // endregion
+
+    // region Puzzles
+
+    private fun restart() {
+        val game = _state.value.game ?: return
+        _state.update {
+            it.copy(
+                game = game.restart(),
+                coach = null,
+                userPaused = false,
+                runningSince = if (foreground) ticker() else null,
+                justSolved = false,
+            ).withDerived()
+        }
+        saveNow()
+    }
+
+    private fun nextClassic() {
+        val difficulty = _state.value.game?.spec?.difficulty ?: Difficulty.Gentle
+        load {
+            val number = store.nextClassicNumber(difficulty)
+            GameState.new(withContext(generatorDispatcher) { Catalog.classic(difficulty, number) })
+        }
+    }
+
+    private fun openDaily(epochDay: Long) {
+        load {
+            store.load(Catalog.dailyKey(epochDay))
+                ?: GameState.new(withContext(generatorDispatcher) { Catalog.daily(epochDay) })
+        }
+    }
+
+    private fun openClassic(difficulty: Difficulty) {
+        val current = _state.value.game
+        if (current != null && current.spec.kind == PuzzleKind.Classic &&
+            current.spec.difficulty == difficulty && !current.solved
+        ) {
+            _state.update { it.copy(picker = null) }
+            return
+        }
+        load {
+            store.latestUnsolvedClassic(difficulty) ?: run {
+                val number = store.nextClassicNumber(difficulty)
+                GameState.new(withContext(generatorDispatcher) { Catalog.classic(difficulty, number) })
+            }
+        }
+    }
+
+    private fun openPicker() {
+        viewModelScope.launch {
+            val today = today()
+            val daily = store.load(Catalog.dailyKey(today))
+            val status = when {
+                daily == null -> SlotStatus.New
+                daily.solved -> SlotStatus.Solved
+                else -> SlotStatus.InProgress
+            }
+            val classic = Difficulty.entries.associateWith { d ->
+                store.latestUnsolvedClassic(d)?.spec?.number
+            }
+            _state.update { it.copy(picker = PickerUi(today, status, classic)) }
+        }
+    }
+
+    private fun load(source: suspend () -> GameState) {
+        loadJob?.cancel()
+        // Stop the current puzzle's clock now: generating the next one is not time spent on it.
+        _state.update {
+            it.copy(game = foldClock(it), runningSince = null, loading = true, picker = null, coach = null)
+        }
+        loadJob = viewModelScope.launch { show(source()) }
+    }
+
+    private suspend fun show(next: GameState) {
+        val previous = foldClock(_state.value)
+        if (previous != null && previous.spec.key != next.spec.key) store.save(previous, clock.millis())
+        _state.update {
+            it.copy(
+                loading = false,
+                game = next,
+                coach = null,
+                picker = null,
+                userPaused = false,
+                runningSince = if (foreground && !next.solved) ticker() else null,
+                justSolved = false,
+            ).withDerived()
+        }
+        store.save(next, clock.millis())
+        settingsStore.update { it.copy(activeKey = next.spec.key) }
+    }
+
+    // endregion
+
+    private fun record(game: GameState) {
+        val spec = game.spec
+        viewModelScope.launch {
+            store.save(game, clock.millis())
+            store.recordOnce(
                 GameResult(
-                    mode = mode,
-                    durationSeconds = duration,
-                    hints = hintsUsed,
-                    completedAt = completedAt,
+                    puzzleKey = spec.key,
+                    kind = spec.kind,
+                    difficulty = spec.difficulty,
+                    durationSeconds = game.elapsedMillis / 1_000,
+                    coachAsks = game.coach.asks,
+                    coachLevel = game.coach.deepest,
+                    completedAt = game.solvedAt ?: clock.millis(),
+                    epochDay = spec.epochDay,
                 ),
             )
+            settingsStore.update { it.copy(techniquesMet = it.techniquesMet + spec.hardest) }
         }
     }
 
-    private fun restore(): Boolean {
-        val mode = savedStateHandle.get<String>(KEY_MODE) ?: return false
-        val savedValues = savedStateHandle.get<ArrayList<Int>>(KEY_VALUES) ?: return false
-
-        val bank = if (mode == MODE_CLASSIC) Puzzles.classic else Puzzles.dailyMini
-        val savedIndex = savedStateHandle.get<Int>(KEY_PUZZLE_INDEX) ?: 0
-        if (savedIndex !in bank.indices) return false
-        puzzleIndex = savedIndex
-        puzzle = bank[savedIndex]
-        puzzleDate = savedStateHandle.get<Long>(KEY_PUZZLE_DAY)
-            ?.let(LocalDate::ofEpochDay)
-            ?: if (mode == MODE_MINI) today else null
-        if (savedValues.size != puzzle.givens.size) return false
-
-        engine = SudokuEngine(puzzle)
-        values = savedValues.toIntArray()
-        val savedNotes = savedStateHandle.get<ArrayList<String>>(KEY_NOTES)
-        notes = MutableList(puzzle.givens.size) { index ->
-            savedNotes
-                ?.getOrNull(index)
-                ?.split(",")
-                ?.mapNotNull { it.toIntOrNull() }
-                ?.toMutableSet()
-                ?: mutableSetOf()
+    private fun scheduleSave() {
+        saveJob?.cancel()
+        saveJob = viewModelScope.launch {
+            delay(SAVE_DEBOUNCE_MILLIS)
+            _state.value.game?.let { store.save(foldClock(_state.value) ?: it, clock.millis()) }
         }
-        selected = savedStateHandle.get<Int>(KEY_SELECTED)?.takeIf { it in values.indices }
-        notesMode = savedStateHandle.get<Boolean>(KEY_NOTES_MODE) ?: false
-        startedAt = savedStateHandle.get<Long>(KEY_STARTED_AT) ?: clock.millis()
-        hintsUsed = savedStateHandle.get<Int>(KEY_HINTS) ?: 0
-        recorded = savedStateHandle.get<Boolean>(KEY_RECORDED) ?: false
-        sheet = if (puzzle.size == 6) Sheet.Keypad else Sheet.None
-        hint = null
-        history.clear()
-        publish()
-        return true
     }
+
+    private fun saveNow() {
+        saveJob?.cancel()
+        val game = _state.value.game ?: return
+        saveJob = viewModelScope.launch { store.save(game, clock.millis()) }
+    }
+
+    private fun engineFor(game: GameState): SudokuEngine {
+        val cached = engine
+        if (cached != null && engineKey == game.spec.key) return cached
+        return SudokuEngine(game.spec.puzzle).also {
+            engine = it
+            engineKey = game.spec.key
+        }
+    }
+
+    private fun PlayUiState.withDerived(): PlayUiState {
+        val game = game ?: return this
+        val values = game.values.toIntArray()
+        val engine = engineFor(game)
+        return copy(
+            conflicts = engine.conflicts(values),
+            mistakes = if (settings.showMistakes && !game.solved) engine.mistakes(values) else emptySet(),
+        )
+    }
+
+    private fun today(): Long = LocalDate.now(clock).toEpochDay()
 
     companion object {
-        private const val KEY_MODE = "mode"
-        private const val KEY_PUZZLE_INDEX = "puzzle_index"
-        private const val KEY_PUZZLE_DAY = "puzzle_day"
-        private const val KEY_VALUES = "values"
-        private const val KEY_NOTES = "notes"
-        private const val KEY_SELECTED = "selected"
-        private const val KEY_NOTES_MODE = "notes_mode"
-        private const val KEY_HINTS = "hints"
-        private const val KEY_STARTED_AT = "started_at"
-        private const val KEY_RECORDED = "recorded"
-
-        private const val MODE_MINI = "mini"
-        private const val MODE_CLASSIC = "classic"
+        private const val SAVE_DEBOUNCE_MILLIS = 400L
+        private const val KEEP_UNFINISHED_DAILY_DAYS = 60L
 
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 GameViewModel(
-                    savedStateHandle = createSavedStateHandle(),
-                    statsRepository = container.statsRepository,
+                    store = container.gameStore,
+                    settingsStore = container.settingsStore,
+                    clock = container.clock,
+                    ticker = container.ticker,
                 )
             }
         }
     }
-
-    private data class Snapshot(
-        val values: IntArray,
-        val notes: List<Set<Int>>,
-        val selected: Int?,
-    )
 }

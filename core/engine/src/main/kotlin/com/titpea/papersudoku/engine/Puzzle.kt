@@ -22,4 +22,6 @@ data class Puzzle(
             "every given must match the solution"
         }
     }
+
+    val geometry: Geometry get() = Geometry.of(size, boxRows, boxCols)
 }
