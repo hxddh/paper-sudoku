@@ -1,12 +1,13 @@
 # Android 开发规范 / Checklist
 
 > 适用：Paper Sudoku（Android）  
-> 基线：`targetSdk 36`、`minSdk 26`、Jetpack Compose + Material 3  
+> 基线：`targetSdk 36`、`compileSdk 37`、`minSdk 26`、Jetpack Compose + Material 3 Expressive  
 > 目标：先把“平台合规”和“可访问”做对，再加内容/变现。
 
 ## 0. 不可妥协
 
-- [x] `targetSdk = 36`、`compileSdk = 36`（Play 2026-08-31 起要求）
+- [x] `targetSdk = 36`（Play 2026-08-31 起要求）、`compileSdk = 37`
+- [x] Material 3 Expressive：`MaterialExpressiveTheme` + expressive motion；`material3 1.5.0-beta01`
 - [x] `minSdk = 26`（Android 8+，`java.time` 可用）
 - [x] 单 Activity + Compose；`enableEdgeToEdge()`
 - [x] `android:enableOnBackInvokedCallback="true"`；不依赖 `onBackPressed`
@@ -44,9 +45,9 @@
 | 顶部栏 | `TopAppBar`（small） | 自绘状态栏/假 9:41 |
 | 棋盘 | 自定义 `Layout` + `Canvas` 画线 + `Text` 放数字 | `LazyVerticalGrid`、Canvas 画字 |
 | 单元格 | `Modifier.clickable` + `semantics` + `collectionItemInfo` | 只画不语义化 |
-| 数字键盘 | `Button` / `FilledTonalButton` | 自绘按钮 |
+| 数字键盘 | `ButtonGroup` + `FilledTonalButton` | 自绘按钮 |
 | 键盘/Coach 面板 | `BottomSheetScaffold` 的 standard sheet | 自绘浮层 |
-| 底部动作 | `Surface` + `IconButton` / `FilledTonalButton` | `NavigationBar`（它是目的地导航） |
+| 底部动作 | 圆角 `Surface` + `TextButton` / `Button` | `NavigationBar`（它是目的地导航） |
 | 菜单 | `IconButton` + `DropdownMenu` | 自绘 `···` |
 | 重置确认 | `AlertDialog` | 自绘弹窗 |
 | 分享 | 系统 Sharesheet | 自建分享面板 |
@@ -73,7 +74,7 @@
 ## 4. 返回、Insets、系统栏
 
 - [x] `enableEdgeToEdge`；`targetSdk 36` 不 opt-out
-- [x] `TopAppBar` 处理状态栏；sheet 内容 `navigationBarsPadding()`；Mini peek = 248dp + 导航栏高度（键盘常驻），Classic peek = 64dp
+- [x] `TopAppBar` 处理状态栏；sheet 内容 `navigationBarsPadding()`；Mini peek = 256dp + 导航栏高度（键盘常驻），Classic peek = 64dp
 - [x] 不画假状态栏/Home indicator
 - [x] 主题切换同步系统栏图标明暗（`WindowCompat` side effect）
 - [x] 返回键：sheet 展开时先收起；再返回退出
@@ -147,7 +148,7 @@
 
 ## 9. Definition of Done
 
-- [x] `targetSdk 36`，edge-to-edge，无假系统栏
+- [x] `targetSdk 36` / `compileSdk 37`，Material 3 Expressive，edge-to-edge，无假系统栏
 - [x] 6×6 手机主路径所有触控 ≥48dp
 - [ ] 9×9 有替代输入或明确例外（当前明确 43.3dp 例外）
 - [ ] TalkBack、200% 字体、键盘、深色、横屏/多窗口设备通过

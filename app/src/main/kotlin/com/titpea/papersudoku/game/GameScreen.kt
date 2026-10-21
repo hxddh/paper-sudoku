@@ -30,7 +30,6 @@ import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonGroup
-import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -655,9 +654,9 @@ private fun Keypad(
                 List(3) { MutableInteractionSource() }
             }
             ButtonGroup(
-                overflowIndicator = { menuState ->
-                    ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
-                },
+                // Three weighted keys always fit; an overflow button would add a second,
+                // zero-size "More options" node that TalkBack and tests cannot disambiguate.
+                overflowIndicator = {},
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
