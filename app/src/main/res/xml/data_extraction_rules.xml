@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: the user's own Android backup and device-to-device transfer carry the journal
+     and settings. The app itself has no network access. -->
 <data-extraction-rules>
     <cloud-backup>
-        <exclude domain="root" path="." />
+        <include domain="database" path="." />
+        <include domain="file" path="datastore/" />
     </cloud-backup>
     <device-transfer>
-        <exclude domain="root" path="." />
+        <include domain="database" path="." />
+        <include domain="file" path="datastore/" />
     </device-transfer>
 </data-extraction-rules>
