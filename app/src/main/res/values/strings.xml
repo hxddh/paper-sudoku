@@ -15,7 +15,6 @@
     <string name="coach">Coach</string>
     <string name="not_now">Not now</string>
     <string name="place_digit">Place %1$d</string>
-    <string name="coach_label">Coach</string>
     <string name="technique_naked_single">Naked single</string>
     <string name="technique_hidden_single">Hidden single</string>
     <string name="hint_title_naked">Only one candidate: %1$d.</string>

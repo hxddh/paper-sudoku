@@ -15,7 +15,6 @@
     <string name="coach">教练</string>
     <string name="not_now">暂不</string>
     <string name="place_digit">填入 %1$d</string>
-    <string name="coach_label">教练</string>
     <string name="technique_naked_single">唯一余数</string>
     <string name="technique_hidden_single">隐性唯一</string>
     <string name="hint_title_naked">这里只能填 %1$d。</string>

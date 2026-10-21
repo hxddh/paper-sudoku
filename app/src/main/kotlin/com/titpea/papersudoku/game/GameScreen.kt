@@ -490,7 +490,7 @@ private fun CoachContent(
             text = when (hint?.technique) {
                 Technique.NakedSingle -> stringResource(R.string.technique_naked_single)
                 Technique.HiddenSingle -> stringResource(R.string.technique_hidden_single)
-                null -> stringResource(R.string.coach_label)
+                null -> stringResource(R.string.coach)
             },
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
