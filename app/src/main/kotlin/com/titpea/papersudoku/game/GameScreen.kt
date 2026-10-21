@@ -159,7 +159,9 @@ private fun CompactGameScreen(
         sheetContent = {
             GameSheet(state = state, onEvent = onEvent)
         },
-        sheetPeekHeight = 64.dp + navigationBars,
+        // The mini uses an always-on keypad. Keep its whole dock+keypad above the peek line,
+        // even before the sheet animation settles; Classic stays compact and opens on demand.
+        sheetPeekHeight = (if (state.isMini) 248.dp else 64.dp) + navigationBars,
         sheetDragHandle = { BottomSheetDefaults.DragHandle() },
         sheetContainerColor = MaterialTheme.colorScheme.surface,
         containerColor = MaterialTheme.colorScheme.background,

@@ -9,6 +9,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -54,7 +55,7 @@ class GameScreenTest {
         showMini(selected = null, events = events)
 
         composeRule.onNodeWithTag("cell-2").performClick()
-        composeRule.onNodeWithTag("keypad-1").performClick()
+        composeRule.onNodeWithTag("keypad-1").assertIsDisplayed().performClick()
         composeRule.onNodeWithTag("coach-action").performClick()
 
         assertEquals(
