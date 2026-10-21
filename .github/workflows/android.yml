@@ -140,10 +140,8 @@ jobs:
             adb shell settings put system user_rotation 1; sleep 5
             adb exec-out screencap -p > app/build/outputs/paper-sudoku-landscape.png
             adb shell settings put system user_rotation 0; sleep 2
-            for f in default night landscape; do
-              (convert "app/build/outputs/paper-sudoku-$f.png" -resize 420x420 -quality 55 "/tmp/$f.jpg" || cp "app/build/outputs/paper-sudoku-$f.png" "/tmp/$f.jpg") || true
-              echo "PREVIEW-$f-BEGIN"; base64 -w0 "/tmp/$f.jpg" || true; echo; echo "PREVIEW-$f-END"
-            done
+            # The emulator runner executes each line on its own, so the loop stays on one line.
+            for f in default night landscape; do (convert "app/build/outputs/paper-sudoku-$f.png" -resize 420x420 -quality 55 "/tmp/$f.jpg" || cp "app/build/outputs/paper-sudoku-$f.png" "/tmp/$f.jpg"); echo "PREVIEW-$f-BEGIN"; base64 -w0 "/tmp/$f.jpg"; echo; echo "PREVIEW-$f-END"; done || true
             ./gradlew --no-daemon :app:connectedDebugAndroidTest
 
       - name: Upload instrumentation report
