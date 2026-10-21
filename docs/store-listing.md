@@ -1,28 +1,27 @@
 # Paper Sudoku — Store Listing Draft
 
-## Short description (80 characters max — this one is 80)
+## Short description (80 characters max — this one is 72)
 
-A calm Sudoku notebook with a Coach that teaches. One page a day, fully offline.
+A Sudoku notebook: one page a day, a Coach in the margin, fully offline.
 
 ## Full description
 
-**A Sudoku notebook that teaches.**
+**A Sudoku notebook.**
 
-Paper Sudoku gives you one small 6×6 page each day, sized for a coffee break, and Classic 9×9
-when you have longer. When you are stuck, the Coach shows you where to look, then why, and only
-then the answer — so next time you won't need it. No accounts, no ads, no notifications, no
-streak guilt.
+Open Paper Sudoku and today's page is in front of you — a small 6×6, made for a coffee break.
+Turn back and every earlier day is there, stamped when you finished it. When you have longer, the
+practice stack waits: 9×9 pages that grow harder as you learn.
 
-- Daily Mini 6×6, the same page for everyone each day, fully offline
-- Classic 9×9 in Gentle, Steady and Tricky, never-ending
-- A three-step Coach: hidden and naked singles, pointing, claiming, pairs, X-Wing
-- A journal that stamps each page you finish; play any past day
-- Printed digits, ink and pencil — and you can print any puzzle on real paper
-- Notes, undo, digit lock, pause, Paper and Night themes
-- TalkBack, hardware keyboard, tablets and foldables
-- No `INTERNET` permission
+Stuck? The Coach writes in the margin: where to look, then why, and the answer only if you ask.
 
-Paper Sudoku is for people who like the ritual of solving, not another feed to check.
+- One page a day, the same for everyone, fully offline
+- Practice that follows you: singles → pointing and pairs → hidden pairs and X-Wings
+- Press and slide to aim; pick up a digit and write it across the page
+- Printed digits, your ink, pencil notes — and print any page on real paper
+- A notebook of stamped days. No streaks.
+- Today's page on your home screen
+- Tablets and foldables: notebook and page side by side
+- No ads, accounts, analytics or `INTERNET` permission
 
 ## Category and tags
 
@@ -37,17 +36,14 @@ privacy/data-safety updates must be designed before release.
 
 ## Screenshot plan
 
-Capture on a phone and a tablet:
+From the CI screenshot matrix (`paper-sudoku-screenshots` artifact) or a device:
 
-1. Daily Mini, fresh page, timer visible
-2. Coach at "Why", with the pattern and crossed-out candidates on the board
-3. Solved page with the ink stamp
-4. Journal calendar with stamped days and the technique handbook
-5. Classic 9×9 on a tablet / landscape, tools beside the board
-6. Night theme
-
-Use real puzzle data and no personal information. The Android status bar and navigation bar are
-real system UI; do not add mockup bars.
+1. Today's page, fresh (Paper)
+2. The Coach at "Why", with the ink line to the board
+3. A stamped page
+4. The notebook with stamped days
+5. A practice page on a tablet, notebook beside it
+6. Night
 
 ## Support / privacy
 
