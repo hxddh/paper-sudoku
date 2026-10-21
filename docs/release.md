@@ -45,6 +45,9 @@ upload key separate from the app-signing key.
 publishes an APK signed with the CI runner's debug key. Each sideload build has a different key,
 so testers uninstall before updating. Not for Play.
 
+Without tag-push access, run the **Release** workflow from the Actions tab with the tag name
+(for example `v2.0.0-sideload`); it creates the tag on the commit it builds.
+
 **Signed (Play-ready):**
 
 Store the upload key as repository secrets, then push a tag:
