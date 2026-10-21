@@ -21,17 +21,18 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
@@ -57,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -161,7 +164,7 @@ private fun CompactGameScreen(
         },
         // The mini uses an always-on keypad. Keep its whole dock+keypad above the peek line,
         // even before the sheet animation settles; Classic stays compact and opens on demand.
-        sheetPeekHeight = (if (state.isMini) 248.dp else 64.dp) + navigationBars,
+        sheetPeekHeight = (if (state.isMini) 256.dp else 64.dp) + navigationBars,
         sheetDragHandle = { BottomSheetDefaults.DragHandle() },
         sheetContainerColor = MaterialTheme.colorScheme.surface,
         containerColor = MaterialTheme.colorScheme.background,
@@ -562,60 +565,69 @@ private fun GameDock(
     state: GameUiState,
     onEvent: (GameEvent) -> Unit,
 ) {
-    Row(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 56.dp)
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 2.dp,
     ) {
-        TextButton(
-            onClick = { onEvent(GameEvent.ToggleNotes) },
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .heightIn(min = 48.dp),
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(
-                text = stringResource(if (state.notesMode) R.string.notes_active else R.string.notes),
-                color = if (state.notesMode) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-        }
-        TextButton(
-            onClick = { onEvent(GameEvent.Undo) },
-            modifier = Modifier
-                .weight(1f)
-                .heightIn(min = 48.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.undo),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        TextButton(
-            onClick = { onEvent(GameEvent.Erase) },
-            modifier = Modifier
-                .weight(1f)
-                .heightIn(min = 48.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.erase),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Button(
-            onClick = { onEvent(GameEvent.Coach) },
-            modifier = Modifier
-                .weight(1.4f)
-                .heightIn(min = 48.dp)
-                .testTag("coach-action"),
-            shape = CircleShape,
-        ) {
-            Text(stringResource(R.string.coach))
+            TextButton(
+                onClick = { onEvent(GameEvent.ToggleNotes) },
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp),
+            ) {
+                Text(
+                    text = stringResource(if (state.notesMode) R.string.notes_active else R.string.notes),
+                    color = if (state.notesMode) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+            TextButton(
+                onClick = { onEvent(GameEvent.Undo) },
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.undo),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            TextButton(
+                onClick = { onEvent(GameEvent.Erase) },
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.erase),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Button(
+                onClick = { onEvent(GameEvent.Coach) },
+                modifier = Modifier
+                    .weight(1.4f)
+                    .heightIn(min = 48.dp)
+                    .testTag("coach-action"),
+                shape = RoundedCornerShape(22.dp),
+            ) {
+                Text(stringResource(R.string.coach))
+            }
         }
     }
 }
@@ -636,27 +648,47 @@ private fun Keypad(
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
             .padding(top = 8.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        rows.forEach { row ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                row.forEach { digit ->
-                    FilledTonalButton(
-                        onClick = { onDigit(digit) },
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer,
+        ) {
+            Column {
+                rows.forEachIndexed { rowIndex, row ->
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .testTag("keypad-$digit"),
-                        shape = MaterialTheme.shapes.small,
+                            .fillMaxWidth()
+                            .height(52.dp),
                     ) {
-                        Text(
-                            text = digit.toString(),
-                            style = MaterialTheme.typography.titleLarge,
+                        row.forEachIndexed { columnIndex, digit ->
+                            TextButton(
+                                onClick = { onDigit(digit) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .testTag("keypad-$digit"),
+                                shape = RectangleShape,
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                ),
+                                contentPadding = PaddingValues(0.dp),
+                            ) {
+                                Text(
+                                    text = digit.toString(),
+                                    style = MaterialTheme.typography.titleLarge,
+                                )
+                            }
+                            if (columnIndex != row.last) {
+                                VerticalDivider(
+                                    modifier = Modifier.fillMaxHeight(),
+                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                                )
+                            }
+                        }
+                    }
+                    if (rowIndex != rows.lastIndex) {
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
                         )
                     }
                 }
