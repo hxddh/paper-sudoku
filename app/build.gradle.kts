@@ -1,14 +1,17 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
 
 android {
     namespace = "com.titpea.papersudoku"
-    compileSdk = 36
-    buildToolsVersion = "36.0.0"
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 0
+        }
+    }
+    buildToolsVersion = "37.0.0"
 
     defaultConfig {
         applicationId = "com.titpea.papersudoku"
@@ -65,10 +68,6 @@ android {
     lint {
         abortOnError = true
     }
-}
-
-kotlin {
-    jvmToolchain(17)
 }
 
 dependencies {

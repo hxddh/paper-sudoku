@@ -6,7 +6,9 @@
 - `applicationId`: `com.titpea.papersudoku`
 - Version: `1.0.0` (`versionCode 1`)
 - Minimum SDK: 26
-- Target/compile SDK: 36
+- Target SDK: 36
+- Compile SDK: 37 (required by Material 3 Expressive `1.5.0-beta01`)
+- Material 3 `1.5.0-beta01`: current public Expressive API; replace with 1.5 stable before rollout if available
 - No `INTERNET`, billing, ads, analytics, or account permissions
 
 ## Signed AAB

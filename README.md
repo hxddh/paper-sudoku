@@ -13,7 +13,7 @@ The source lives at [github.com/hxddh/paper-sudoku](https://github.com/hxddh/pap
 - 31 Classic 9×9 puzzles; “New game” advances through the Classic bank
 - Coach teaches naked single and hidden single, with technique-specific copy
 - Notes, undo, erase, timer, solved overlay with elapsed time, local stats (completed + best)
-- Paper light/dark theme; saved theme; edge-to-edge Material 3 layout
+- Paper light/dark theme; saved theme; edge-to-edge Material 3 Expressive layout
 - Expanded (≥840dp) two-pane layout: board + dock / keypad / Coach rail
 - Hardware keyboard: arrows move, digits enter, Backspace erases, N notes, H coach
 - TalkBack cell semantics plus Notes / Erase / Coach custom actions
@@ -27,8 +27,9 @@ store procedures are in [docs/release.md](docs/release.md) and
 ## Requirements
 
 - JDK 17
-- Android SDK platform 36 + build-tools 36.0.0
-- Gradle wrapper included (`8.13`)
+- Android SDK platform 37.0 + build-tools 37.0.0
+- Gradle wrapper included (`9.6`)
+- `compileSdk 37` is required by Material 3 `1.5.0-beta01`; `targetSdk` remains 36
 - `local.properties` with your SDK path:
 
 ```properties
@@ -77,9 +78,9 @@ currently passes 4/4 on the emulator.
   solution and is solvable with the two Coach techniques.
 - `SudokuEngine`: candidates, naked/hidden singles, conflicts, solved check.
 - `SudokuBoard`: Canvas grid + Text digits, collection semantics, custom actions, test tags.
-- `GameScreen`: compact `BottomSheetScaffold` and expanded two-pane layouts; timer; stats dialog;
-  keyboard handling; solved overlay.
-- `SudokuTheme`: Paper light/dark tokens, type, shapes.
+- `GameScreen`: compact `BottomSheetScaffold` and expanded two-pane layouts; ButtonGroup keypad;
+  timer; stats dialog; keyboard handling; solved overlay.
+- `SudokuTheme`: Paper light/dark tokens, expressive motion, type, shapes.
 - Room: local `game_results` history; DataStore: theme.
 
 Tests cover the engine, ViewModel, puzzle bank, and Compose/accessibility UI. The instrumentation

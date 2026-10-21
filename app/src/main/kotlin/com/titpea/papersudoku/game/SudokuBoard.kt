@@ -71,6 +71,7 @@ fun SudokuBoard(
         modifier = modifier
             .fillMaxWidth()
             .widthIn(max = 640.dp)
+            .padding(horizontal = 2.dp)
             .testTag("sudoku-board")
             .semantics { collectionInfo = CollectionInfo(state.size, state.size) },
         contentAlignment = Alignment.Center,
@@ -86,10 +87,12 @@ fun SudokuBoard(
             Canvas(Modifier.fillMaxSize()) {
                 val cell = size.width / state.size
                 for (i in 0..state.size) {
-                    val x = i * cell
-                    val y = i * cell
                     val verticalStroke = if (i % state.boxCols == 0) 2.dp.toPx() else 1.dp.toPx()
                     val horizontalStroke = if (i % state.boxRows == 0) 2.dp.toPx() else 1.dp.toPx()
+                    // Keep the outer stroke inside the Canvas; a line centered on x=0 loses half
+                    // its width to clipping and the board looks borderless at the screen edge.
+                    val x = (i * cell).coerceIn(verticalStroke / 2f, size.width - verticalStroke / 2f)
+                    val y = (i * cell).coerceIn(horizontalStroke / 2f, size.height - horizontalStroke / 2f)
                     drawLine(
                         color = if (i % state.boxCols == 0) strongLineColor else lineColor,
                         start = Offset(x, 0f),

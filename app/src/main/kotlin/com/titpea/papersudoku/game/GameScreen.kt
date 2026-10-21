@@ -3,6 +3,7 @@ package com.titpea.papersudoku.game
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,13 +22,14 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,7 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberStandardBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -122,9 +124,9 @@ private fun CompactGameScreen(
     val navigationBars = WindowInsets.navigationBars
         .asPaddingValues()
         .calculateBottomPadding()
-    val sheetState = rememberStandardBottomSheetState(
+    val sheetState = rememberBottomSheetState(
         initialValue = if (state.isMini) SheetValue.Expanded else SheetValue.PartiallyExpanded,
-        skipHiddenState = true,
+        enabledValues = setOf(SheetValue.PartiallyExpanded, SheetValue.Expanded),
     )
 
     LaunchedEffect(state.sheet, state.isMini) {
@@ -161,7 +163,7 @@ private fun CompactGameScreen(
         },
         // The mini uses an always-on keypad. Keep its whole dock+keypad above the peek line,
         // even before the sheet animation settles; Classic stays compact and opens on demand.
-        sheetPeekHeight = (if (state.isMini) 248.dp else 64.dp) + navigationBars,
+        sheetPeekHeight = (if (state.isMini) 256.dp else 64.dp) + navigationBars,
         sheetDragHandle = { BottomSheetDefaults.DragHandle() },
         sheetContainerColor = MaterialTheme.colorScheme.surface,
         containerColor = MaterialTheme.colorScheme.background,
@@ -562,60 +564,69 @@ private fun GameDock(
     state: GameUiState,
     onEvent: (GameEvent) -> Unit,
 ) {
-    Row(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 56.dp)
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 2.dp,
     ) {
-        TextButton(
-            onClick = { onEvent(GameEvent.ToggleNotes) },
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .heightIn(min = 48.dp),
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(
-                text = stringResource(if (state.notesMode) R.string.notes_active else R.string.notes),
-                color = if (state.notesMode) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-        }
-        TextButton(
-            onClick = { onEvent(GameEvent.Undo) },
-            modifier = Modifier
-                .weight(1f)
-                .heightIn(min = 48.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.undo),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        TextButton(
-            onClick = { onEvent(GameEvent.Erase) },
-            modifier = Modifier
-                .weight(1f)
-                .heightIn(min = 48.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.erase),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Button(
-            onClick = { onEvent(GameEvent.Coach) },
-            modifier = Modifier
-                .weight(1.4f)
-                .heightIn(min = 48.dp)
-                .testTag("coach-action"),
-            shape = CircleShape,
-        ) {
-            Text(stringResource(R.string.coach))
+            TextButton(
+                onClick = { onEvent(GameEvent.ToggleNotes) },
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp),
+            ) {
+                Text(
+                    text = stringResource(if (state.notesMode) R.string.notes_active else R.string.notes),
+                    color = if (state.notesMode) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+            TextButton(
+                onClick = { onEvent(GameEvent.Undo) },
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.undo),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            TextButton(
+                onClick = { onEvent(GameEvent.Erase) },
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.erase),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Button(
+                onClick = { onEvent(GameEvent.Coach) },
+                modifier = Modifier
+                    .weight(1.4f)
+                    .heightIn(min = 48.dp)
+                    .testTag("coach-action"),
+                shape = RoundedCornerShape(22.dp),
+            ) {
+                Text(stringResource(R.string.coach))
+            }
         }
     }
 }
@@ -638,27 +649,51 @@ private fun Keypad(
             .padding(top = 8.dp, bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        rows.forEach { row ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
+        for (row in rows) {
+            val interactionSources = remember(row) {
+                List(3) { MutableInteractionSource() }
+            }
+            ButtonGroup(
+                // Three weighted keys always fit; an overflow button would add a second,
+                // zero-size "More options" node that TalkBack and tests cannot disambiguate.
+                overflowIndicator = {},
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                row.forEach { digit ->
-                    FilledTonalButton(
-                        onClick = { onDigit(digit) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .testTag("keypad-$digit"),
-                        shape = MaterialTheme.shapes.small,
-                    ) {
-                        Text(
-                            text = digit.toString(),
-                            style = MaterialTheme.typography.titleLarge,
-                        )
-                    }
+                val groupScope = this
+                row.forEachIndexed { index, digit ->
+                    val interactionSource = interactionSources[index]
+                    customItem(
+                        buttonGroupContent = {
+                            FilledTonalButton(
+                                onClick = { onDigit(digit) },
+                                modifier = with(groupScope) {
+                                    Modifier
+                                        .weight(1f)
+                                        .animateWidth(interactionSource)
+                                }
+                                    .height(52.dp)
+                                    .testTag("keypad-$digit"),
+                                shape = MaterialTheme.shapes.medium,
+                                contentPadding = PaddingValues(0.dp),
+                                interactionSource = interactionSource,
+                            ) {
+                                Text(
+                                    text = digit.toString(),
+                                    style = MaterialTheme.typography.titleLarge,
+                                )
+                            }
+                        },
+                        menuContent = { menuState ->
+                            DropdownMenuItem(
+                                text = { Text(digit.toString()) },
+                                onClick = {
+                                    onDigit(digit)
+                                    menuState.dismiss()
+                                },
+                            )
+                        },
+                    )
                 }
             }
         }
