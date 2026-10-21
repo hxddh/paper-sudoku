@@ -2,7 +2,8 @@ package com.titpea.papersudoku.designsystem
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -123,8 +124,9 @@ fun SudokuTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    MaterialTheme(
+    MaterialExpressiveTheme(
         colorScheme = if (darkTheme) PaperDark else PaperLight,
+        motionScheme = MotionScheme.expressive(),
         typography = SudokuTypography,
         shapes = SudokuShapes,
         content = content,

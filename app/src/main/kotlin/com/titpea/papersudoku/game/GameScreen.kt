@@ -3,6 +3,7 @@ package com.titpea.papersudoku.game
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,11 +29,12 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,8 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.VerticalDivider
-import androidx.compose.material3.rememberStandardBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -59,7 +60,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -125,9 +125,9 @@ private fun CompactGameScreen(
     val navigationBars = WindowInsets.navigationBars
         .asPaddingValues()
         .calculateBottomPadding()
-    val sheetState = rememberStandardBottomSheetState(
+    val sheetState = rememberBottomSheetState(
         initialValue = if (state.isMini) SheetValue.Expanded else SheetValue.PartiallyExpanded,
-        skipHiddenState = true,
+        enabledValues = setOf(SheetValue.PartiallyExpanded, SheetValue.Expanded),
     )
 
     LaunchedEffect(state.sheet, state.isMini) {
@@ -648,49 +648,53 @@ private fun Keypad(
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
             .padding(top = 8.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.secondaryContainer,
-        ) {
-            Column {
-                rows.forEachIndexed { rowIndex, row ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                    ) {
-                        row.forEachIndexed { columnIndex, digit ->
-                            TextButton(
+        for (row in rows) {
+            val interactionSources = remember(row) {
+                List(3) { MutableInteractionSource() }
+            }
+            ButtonGroup(
+                overflowIndicator = { menuState ->
+                    ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                val groupScope = this
+                row.forEachIndexed { index, digit ->
+                    val interactionSource = interactionSources[index]
+                    customItem(
+                        buttonGroupContent = {
+                            FilledTonalButton(
                                 onClick = { onDigit(digit) },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
+                                modifier = with(groupScope) {
+                                    Modifier
+                                        .weight(1f)
+                                        .animateWidth(interactionSource)
+                                }
+                                    .height(52.dp)
                                     .testTag("keypad-$digit"),
-                                shape = RectangleShape,
-                                colors = ButtonDefaults.textButtonColors(
-                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                ),
+                                shape = MaterialTheme.shapes.medium,
                                 contentPadding = PaddingValues(0.dp),
+                                interactionSource = interactionSource,
                             ) {
                                 Text(
                                     text = digit.toString(),
                                     style = MaterialTheme.typography.titleLarge,
                                 )
                             }
-                            if (columnIndex != row.last) {
-                                VerticalDivider(
-                                    modifier = Modifier.fillMaxHeight(),
-                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
-                                )
-                            }
-                        }
-                    }
-                    if (rowIndex != rows.lastIndex) {
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
-                        )
-                    }
+                        },
+                        menuContent = { menuState ->
+                            DropdownMenuItem(
+                                text = { Text(digit.toString()) },
+                                onClick = {
+                                    onDigit(digit)
+                                    menuState.dismiss()
+                                },
+                            )
+                        },
+                    )
                 }
             }
         }
