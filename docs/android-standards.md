@@ -3,6 +3,10 @@
 > 适用：Paper Sudoku（Android）  
 > 基线：`targetSdk 36`、`compileSdk 37`、`minSdk 26`、Jetpack Compose + Material 3 Expressive  
 > 目标：先把“平台合规”和“可访问”做对，再加内容/变现。
+>
+> 依赖说明：Material 3 的公开 Expressive 组件目前只在 `1.5.0-beta01` 中提供；1.4 稳定版仍把
+> 这些 API 标为 internal。发布前跟踪 1.5 stable，若仍未发布，需要在“固定 beta”与“等待 stable”
+> 之间做一次明确决策，不能把 beta 当成长期稳定依赖。
 
 ## 0. 不可妥协
 
