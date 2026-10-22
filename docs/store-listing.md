@@ -9,7 +9,7 @@ A Sudoku notebook: one page a day, a Coach in the margin, fully offline.
 **A Sudoku notebook.**
 
 Open Paper Sudoku and today's page is in front of you — a small 6×6, made for a coffee break.
-Turn back and every earlier day is there, stamped when you finished it. When you have longer, the
+Turn back and every day since you started is there, stamped when you finished it. When you have longer, the
 practice stack waits: 9×9 pages that grow harder as you learn.
 
 Stuck? The Coach writes in the margin: where to look, then why, and the answer only if you ask.
@@ -17,7 +17,7 @@ Stuck? The Coach writes in the margin: where to look, then why, and the answer o
 - One page a day, the same for everyone, fully offline
 - Practice that follows you: singles → pointing and pairs → hidden pairs and X-Wings
 - Press and slide to aim; pick up a digit and write it across the page
-- Printed digits, your ink, pencil notes — and print any page on real paper
+- Printed digits, your ink, pencil marks — and print a blank copy of any page on real paper
 - A notebook of stamped days. No streaks.
 - Today's page on your home screen
 - Tablets and foldables: notebook and page side by side

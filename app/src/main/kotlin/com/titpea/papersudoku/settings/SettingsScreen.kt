@@ -117,11 +117,14 @@ fun SettingsScreen(
                             .widthIn(max = 640.dp)
                             .fillMaxWidth()
                             .clickable {
-                                // The system's per-app language screen (Android 13+).
-                                context.startActivity(
-                                    Intent(Settings.ACTION_APP_LOCALE_SETTINGS)
-                                        .setData(Uri.fromParts("package", context.packageName, null)),
-                                )
+                                // The system's per-app language screen (Android 13+); a device
+                                // without it falls back to the app's system settings.
+                                val app = Uri.fromParts("package", context.packageName, null)
+                                runCatching {
+                                    context.startActivity(Intent(Settings.ACTION_APP_LOCALE_SETTINGS).setData(app))
+                                }.recoverCatching {
+                                    context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(app))
+                                }
                             },
                     )
                 }

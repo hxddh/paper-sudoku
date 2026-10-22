@@ -1,4 +1,4 @@
-# Android 开发规范 / Checklist — v4.0
+# Android 开发规范 / Checklist — v5.0
 
 > 基线：`targetSdk 36`、`compileSdk 37`、`minSdk 26`，Jetpack Compose + Material 3 Expressive
 > （`material3 1.5.0-beta01`）、Material 3 Adaptive 1.1、Navigation 3、Room 2.8、DataStore、Glance。
@@ -14,7 +14,7 @@
 - [x] 不锁方向、不禁止 resize；布局按窗口尺寸而非设备类型决定
 - [x] SplashScreen API（`core-splashscreen`），启动画面停留到主题设置读出，深色用户无纸色闪烁
 - [x] R8 + 资源压缩的 release 构建；kotlinx.serialization 自带 R8 规则
-- [x] 无 `INTERNET` 权限；Android 备份包含 Room 与 DataStore
+- [x] 无 `INTERNET` 与 `ACCESS_NETWORK_STATE`（合并清单中移除 WorkManager 声明），CI 对 release APK 检查；Android 备份包含 Room 与 DataStore
 - [ ] Play Data Safety、内容分级、隐私政策托管（文案已更新，提交待 owner）
 
 ## 1. 触控与视觉
@@ -73,7 +73,7 @@
 - [x] Room schema 导出到 `app/schemas`；v1 → v2 → v3 迁移与存储查询有仪器测试
 - [x] 本子读取投影列（`givens`/`grid`），不解码整局 JSON；JSON 编解码在 `Dispatchers.Default`
 - [x] 完成的保存与记录在同一事务
-- [x] 计时使用单调时钟，仅前台且未暂停时计时
+- [x] 计时使用单调时钟，仅页面在前台时计时
 - [x] 题目生成在 `Dispatchers.Default`；明日每日题与下一页练习预先生成并缓存（`cacheDir`）
 - [x] DataStore `ReplaceFileCorruptionHandler`
 - [x] 手写 `AppContainer`（规模不需要 Hilt）
@@ -83,7 +83,7 @@
 - [x] 引擎：几何、求解唯一性、生成确定性与评级、每一步逻辑推导与答案一致、X-Wing 定式
 - [x] `GameState`：输入、笔记整理、撤销、锁定、完成冻结、JSON 往返与篡改拒绝
 - [x] ViewModel：自动保存恢复、计时、只记一次、Coach 三级、错误提示、经典续玩、启动落到今天
-- [x] Compose UI：棋盘语义、事件、Coach、完成页、暂停、宽布局；`AccessibilityChecks`
+- [x] Compose UI：棋盘语义、事件、Coach、完成页、宽布局；`AccessibilityChecks`
 - [x] Room 迁移仪器测试
 - [x] CI：JVM 测试、debug/release 构建、lint、schema 已提交检查、API 36 模拟器仪器测试
 - [x] 截图矩阵（Paper/Night × 页面状态 × 宽屏 × 200% 字号）与已提交的基准图逐张比对

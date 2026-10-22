@@ -1,4 +1,4 @@
-# Design · Paper Sudoku 4.0
+# Design · Paper Sudoku 5.0
 
 **A notebook of pages.** Open it and today's page is in front of you. Turn back and every earlier
 day is there. Finish a page and it is stamped. When you are stuck, the Coach writes in the margin.
@@ -11,7 +11,8 @@ day is there. Finish a page and it is stamped. When you are stuck, the Coach wri
    (tools, Coach, solved note) keeps one height (it grows only for very large text).
 3. **Teach, don't tell.** The Coach answers last, and only with the techniques every generated
    puzzle is graded with.
-4. **Calm.** No streaks, no visible clock, no red marks unless digits truly clash.
+4. **Calm.** No streaks, no visible clock, no error marks unless digits truly clash (terracotta
+   is the ink of the stamp, the Coach and the one digit in hand — never a scolding).
 5. **Native first.** Material 3 / Expressive components and adaptive scaffolds everywhere except
    the board, the one hand-drawn surface.
 
@@ -43,6 +44,10 @@ day is there. Finish a page and it is stamped. When you are stuck, the Coach wri
 - **Coach:** Look tints the unit; Why adds the pattern, crossed-out candidates and the target;
   Answer shows the digit faintly and offers Place. A wrong digit is pointed out first.
 - **Leaving** a page (back, notebook, background) stops the hidden clock.
+- **First page:** until the first digit is ever written, the status line reads "Tap a cell, then a
+  digit — or press and slide to aim." It is the app's only how-to.
+- **Clean:** a page is clean unless the Coach gave its answer; pointing at a wrong digit does not
+  count. The same rule drives stamps, practice levels and share text.
 
 ## Writing layers
 

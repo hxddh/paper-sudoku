@@ -38,7 +38,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Renders the key screens across themes, sizes and font scale and saves them as JPEGs under the
+ * Renders the key screens across themes, sizes and font scale and saves them as PNGs under the
  * app's external files dir (`screenshots/`), which CI pulls and uploads for review. Each capture
  * must render a non-blank image; layout assertions live in the other UI tests.
  */

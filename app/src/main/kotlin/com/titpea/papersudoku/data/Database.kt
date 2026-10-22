@@ -117,6 +117,9 @@ interface GameResultDao {
     @Query("SELECT COUNT(*) FROM game_results")
     suspend fun count(): Int
 
+    @Query("SELECT COUNT(*) FROM game_results")
+    fun observeCount(): Flow<Int>
+
     /** Practice (9×9) solves without the Coach's answer, per difficulty. */
     @Query(
         """
@@ -147,8 +150,14 @@ interface SavedGameDao {
     @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE puzzleKey = :puzzleKey")
     fun observePage(puzzleKey: String): Flow<SavedPageRow?>
 
-    @Query("SELECT MAX(number) FROM saved_games WHERE kind = 'Classic' AND difficulty = :difficulty")
-    suspend fun maxClassicNumber(difficulty: String): Int?
+    /** Highest page number dealt under a key prefix such as "classic-steady-" (the requested level). */
+    @Query(
+        """
+        SELECT MAX(CAST(substr(puzzleKey, length(:prefix) + 1) AS INTEGER)) FROM saved_games
+        WHERE kind = 'Classic' AND substr(puzzleKey, 1, length(:prefix)) = :prefix
+        """,
+    )
+    suspend fun maxClassicNumber(prefix: String): Int?
 
     @Query("DELETE FROM saved_games WHERE kind = 'Daily' AND solved = 0 AND epochDay < :beforeEpochDay")
     suspend fun pruneUnsolvedDailies(beforeEpochDay: Long)

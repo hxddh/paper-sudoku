@@ -58,7 +58,7 @@ jobs:
             echo "**Sideload build.** Signed with a build-machine debug key for testing outside Google Play."
             echo "To update from an earlier sideload build (including 1.0), uninstall it first."
             echo
-            cat CHANGELOG.md
+            sh tools/ci/changelog-section.sh "${version%-sideload}" CHANGELOG.md
           } > release-notes.md
 
       - name: Restore upload key
@@ -84,7 +84,12 @@ jobs:
           version="${TAG#v}"
           cp app/build/outputs/apk/release/app-release.apk "paper-sudoku-$version.apk"
           cp app/build/outputs/bundle/release/app-release.aab "paper-sudoku-$version.aab"
-          cp CHANGELOG.md release-notes.md
+          sh tools/ci/changelog-section.sh "$version" CHANGELOG.md > release-notes.md
+
+      - name: Verify signature
+        run: |
+          version="${TAG#v}"
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "paper-sudoku-$version.apk"
 
       - name: Create GitHub release
         env:

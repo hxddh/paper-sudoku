@@ -11,7 +11,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.unit.sp
 import com.titpea.papersudoku.designsystem.FrauncesPen
 import com.titpea.papersudoku.designsystem.FrauncesPrinted
 import com.titpea.papersudoku.designsystem.PaperTheme
@@ -49,7 +48,8 @@ fun PageThumbnail(
             style = Stroke(width = 1.5f),
         )
         if (page == null) return@Canvas
-        val fontSize = (cell * 0.62f / density / fontScale).sp
+        // Pixels → sp through the density, so the digits fit the cell at any font scale.
+        val fontSize = (cell * 0.62f).toSp()
         for (index in 0 until size * size) {
             val value = page.valueAt(index)
             if (value == 0) continue

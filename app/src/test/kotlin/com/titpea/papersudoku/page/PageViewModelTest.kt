@@ -379,4 +379,116 @@ class PageViewModelTest {
         assertTrue(vm.game().solved)
         assertEquals(0, dailySaves)
     }
+
+    @Test
+    fun `reopening the page in memory while another loads keeps its moves`() = test {
+        val generator = StandardTestDispatcher(testScheduler)
+        val vm = viewModel(generator)
+        advanceUntilIdle()
+        val spec = vm.game().spec
+        val empty = spec.givens.indexOfFirst { it == 0 }
+        vm.onEvent(PageEvent.Tap(empty))
+        vm.onEvent(PageEvent.Digit(spec.solution[empty]))
+        vm.onEvent(PageEvent.OpenDaily(today.toEpochDay() - 40)) // not generated yet: stays loading
+        assertTrue(vm.state.value.loading)
+        vm.onEvent(PageEvent.OpenDaily(today.toEpochDay()))
+        assertFalse(vm.state.value.loading)
+        advanceUntilIdle()
+        assertEquals(spec.key, vm.game().spec.key)
+        assertEquals(spec.solution[empty], vm.game().values[empty])
+        assertEquals(spec.solution[empty], store.saved.getValue(spec.key).first.values[empty])
+    }
+
+    @Test
+    fun `practice asked for while another page loads stays on practice`() = test {
+        val generator = StandardTestDispatcher(testScheduler)
+        val vm = viewModel(generator)
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.OpenPractice)
+        advanceUntilIdle()
+        val practice = vm.game().spec.key
+        vm.onEvent(PageEvent.OpenDaily(today.toEpochDay() - 40))
+        vm.onEvent(PageEvent.OpenPractice)
+        advanceUntilIdle()
+        assertEquals(practice, vm.game().spec.key)
+    }
+
+    @Test
+    fun `a solved practice page comes back after process death`() = test {
+        val handle = SavedStateHandle()
+        val vm = viewModel(savedState = handle)
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.OpenPractice)
+        advanceUntilIdle()
+        vm.solveFully()
+        advanceUntilIdle()
+        val solved = vm.game().spec.key
+        val restored = viewModel(savedState = SavedStateHandle(handle.keys().associateWith { handle.get<Any>(it) }))
+        advanceUntilIdle()
+        assertEquals(solved, restored.game().spec.key)
+        assertTrue(restored.game().solved)
+    }
+
+    @Test
+    fun `being shown a wrong digit keeps the page clean`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        val spec = vm.game().spec
+        val empty = spec.givens.indexOfFirst { it == 0 }
+        vm.onEvent(PageEvent.Tap(empty))
+        vm.onEvent(PageEvent.Digit((spec.solution[empty] % spec.size) + 1))
+        vm.onEvent(PageEvent.Coach)
+        assertTrue(vm.state.value.coach?.hint is CoachHint.Mistake)
+        vm.onEvent(PageEvent.CoachDeeper)
+        vm.onEvent(PageEvent.CoachDeeper)
+        assertEquals(3, vm.state.value.coach?.level)
+        assertEquals(2, vm.game().coach.deepest)
+    }
+
+    @Test
+    fun `a page set aside is not revived by a save on the way out`() = test {
+        val generator = StandardTestDispatcher(testScheduler)
+        val vm = viewModel(generator)
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.OpenPractice)
+        advanceUntilIdle()
+        val setAside = vm.game().spec
+        val empty = setAside.givens.indexOfFirst { it == 0 }
+        vm.onEvent(PageEvent.Tap(empty))
+        vm.onEvent(PageEvent.Digit(setAside.solution[empty]))
+        vm.onEvent(PageEvent.NextPractice)
+        vm.onEvent(PageEvent.Background)
+        advanceUntilIdle()
+        assertFalse(store.saved.containsKey(setAside.key))
+        assertTrue(vm.game().spec.key != setAside.key)
+    }
+
+    @Test
+    fun `the how-to line goes once a first digit is written`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        assertFalse(vm.state.value.settings.wroteFirstDigit)
+        val spec = vm.game().spec
+        val empty = spec.givens.indexOfFirst { it == 0 }
+        vm.onEvent(PageEvent.Tap(empty))
+        vm.onEvent(PageEvent.Digit(spec.solution[empty]))
+        advanceUntilIdle()
+        assertTrue(settings.flow.value.wroteFirstDigit)
+    }
+
+    @Test
+    fun `a daily solved a day late still turns to the new day`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.Background)
+        instant = Instant.parse("2026-10-22T09:00:00Z")
+        vm.onEvent(PageEvent.Foreground)
+        vm.solveFully()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.Background)
+        instant = Instant.parse("2026-10-23T09:00:00Z")
+        vm.onEvent(PageEvent.Foreground)
+        advanceUntilIdle()
+        assertEquals(Catalog.dailyKey(today.toEpochDay() + 2), vm.game().spec.key)
+    }
 }

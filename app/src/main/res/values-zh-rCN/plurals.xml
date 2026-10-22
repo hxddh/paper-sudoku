@@ -3,4 +3,7 @@
     <plurals name="notebook_summary">
         <item quantity="other">已盖章 %1$d 页。</item>
     </plurals>
+    <plurals name="practice_to_next">
+        <item quantity="other">再做 %1$d 页（不看教练答案）即可升级</item>
+    </plurals>
 </resources>

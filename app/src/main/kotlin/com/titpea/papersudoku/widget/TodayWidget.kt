@@ -1,5 +1,7 @@
 package com.titpea.papersudoku.widget
 
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -12,6 +14,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,8 +59,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.TextStyle as JavaTextStyle
 
 /**
@@ -77,6 +82,9 @@ class TodayWidget : GlanceAppWidget() {
         val key = Catalog.dailyKey(date.toEpochDay())
         val blank = PageSummary.of(GameState.new(container.puzzles.daily(date.toEpochDay())))
         val pages = container.gameStore.page(key)
+        // Read once before the first frame, so a started page never flashes as blank.
+        val initial = pages.first()
+        NewDayAlarm.schedule(context, date)
         val weekday = date.dayOfWeek.getDisplayName(JavaTextStyle.SHORT, context.resources.configuration.locales[0])
         val open = Intent(context, MainActivity::class.java)
             .setAction(MainActivity.ACTION_OPEN_TODAY)
@@ -85,7 +93,7 @@ class TodayWidget : GlanceAppWidget() {
 
         provideContent {
             // Read inside the composition, so an update to a running session shows the latest page.
-            val saved by remember { pages }.collectAsState(initial = null)
+            val saved by remember { pages }.collectAsState(initial = initial)
             val page = saved ?: blank
             val status = context.getString(
                 when {
@@ -95,7 +103,10 @@ class TodayWidget : GlanceAppWidget() {
                 },
             )
             val layers = remember(page.grid) { PageLayers.render(context, page) }
-            val wide = LocalSize.current.width >= Wide.width
+            val size = LocalSize.current
+            val wide = size.width >= Wide.width
+            // The miniature fits the cell the launcher gives, down to the smallest size.
+            val side = minOf(96.dp, size.height - 28.dp, if (wide) 96.dp else size.width - 28.dp).coerceAtLeast(40.dp)
             Row(
                 modifier = GlanceModifier
                     .fillMaxSize()
@@ -111,13 +122,16 @@ class TodayWidget : GlanceAppWidget() {
                     Column(modifier = GlanceModifier.defaultWeight()) {
                         Text(context.getString(R.string.today), style = TextStyle(color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Medium))
                         Text(date.dayOfMonth.toString(), style = TextStyle(color = InkColor, fontSize = 34.sp))
-                        Text(weekday, style = TextStyle(color = Muted, fontSize = 13.sp))
-                        Spacer(GlanceModifier.size(6.dp))
+                        // At the shortest size the weekday gives way, so the status always fits.
+                        if (size.height >= 130.dp) {
+                            Text(weekday, style = TextStyle(color = Muted, fontSize = 13.sp))
+                            Spacer(GlanceModifier.size(6.dp))
+                        }
                         Text(status, style = TextStyle(color = InkColor, fontSize = 13.sp, fontWeight = FontWeight.Medium))
                     }
                     Spacer(GlanceModifier.width(8.dp))
                 }
-                Miniature(layers, context.getString(R.string.widget_page_description) + ", " + status)
+                Miniature(layers, side, context.getString(R.string.widget_page_description) + ", " + status)
             }
         }
     }
@@ -147,6 +161,18 @@ class TodayWidget : GlanceAppWidget() {
             }
         }
 
+        /** Redraws placed widgets now, then calls [done] whether or not that succeeded. */
+        fun updateNow(context: Context, done: () -> Unit) {
+            val app = context.applicationContext
+            scope.launch {
+                try {
+                    runCatching { TodayWidget().updateAll(app) }
+                } finally {
+                    done()
+                }
+            }
+        }
+
         /** The launcher's own widget radius (Android 12+; older launchers draw square widgets). */
         private fun systemCorners(): GlanceModifier =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -156,9 +182,9 @@ class TodayWidget : GlanceAppWidget() {
             }
 
         @Composable
-        private fun Miniature(layers: PageLayers, description: String) {
+        private fun Miniature(layers: PageLayers, side: Dp, description: String) {
             Box(
-                modifier = GlanceModifier.size(96.dp).background(Sheet).cornerRadius(6.dp),
+                modifier = GlanceModifier.size(side).background(Sheet).cornerRadius(6.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Layer(layers.grid, GridInk, description)
@@ -222,4 +248,33 @@ class PageLayers(val grid: Bitmap, val printed: Bitmap, val pen: Bitmap) {
 
 class TodayWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = TodayWidget()
+
+    override fun onReceive(context: Context, intent: Intent) {
+        when (intent.action) {
+            // A new day, or the clock or time zone moved: today's page may be a different one.
+            NewDayAlarm.ACTION_NEW_DAY, Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED -> {
+                // The broadcast may be all that keeps the process alive: hold it until the redraw
+                // (which also schedules the next midnight) is done.
+                val result = goAsync()
+                TodayWidget.updateNow(context) { result.finish() }
+            }
+            else -> super.onReceive(context, intent)
+        }
+    }
+}
+
+/** Wakes the widget shortly after local midnight (inexact, so no exact-alarm permission). */
+object NewDayAlarm {
+    const val ACTION_NEW_DAY = "com.titpea.papersudoku.action.NEW_DAY"
+    private const val WINDOW_MILLIS = 10 * 60 * 1000L
+
+    fun schedule(context: Context, today: LocalDate) {
+        val alarms = context.getSystemService(AlarmManager::class.java) ?: return
+        val at = today.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() + 60_000
+        val intent = Intent(context, TodayWidgetReceiver::class.java).setAction(ACTION_NEW_DAY)
+        val pending = PendingIntent.getBroadcast(
+            context, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        alarms.setWindow(AlarmManager.RTC, at, WINDOW_MILLIS, pending)
+    }
 }

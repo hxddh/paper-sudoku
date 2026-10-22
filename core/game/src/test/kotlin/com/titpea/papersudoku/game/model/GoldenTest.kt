@@ -41,4 +41,16 @@ class GoldenTest {
         assertEquals(2, game.coach.deepest)
         assertEquals(0, game.undo().values[0])
     }
+
+    @Test
+    fun `stored names are pinned`() {
+        // These names are written to the database, saved JSON and settings: renaming one would
+        // silently orphan saved pages, results or techniques met.
+        assertEquals(listOf("Gentle", "Steady", "Tricky"), Difficulty.entries.map { it.name })
+        assertEquals(listOf("Daily", "Classic"), PuzzleKind.entries.map { it.name })
+        assertEquals(
+            listOf("HiddenSingle", "NakedSingle", "Pointing", "Claiming", "NakedPair", "HiddenPair", "XWing"),
+            com.titpea.papersudoku.engine.Technique.entries.map { it.name },
+        )
+    }
 }

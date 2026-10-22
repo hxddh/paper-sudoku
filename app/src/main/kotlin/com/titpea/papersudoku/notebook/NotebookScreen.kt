@@ -110,7 +110,7 @@ fun NotebookScreen(
     ) { padding ->
         val direction = LocalLayoutDirection.current
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().testTag("notebook-list"),
             contentPadding = PaddingValues(
                 start = padding.calculateStartPadding(direction) + 16.dp,
                 end = padding.calculateEndPadding(direction) + 16.dp,
@@ -153,7 +153,14 @@ fun NotebookScreen(
                     modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
                 )
             }
-            item(key = "earlier") { SectionTitle(stringResource(R.string.notebook_earlier)) }
+            // The handbook sits above the days, so it never drifts to the end of a long notebook.
+            item(key = "techniques") { SectionTitle(stringResource(R.string.notebook_techniques)) }
+            items(Technique.entries, key = { it.name }) { technique ->
+                TechniqueRow(technique, technique in state.techniquesMet)
+            }
+            if (state.pastDays.isNotEmpty()) {
+                item(key = "earlier") { SectionTitle(stringResource(R.string.notebook_earlier)) }
+            }
             items(state.pastDays, key = { it }) { day ->
                 val page = state.pages[day] ?: return@items
                 PageRow(
@@ -162,10 +169,6 @@ fun NotebookScreen(
                     onClick = { onOpenDay(day) },
                     thumbnailModifier = boardTransition("daily-$day"),
                 )
-            }
-            item(key = "techniques") { SectionTitle(stringResource(R.string.notebook_techniques)) }
-            items(Technique.entries, key = { it.name }) { technique ->
-                TechniqueRow(technique, technique in state.techniquesMet)
             }
         }
     }
@@ -259,7 +262,7 @@ private fun PracticeCard(
     val progress = if (next == null) {
         stringResource(R.string.practice_top_level)
     } else {
-        stringResource(R.string.practice_to_next, next)
+        pluralStringResource(R.plurals.practice_to_next, next, next)
     }
     val status = if (practice.saved != null) {
         stringResource(R.string.practice_continue, (practice.saved.number ?: 0) + 1)

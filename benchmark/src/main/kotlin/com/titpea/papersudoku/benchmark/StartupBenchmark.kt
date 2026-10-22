@@ -47,7 +47,8 @@ class StartupBenchmark {
             launchToTodaysPage()
         },
     ) {
-        val board = device.wait(Until.findObject(By.res("sudoku-board")), 5_000) ?: return@measureRepeated
+        // The benchmark build is minified like a release: a missing board is a failure, not a skip.
+        val board = checkNotNull(device.wait(Until.findObject(By.res("sudoku-board")), 5_000)) { "No board on today's page" }
         val b = board.visibleBounds
         val cell = b.width() / 6
         for (i in 0 until 6) {
@@ -63,7 +64,7 @@ class StartupBenchmark {
      */
     private fun MacrobenchmarkScope.launchToTodaysPage() {
         device.executeShellCommand("am start -W -n $PACKAGE/.MainActivity")
-        device.wait(Until.hasObject(By.res("sudoku-board")), 10_000)
+        check(device.wait(Until.hasObject(By.res("sudoku-board")), 10_000)) { "Today's page never showed its board" }
     }
 
     private companion object {

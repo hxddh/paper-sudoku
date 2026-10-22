@@ -70,7 +70,7 @@ private class PuzzlePrintAdapter(
             return
         }
         attributes = newAttributes
-        val info = PrintDocumentInfo.Builder("paper-sudoku.pdf")
+        val info = PrintDocumentInfo.Builder(fileName(title))
             .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
             .setPageCount(1)
             .build()
@@ -105,8 +105,9 @@ private class PuzzlePrintAdapter(
     private fun drawPage(canvas: Canvas, width: Float, height: Float) {
         val printed = ResourcesCompat.getFont(context, R.font.fraunces) ?: Typeface.SERIF
         val margin = 54f
+        // Words in the platform sans (it has every script); Fraunces only for the numerals.
         val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = printed
+            typeface = Typeface.DEFAULT
             textSize = 20f
             color = INK
         }
@@ -146,6 +147,7 @@ private class PuzzlePrintAdapter(
             canvas.drawText(digit.toString(), cx, cy, digitPaint)
         }
         val footer = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = Typeface.DEFAULT
             textSize = 9f
             color = MUTED
         }
@@ -153,6 +155,10 @@ private class PuzzlePrintAdapter(
     }
 
     private companion object {
+        /** The page's title as a file name a printer or PDF viewer can show. */
+        fun fileName(title: String): String =
+            title.replace(Regex("""[\\/:*?"<>|]"""), "").replace(" · ", " - ").trim() + ".pdf"
+
         const val INK = 0xFF1F1C18.toInt()
         const val MUTED = 0xFF5F574C.toInt()
     }

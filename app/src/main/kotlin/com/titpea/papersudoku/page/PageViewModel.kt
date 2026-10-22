@@ -40,7 +40,7 @@ import java.time.LocalDate
 object PageKeys {
     const val PRACTICE = "practice"
     fun daily(epochDay: Long): String = Catalog.dailyKey(epochDay)
-    fun dayOf(key: String): Long? = key.removePrefix("daily-").takeIf { key.startsWith("daily-") }?.toLongOrNull()
+    fun dayOf(key: String): Long? = Catalog.dayOf(key)
     fun of(game: GameState): String =
         if (game.spec.kind == PuzzleKind.Daily) game.spec.key else PRACTICE
 }
@@ -125,6 +125,8 @@ class PageViewModel(
     private var foreground = false
     private var saveJob: Job? = null
     private var loadJob: Job? = null
+    private var recordJob: Job? = null
+    private var discardedKey: String? = null
 
     init {
         viewModelScope.launch {
@@ -136,8 +138,9 @@ class PageViewModel(
         // After process death, reopen the page that was on the desk.
         val open = savedState.get<String>(OPEN_PAGE)
         when {
-            open == PageKeys.PRACTICE -> openPractice()
             open != null && PageKeys.dayOf(open) != null -> openDaily(PageKeys.dayOf(open)!!)
+            open != null && open.startsWith(CLASSIC_PREFIX) -> load { store.load(open) ?: openablePractice() }
+            open == PageKeys.PRACTICE -> openPractice()
             else -> openDaily(today())
         }
     }
@@ -222,6 +225,10 @@ class PageViewModel(
         }
         scheduleSave()
         feedback?.let { _effects.trySend(it) }
+        // The one-line how-to is shown until the player writes a first digit.
+        if (after.values != before.values && !current.settings.wroteFirstDigit) {
+            viewModelScope.launch { updateSettings { it.copy(wroteFirstDigit = true) } }
+        }
     }
 
     // endregion
@@ -244,11 +251,13 @@ class PageViewModel(
         val game = current.game ?: return
         if (coach.hint == null || coach.level >= 3) return
         val level = coach.level + 1
-        _state.update { it.copy(game = game.coachReached(level), coach = coach.copy(level = level)) }
         val hint = coach.hint
+        // Being shown which digit is wrong is not being given an answer: the page stays clean.
+        val recorded = if (hint is CoachHint.Mistake) minOf(level, 2) else level
+        _state.update { it.copy(game = game.coachReached(recorded), coach = coach.copy(level = level)) }
         if (level >= 2 && hint is CoachHint.Next) {
             viewModelScope.launch {
-                updateSettings { it.copy(techniquesMet = it.techniquesMet + hint.technique) }
+                updateSettings { it.copy(techniquesMet = it.techniquesMet + hint.lesson.technique) }
             }
         }
         scheduleSave()
@@ -273,8 +282,8 @@ class PageViewModel(
         foreground = true
         val today = today()
         val previous = _state.value
-        _state.update { it.copy(today = today) }
-        // Left open on a finished daily past midnight: the new day's page is the one to show.
+        // Left open on a finished daily past midnight: the new day's page is the one to show. The
+        // reference day is the day the page was chosen, so it is not moved here.
         val game = previous.game
         if (today > previous.today && game != null && game.solved && game.spec.epochDay == previous.today) {
             openDaily(today)
@@ -324,7 +333,10 @@ class PageViewModel(
         // Choosing a page is the reference point for the midnight turn in [onForeground].
         _state.update { it.copy(today = today()) }
         val current = _state.value.game
-        if (current != null && current.spec.key == Catalog.dailyKey(epochDay) && !_state.value.loading) return
+        if (current != null && current.spec.key == Catalog.dailyKey(epochDay)) {
+            resumeCurrent()
+            return
+        }
         load {
             store.load(Catalog.dailyKey(epochDay)) ?: GameState.new(puzzles.daily(epochDay))
         }
@@ -333,16 +345,39 @@ class PageViewModel(
     private fun openPractice() {
         _state.update { it.copy(today = today()) }
         val current = _state.value.game
-        if (current != null && current.spec.kind == PuzzleKind.Classic && !current.solved) return
-        load {
-            store.latestUnsolvedPracticeKey()?.let { store.load(it) } ?: newPractice()
+        if (current != null && current.spec.kind == PuzzleKind.Classic && !current.solved) {
+            resumeCurrent()
+            return
+        }
+        load { openablePractice() }
+    }
+
+    private suspend fun openablePractice(): GameState =
+        store.latestUnsolvedPracticeKey()?.let { store.load(it) } ?: newPractice()
+
+    /**
+     * The page asked for is the one already in memory: if another page was being prepared, stop
+     * that and carry on with this one (its unsaved time and last moves are kept).
+     */
+    private fun resumeCurrent() {
+        if (!_state.value.loading) return
+        loadJob?.cancel()
+        _state.update {
+            val game = it.game
+            it.copy(
+                loading = false,
+                runningSince = if (foreground && game != null && !game.solved) ticker() else null,
+            )
         }
     }
 
     private fun nextPractice() {
         // A page set aside unfinished is dropped, so the notebook never offers it again.
         saveJob?.cancel()
+        _state.value.game?.takeIf { it.spec.kind == PuzzleKind.Classic && !it.solved }?.let { discardedKey = it.spec.key }
         load(keepPrevious = false) {
+            // A solve still being recorded counts towards the level of the next page.
+            recordJob?.join()
             newPractice().also { store.discardUnsolvedPractice(except = it.spec.key) }
         }
     }
@@ -377,7 +412,7 @@ class PageViewModel(
                 justSolved = false,
             ).withDerived()
         }
-        savedState[OPEN_PAGE] = PageKeys.of(next)
+        savedState[OPEN_PAGE] = next.spec.key
         persist(next)
     }
 
@@ -398,7 +433,7 @@ class PageViewModel(
 
     private fun record(game: GameState) {
         val spec = game.spec
-        viewModelScope.launch {
+        recordJob = viewModelScope.launch {
             store.saveSolved(
                 game,
                 GameResult(
@@ -419,6 +454,8 @@ class PageViewModel(
     }
 
     private suspend fun persist(game: GameState, notifyWidget: Boolean = false) {
+        // A practice page set aside is never written back (a late save would revive it).
+        if (game.spec.key == discardedKey && !game.solved) return
         store.save(game, clock.millis())
         if (notifyWidget) notifyWidget(game)
     }
@@ -472,6 +509,7 @@ class PageViewModel(
         private const val SAVE_DEBOUNCE_MILLIS = 400L
         private const val KEEP_UNFINISHED_DAILY_DAYS = 365L
         private const val OPEN_PAGE = "open_page"
+        private const val CLASSIC_PREFIX = "classic-"
         private const val TAG = "PageViewModel"
 
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {

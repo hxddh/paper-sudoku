@@ -1,6 +1,7 @@
 package com.titpea.papersudoku
 
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.KeyboardShortcutGroup
@@ -8,13 +9,13 @@ import android.view.KeyboardShortcutInfo
 import android.view.Menu
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.titpea.papersudoku.data.ThemeMode
 import com.titpea.papersudoku.data.UserSettings
@@ -52,13 +53,16 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.Light -> false
                 ThemeMode.Dark -> true
             }
+            // System bars follow the app's theme, not the system's: on Android 8–9 the navigation
+            // bar's scrim is drawn by the app, so it must match the icons it sits behind.
+            DisposableEffect(darkTheme) {
+                enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
+                    navigationBarStyle = SystemBarStyle.auto(LIGHT_SCRIM, DARK_SCRIM) { darkTheme },
+                )
+                onDispose {}
+            }
             SudokuTheme(darkTheme = darkTheme) {
-                SideEffect {
-                    WindowCompat.getInsetsController(window, window.decorView).apply {
-                        isAppearanceLightStatusBars = !darkTheme
-                        isAppearanceLightNavigationBars = !darkTheme
-                    }
-                }
                 PaperSudokuApp(container, versionName, openToday.receiveAsFlow())
             }
         }
@@ -76,6 +80,10 @@ class MainActivity : ComponentActivity() {
     companion object {
         /** Sent by the home-screen widget: show today's page. */
         const val ACTION_OPEN_TODAY = "com.titpea.papersudoku.action.OPEN_TODAY"
+
+        // The platform's own navigation-bar scrims (androidx.activity defaults).
+        private val LIGHT_SCRIM = Color.argb(0xe6, 0xFF, 0xFF, 0xFF)
+        private val DARK_SCRIM = Color.argb(0x80, 0x1b, 0x1b, 0x1b)
     }
 
     /** Lists the hardware-keyboard shortcuts in the system helper (Meta + /). */

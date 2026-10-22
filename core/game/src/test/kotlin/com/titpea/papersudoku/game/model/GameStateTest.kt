@@ -137,4 +137,22 @@ class GameStateTest {
         s = s.tap(cells.last(), autoClearNotes = true)
         assertNull(s.lockedDigit)
     }
+
+    @Test
+    fun `damaged saves that parse are still refused`() {
+        val good = GameState.new(spec).select(empty).input(answer, true)
+        assertNull(GameState.decode(good.copy(values = good.values.toMutableList().also { it[empty] = 12 }).encode()))
+        assertNull(GameState.decode(good.copy(lockedDigit = 0).encode()))
+        assertNull(GameState.decode(good.copy(history = listOf(Snapshot(listOf(1), listOf(0), null))).encode()))
+        assertNull(GameState.decode(good.copy(elapsedMillis = -1).encode()))
+        assertEquals(good, GameState.decode(good.encode()))
+    }
+
+    @Test
+    fun `keys name their day and level`() {
+        assertEquals(20_000L, Catalog.dayOf(Catalog.dailyKey(20_000)))
+        assertNull(Catalog.dayOf(Catalog.classicKey(Difficulty.Steady, 3)))
+        assertEquals("classic-steady-", Catalog.classicPrefix(Difficulty.Steady))
+        assertTrue(Catalog.classicKey(Difficulty.Steady, 3).startsWith(Catalog.classicPrefix(Difficulty.Steady)))
+    }
 }

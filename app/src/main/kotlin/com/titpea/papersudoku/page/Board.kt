@@ -36,9 +36,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -125,13 +127,17 @@ fun Board(
         val cellSize = side / size
         val density = LocalDensity.current
         val cellPx = with(density) { cellSize.toPx() }
+        // Android honours at most 200dp of back-gesture exclusion per edge: spend it on the lower
+        // part of each side, where a thumb starts slides from the edge cells.
+        val stripPx = with(density) { 24.dp.toPx() }
+        val budgetPx = with(density) { 200.dp.toPx() }
         Box(
             Modifier
                 .size(side)
                 .background(ink.sheet, RoundedCornerShape(6.dp))
                 .border(1.5.dp, ink.boxLine, RoundedCornerShape(6.dp))
-                // Slides that start at the board's edges stay with the board, not the back gesture.
-                .systemGestureExclusion()
+                .systemGestureExclusion { it.edgeStrip(left = true, stripPx, budgetPx) }
+                .systemGestureExclusion { it.edgeStrip(left = false, stripPx, budgetPx) }
                 .pointerInput(enabled, size, cellPx) {
                     if (!enabled) return@pointerInput
                     fun cellAt(p: Offset): Int {
@@ -145,30 +151,35 @@ fun Board(
                         aimed = current
                         var sliding = false
                         var lifted = false
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            if (!change.pressed) {
-                                // A cancelled touch arrives as an already-consumed lift.
-                                lifted = !change.isConsumed
-                                break
-                            }
-                            if (!sliding && (change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
-                                sliding = true
-                            }
-                            if (sliding) {
-                                change.consume()
-                                val next = cellAt(change.position)
-                                if (next != current) {
-                                    current = next
-                                    aimed = next
-                                    currentOnAimMove()
+                        // Cleared in finally: if the gesture is cut off (the board resizes under the
+                        // finger), no highlight or loupe is left behind.
+                        try {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!change.pressed) {
+                                    // A cancelled touch arrives as an already-consumed lift.
+                                    lifted = !change.isConsumed
+                                    break
                                 }
-                                loupeAt = change.position
+                                if (!sliding && (change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                                    sliding = true
+                                }
+                                if (sliding) {
+                                    change.consume()
+                                    val next = cellAt(change.position)
+                                    if (next != current) {
+                                        current = next
+                                        aimed = next
+                                        currentOnAimMove()
+                                    }
+                                    loupeAt = change.position
+                                }
                             }
+                        } finally {
+                            aimed = null
+                            loupeAt = null
                         }
-                        aimed = null
-                        loupeAt = null
                         if (lifted) currentOnTap(current)
                     }
                 },
@@ -504,4 +515,12 @@ private fun cellDescription(
     if (ghost != null) suffix += ", " + stringResource(R.string.cell_coach_answer, ghost)
     if (removed.isNotEmpty()) suffix += ", " + stringResource(R.string.cell_coach_removes, removed.sorted().joinToString(" "))
     return stringResource(R.string.cell_description, row + 1, column + 1, state) + suffix
+}
+
+/** A strip along one side of the board, at most [budget] tall and anchored at its bottom. */
+private fun LayoutCoordinates.edgeStrip(left: Boolean, strip: Float, budget: Float): Rect {
+    val width = size.width.toFloat()
+    val height = size.height.toFloat()
+    val top = (height - budget).coerceAtLeast(0f)
+    return if (left) Rect(0f, top, strip, height) else Rect(width - strip, top, width, height)
 }

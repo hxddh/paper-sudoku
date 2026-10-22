@@ -28,6 +28,8 @@ data class UserSettings(
     val autoClearNotes: Boolean = true,
     /** Techniques met in solved puzzles or explained by the Coach. */
     val techniquesMet: Set<Technique> = emptySet(),
+    /** The player has written a first digit; the one-line how-to stops showing. */
+    val wroteFirstDigit: Boolean = false,
 )
 
 interface SettingsStore {
@@ -55,6 +57,7 @@ class DataStoreSettings(context: Context) : SettingsStore {
             p[THEME_MODE] = next.theme.name
             p[AUTO_CLEAR_NOTES] = next.autoClearNotes
             p[TECHNIQUES_MET] = next.techniquesMet.map { it.name }.toSet()
+            p[WROTE_FIRST_DIGIT] = next.wroteFirstDigit
         }
     }
 
@@ -64,6 +67,7 @@ class DataStoreSettings(context: Context) : SettingsStore {
         techniquesMet = this[TECHNIQUES_MET].orEmpty()
             .mapNotNull { name -> Technique.entries.firstOrNull { it.name == name } }
             .toSet(),
+        wroteFirstDigit = this[WROTE_FIRST_DIGIT] ?: false,
     )
 
     private companion object {
@@ -72,5 +76,6 @@ class DataStoreSettings(context: Context) : SettingsStore {
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val AUTO_CLEAR_NOTES = booleanPreferencesKey("auto_clear_notes")
         val TECHNIQUES_MET = stringSetPreferencesKey("techniques_met")
+        val WROTE_FIRST_DIGIT = booleanPreferencesKey("wrote_first_digit")
     }
 }

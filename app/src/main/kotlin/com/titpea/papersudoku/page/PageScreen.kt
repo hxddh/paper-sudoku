@@ -100,6 +100,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
@@ -158,12 +159,15 @@ fun PageScreen(
         }
     }
 
-    var confirmRestart by rememberSaveable { mutableStateOf(false) }
-    var confirmNextPractice by rememberSaveable { mutableStateOf(false) }
+    // Dialogs belong to the page they were opened on: another page arriving closes them.
+    val pageKey = state.game?.spec?.key
+    var confirmRestart by rememberSaveable(pageKey) { mutableStateOf(false) }
+    var confirmNextPractice by rememberSaveable(pageKey) { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     var pageFocused by remember { mutableStateOf(false) }
     val keyboardMode = LocalInputModeManager.current.inputMode == InputMode.Keyboard
-    LaunchedEffect(Unit) { if (onBack != null) runCatching { focusRequester.requestFocus() } }
+    // Each page that opens takes focus, so a keyboard works at once (also beside the notebook).
+    LaunchedEffect(pageKey) { if (pageKey != null) runCatching { focusRequester.requestFocus() } }
 
     // Ink connector between the Coach's note and the board, in this screen's coordinates.
     var origin by remember { mutableStateOf(Offset.Zero) }
@@ -405,7 +409,7 @@ private fun WorkArea(
                 verticalArrangement = Arrangement.Bottom,
             ) {
                 PageToolbar(game, onEvent)
-                StatusLine(game, onEvent)
+                StatusLine(game, onEvent, showHint = !state.settings.wroteFirstDigit)
                 Keypad(game, onEvent)
             }
             WorkMode.Coach -> state.coach?.let { coach ->
@@ -413,8 +417,8 @@ private fun WorkArea(
                     coach = coach,
                     geometry = game.spec.geometry,
                     onEvent = onEvent,
-                    // A fixed height: the note scrolls inside rather than pushing the board.
-                    modifier = Modifier.fillMaxWidth().height(height).graphicsLayer {
+                    // The tools' height at normal sizes; with large text the note grows to show it all.
+                    modifier = Modifier.fillMaxWidth().heightIn(min = height).graphicsLayer {
                         val s = 1f - 0.06f * backProgress
                         scaleX = s
                         scaleY = s
@@ -444,13 +448,17 @@ private fun WorkArea(
     }
 }
 
-/** One quiet line between the tools and the digits that says which mode the pen is in. */
+/**
+ * One quiet line between the tools and the digits that says which mode the pen is in. Until the
+ * first digit is ever written it carries the one how-to the app has.
+ */
 @Composable
-private fun StatusLine(game: GameState, onEvent: (PageEvent) -> Unit) {
+private fun StatusLine(game: GameState, onEvent: (PageEvent) -> Unit, showHint: Boolean) {
     val held = game.lockedDigit
     val text = when {
         held != null -> stringResource(R.string.status_holding, held)
         game.notesMode -> stringResource(R.string.status_pencil)
+        showHint -> stringResource(R.string.status_hint)
         else -> ""
     }
     Box(
@@ -470,7 +478,13 @@ private fun StatusLine(game: GameState, onEvent: (PageEvent) -> Unit) {
                 Text(text, style = MaterialTheme.typography.labelLarge)
             }
         } else if (text.isNotEmpty()) {
-            Text(text, style = MaterialTheme.typography.labelMedium, color = PaperTheme.ink.pencil)
+            Text(
+                text,
+                style = MaterialTheme.typography.labelMedium,
+                color = PaperTheme.ink.pencil,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 8.dp),
+            )
         }
     }
 }

@@ -1,5 +1,43 @@
 # Changelog
 
+## 5.0.0
+
+Everything that was found wrong in 4.0, fixed; the words and the Coach made exact.
+
+**Changed**
+- The notebook starts on the day you installed the app (or your earliest page): no wall of blank
+  days. The technique handbook sits above the earlier pages; the stamp count includes practice.
+- One rule for a clean page everywhere: the Coach did not give the answer. Being shown which digit
+  is wrong keeps a page clean. The solved note, share text and restart dialog say so.
+- The Coach names the technique it is actually explaining and marks every cell its note mentions.
+  Claiming has its own hint.
+- One line on the first page explains how to write, until the first digit is written.
+- Chinese: difficulties 入门 / 进阶 / 挑战, Coach steps 看 / 想 / 答, a corrected X-Wing
+  explanation and more natural wording throughout. "Pencil" is used consistently in both languages.
+- Print is "Print a blank copy", with a titled file and the system font for words.
+- With very large text the Coach's note grows instead of hiding words behind its buttons.
+
+**Fixed**
+- Tapping the Settings back arrow twice no longer closes the app.
+- Reopening the page you were on while another one loads keeps your last moves and time.
+- A solved practice page comes back after Android reclaims the app; Practice tapped during a load
+  opens practice.
+- A confirm dialog no longer applies to a different page that opened behind it.
+- The widget opens today even from Settings, fits its smallest size, no longer flashes a blank
+  page, and turns to the new day at midnight and when the clock or time zone changes.
+- A keyboard works on a page opened beside the notebook; "today" follows a new time zone.
+- Edge cells near the thumb keep slides away from the back gesture; an interrupted slide leaves no
+  highlight behind; system bars match the app's theme on Android 8–9.
+- A practice page set aside can no longer come back; a page that graded easier than its level can
+  never be dealt twice; a solve just before "Next page" counts towards the level.
+- Damaged saves are refused instead of crashing later.
+
+**Under the hood**
+- The release APK is checked for network permissions (WorkManager's network-state permission is
+  removed) and its signature is verified; release notes carry only that version's section.
+- CI no longer leaves a write token where build scripts can read it, and taps an ANR dialog only
+  when one is shown. New tests cover each fix, the puzzle cache, the notebook and stored names.
+
 ## 4.0.0
 
 A polish release: nothing new to learn, many things that now simply work.

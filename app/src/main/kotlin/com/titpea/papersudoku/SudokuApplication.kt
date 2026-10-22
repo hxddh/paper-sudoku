@@ -13,12 +13,17 @@ import com.titpea.papersudoku.game.model.PuzzleSource
 import com.titpea.papersudoku.widget.TodayWidget
 import java.io.File
 import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
 
 interface AppContainer {
     val settingsStore: SettingsStore
     val gameStore: GameStore
     val puzzles: PuzzleSource
     val clock: Clock
+
+    /** The day the app was installed, as epoch day: where the notebook begins. */
+    val firstDay: Long
 
     /** Monotonic milliseconds for the game clock; immune to wall-clock changes. */
     val ticker: () -> Long
@@ -33,9 +38,21 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     override val settingsStore: SettingsStore = DataStoreSettings(context)
     override val gameStore: GameStore = RoomGameStore(database)
     override val puzzles: PuzzleSource = CachedPuzzleSource(File(context.cacheDir, "puzzles"))
-    override val clock: Clock = Clock.systemDefaultZone()
+    override val clock: Clock = SystemZoneClock
+    override val firstDay: Long by lazy {
+        val installed = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).firstInstallTime }
+            .getOrDefault(System.currentTimeMillis())
+        Instant.ofEpochMilli(installed).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay()
+    }
     override val ticker: () -> Long = { SystemClock.elapsedRealtime() }
     override val onDailySaved: () -> Unit = { TodayWidget.requestUpdate(context) }
+}
+
+/** The system clock in whatever time zone the device is in now, so "today" follows travel. */
+private object SystemZoneClock : Clock() {
+    override fun getZone(): ZoneId = ZoneId.systemDefault()
+    override fun withZone(zone: ZoneId): Clock = system(zone)
+    override fun instant(): Instant = Instant.now()
 }
 
 class SudokuApplication : Application() {

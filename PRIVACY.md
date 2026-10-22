@@ -1,6 +1,6 @@
 # Paper Sudoku — Privacy Policy
 
-Last updated: 2026-10-22 (version 4.0)
+Last updated: 2026-10-22 (version 5.0)
 
 Paper Sudoku is an offline puzzle game. It does not require an account, does not contain ads or
 analytics, and does not request the `INTERNET` permission.
@@ -11,7 +11,7 @@ The app stores only the data needed to run the game locally:
 
 - your games (board, notes, undo history, time, how much the Coach helped) in a local Room
   database;
-- finished-puzzle results (mode, difficulty, time, Coach use, date) for the journal;
+- finished-puzzle results (mode, difficulty, time, Coach use, date) for the notebook;
 - settings (theme, note tidying, techniques you have met) in Android DataStore.
 
 The home-screen widget reads today's page from the same local database.
@@ -27,7 +27,10 @@ uses Android's print service and the printer or "Save as PDF" target you pick.
 ## Permissions and sharing
 
 The app does not request network, location, contacts, camera, microphone, or advertising
-permissions. It does not share data with third parties.
+permissions. The home-screen widget relies on Android's job scheduler, which brings two system
+permissions with it: keeping the device awake briefly while the widget redraws, and restoring
+scheduled redraws after a restart. Neither gives access to any data. The app does not share data
+with third parties.
 
 ## Children
 

@@ -165,11 +165,21 @@ data class GameState(
             json.decodeFromString(serializer(), text).takeIf { it.isConsistent() }
         }.getOrNull()
 
-        private fun GameState.isConsistent(): Boolean =
-            values.size == spec.cellCount &&
-                notes.size == spec.cellCount &&
+        /** A readable but damaged save is refused rather than crashing later (remaining, undo). */
+        private fun GameState.isConsistent(): Boolean {
+            val cells = spec.cellCount
+            val digits = 0..spec.size
+            val noteMask = (1 shl (spec.size + 1)) - 1
+            fun boardOk(v: List<Int>, n: List<Int>, sel: Int?) =
+                v.size == cells && n.size == cells && v.all { it in digits } &&
+                    n.all { it and noteMask.inv() == 0 } && (sel == null || sel in 0 until cells)
+            return spec.givens.size == cells && spec.solution.size == cells &&
+                boardOk(values, notes, selected) &&
                 values.indices.all { spec.givens[it] == 0 || values[it] == spec.givens[it] } &&
-                (selected == null || selected in values.indices)
+                (lockedDigit == null || lockedDigit in 1..spec.size) &&
+                history.all { boardOk(it.values, it.notes, it.selected) } &&
+                coach.deepest in 0..3 && elapsedMillis >= 0
+        }
     }
 }
 

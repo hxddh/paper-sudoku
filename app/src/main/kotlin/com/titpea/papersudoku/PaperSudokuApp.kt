@@ -22,6 +22,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -79,6 +81,17 @@ fun PaperSudokuApp(
     val scope = rememberCoroutineScope()
     val grain = rememberPaperGrain(PaperTheme.ink)
 
+    // The widget asks for today's page: leave Settings if it is open, open today, and let the
+    // notebook move its detail pane once it is on screen.
+    var showToday by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(openTodayRequests) {
+        openTodayRequests.collect {
+            while (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+            pageViewModel.onEvent(PageEvent.OpenToday)
+            showToday = true
+        }
+    }
+
     Box(
         Modifier
             .fillMaxSize()
@@ -97,9 +110,10 @@ fun PaperSudokuApp(
                             Screen.Home -> NotebookHome(
                                 pageViewModel = pageViewModel,
                                 notebookViewModel = notebookViewModel,
-                                onOpenSettings = { backStack.add(Screen.Settings) },
-                                openTodayRequests = openTodayRequests,
-                                onShowHome = { while (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
+                                // Guarded: a double tap during the transition must not stack Settings twice.
+                                onOpenSettings = { if (backStack.lastOrNull() == Screen.Home) backStack.add(Screen.Settings) },
+                                showToday = showToday,
+                                onTodayShown = { showToday = false },
                             )
                             Screen.Settings -> {
                                 val state by pageViewModel.state.collectAsStateWithLifecycle()
@@ -107,7 +121,8 @@ fun PaperSudokuApp(
                                     settings = state.settings,
                                     versionName = versionName,
                                     onUpdate = { transform -> scope.launch { container.settingsStore.update(transform) } },
-                                    onBack = { backStack.removeAt(backStack.lastIndex) },
+                                    // Guarded: the leaving screen stays tappable while it animates out.
+                                    onBack = { if (backStack.lastOrNull() == Screen.Settings) backStack.removeAt(backStack.lastIndex) },
                                 )
                             }
                         }
@@ -124,8 +139,8 @@ private fun NotebookHome(
     pageViewModel: PageViewModel,
     notebookViewModel: NotebookViewModel,
     onOpenSettings: () -> Unit,
-    openTodayRequests: Flow<Unit>,
-    onShowHome: () -> Unit,
+    showToday: Boolean,
+    onTodayShown: () -> Unit,
 ) {
     val page by pageViewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -153,6 +168,7 @@ private fun NotebookHome(
     val twoPane = navigator.scaffoldValue[ListDetailPaneScaffoldRole.List] == PaneAdaptedValue.Expanded &&
         navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] == PaneAdaptedValue.Expanded
     val openKey = page.game?.let(PageKeys::of)
+    val boardKey = navigator.currentDestination?.contentKey ?: openKey
 
     // Fully drawn once a page is on the desk (Macrobenchmark's time to full display).
     ReportDrawnWhen { page.game != null && !page.loading }
@@ -160,12 +176,10 @@ private fun NotebookHome(
         notebookViewModel.refreshDate()
         onStopOrDispose { }
     }
-    LaunchedEffect(openTodayRequests) {
-        openTodayRequests.collect {
-            onShowHome()
-            pageViewModel.onEvent(PageEvent.OpenToday)
-            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, PageKeys.daily(pageViewModel.state.value.today))
-        }
+    LaunchedEffect(showToday) {
+        if (!showToday) return@LaunchedEffect
+        navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, PageKeys.daily(pageViewModel.state.value.today))
+        onTodayShown()
     }
     val notebookTitle = stringResource(R.string.notebook)
     val pageTitle = stringResource(R.string.page_pane)
@@ -211,8 +225,9 @@ private fun NotebookHome(
                         onPrint = { printPuzzle(context, it) },
                         onShare = { sharePage(context, it) },
                         effects = pageViewModel.effects,
-                        boardModifier = if (openKey != null) {
-                            Modifier.sharedElement(rememberSharedContentState("board-$openKey"), paneScope)
+                        // Keyed by the page being opened, not the one still on screen while it loads.
+                        boardModifier = if (boardKey != null) {
+                            Modifier.sharedElement(rememberSharedContentState("board-$boardKey"), paneScope)
                         } else {
                             Modifier
                         },
