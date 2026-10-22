@@ -1,7 +1,9 @@
 package com.titpea.papersudoku
 
+import android.app.UiModeManager
 import android.content.Intent
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.KeyboardShortcutGroup
@@ -35,7 +37,8 @@ class MainActivity : ComponentActivity() {
 
         val container = (application as SudokuApplication).container
         val versionName = BuildConfig.VERSION_NAME
-        // Hold the splash until the theme is known, so a dark-theme choice never flashes paper.
+        // Hold the splash until the theme is known, so a dark-theme choice never flashes paper
+        // (and from Android 12 the splash itself is drawn in the app's theme; see below).
         var settingsLoaded = false
         splash.setKeepOnScreenCondition { !settingsLoaded }
         if (savedInstanceState == null) handle(intent)
@@ -60,6 +63,20 @@ class MainActivity : ComponentActivity() {
                     statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
                     navigationBarStyle = SystemBarStyle.auto(LIGHT_SCRIM, DARK_SCRIM) { darkTheme },
                 )
+                onDispose {}
+            }
+            // Tell the system the app's own choice (Android 12+), so the next cold start's splash
+            // screen is already in it. uiMode is handled in place, so this does not recreate us.
+            DisposableEffect(settings.theme) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    getSystemService(UiModeManager::class.java)?.setApplicationNightMode(
+                        when (settings.theme) {
+                            ThemeMode.System -> UiModeManager.MODE_NIGHT_AUTO
+                            ThemeMode.Light -> UiModeManager.MODE_NIGHT_NO
+                            ThemeMode.Dark -> UiModeManager.MODE_NIGHT_YES
+                        },
+                    )
+                }
                 onDispose {}
             }
             SudokuTheme(darkTheme = darkTheme) {

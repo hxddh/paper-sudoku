@@ -50,11 +50,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
 import com.titpea.papersudoku.data.ThemeMode
+import com.titpea.papersudoku.designsystem.SectionHeader
 import com.titpea.papersudoku.data.UserSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -225,17 +224,6 @@ private fun SettingsScaffold(
             content = content,
         )
     }
-}
-
-/** A section title: the same token as the notebook's, lined up with the rows' text. */
-@Composable
-fun SectionHeader(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = modifier.semantics { heading() },
-    )
 }
 
 @Composable

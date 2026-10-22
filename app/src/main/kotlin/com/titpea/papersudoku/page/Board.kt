@@ -38,6 +38,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -135,7 +137,8 @@ fun Board(
             Modifier
                 .size(side)
                 .background(ink.sheet, RoundedCornerShape(6.dp))
-                .border(1.5.dp, ink.boxLine, RoundedCornerShape(6.dp))
+                // The frame is the heaviest line, then box lines (2dp), then cells (1dp).
+                .border(2.5.dp, ink.boxLine, RoundedCornerShape(6.dp))
                 .systemGestureExclusion { it.edgeStrip(left = true, stripPx, budgetPx) }
                 .systemGestureExclusion { it.edgeStrip(left = false, stripPx, budgetPx) }
                 .pointerInput(enabled, size, cellPx) {
@@ -331,8 +334,9 @@ private fun Cell(
     val removed = marks.removals[index].orEmpty()
 
     val background = when {
+        // Red is the Coach's; the player's own selection is in pen blue.
         isTarget -> colors.primary.copy(alpha = 0.20f)
-        isSelected -> colors.primary.copy(alpha = 0.16f)
+        isSelected -> colors.secondary.copy(alpha = 0.14f)
         inPattern -> colors.primaryContainer.copy(alpha = 0.85f)
         inFocus -> colors.tertiaryContainer.copy(alpha = 0.55f)
         sameDigit -> colors.secondaryContainer.copy(alpha = 0.75f)
@@ -346,8 +350,10 @@ private fun Cell(
     }
 
     val density = LocalDensity.current
-    val digitSize: TextUnit = with(density) { (cellSize.toPx() * 0.56f).toSp() }
-    val noteSize: TextUnit = with(density) { (cellSize.toPx() / 3f * 0.66f).toSp() }
+    // 6×6 cells are large: their digits are a little lighter in proportion. Pencil marks are as
+    // large as their third of the cell allows.
+    val digitSize: TextUnit = with(density) { (cellSize.toPx() * if (size == 6) 0.50f else 0.56f).toSp() }
+    val noteSize: TextUnit = with(density) { (cellSize.toPx() / 3f * 0.76f).toSp() }
 
     // Ink lands with a small settle when the player writes a digit.
     val appear = remember { Animatable(1f) }
@@ -366,7 +372,7 @@ private fun Cell(
         removed = removed,
     )
     val eraseLabel = stringResource(R.string.erase)
-    val outline = colors.primary
+    val outline = if (isTarget) colors.primary else colors.secondary
 
     Box(
         modifier = modifier
@@ -421,11 +427,14 @@ private fun Cell(
                         if (conflict) {
                             Modifier.drawBehind {
                                 val y = this.size.height * 0.92f
+                                // Dotted, so a clash differs from a mark by shape, not only colour.
                                 drawLine(
                                     color = digitColor,
                                     start = Offset(this.size.width * 0.15f, y),
                                     end = Offset(this.size.width * 0.85f, y),
                                     strokeWidth = 2.dp.toPx(),
+                                    cap = StrokeCap.Round,
+                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(0.1f, 4.dp.toPx())),
                                 )
                             }
                         } else {
@@ -481,7 +490,8 @@ private fun NoteGrid(
                                 },
                                 style = TextStyle(
                                     fontSize = noteSize,
-                                    fontWeight = if (emphasised) FontWeight.Bold else FontWeight.Medium,
+                                    fontWeight = if (emphasised) FontWeight.Bold else FontWeight.Normal,
+                                    fontFeatureSettings = "tnum",
                                     textDecoration = if (struck) TextDecoration.LineThrough else null,
                                     textAlign = TextAlign.Center,
                                 ),
@@ -511,9 +521,10 @@ private fun cellDescription(
         given -> stringResource(R.string.cell_given, value)
         else -> stringResource(R.string.cell_entered, value)
     }
-    var suffix = if (conflict) ", " + stringResource(R.string.cell_conflict) else ""
-    if (ghost != null) suffix += ", " + stringResource(R.string.cell_coach_answer, ghost)
-    if (removed.isNotEmpty()) suffix += ", " + stringResource(R.string.cell_coach_removes, removed.sorted().joinToString(" "))
+    val separator = stringResource(R.string.list_separator)
+    var suffix = if (conflict) separator + stringResource(R.string.cell_conflict) else ""
+    if (ghost != null) suffix += separator + stringResource(R.string.cell_coach_answer, ghost)
+    if (removed.isNotEmpty()) suffix += separator + stringResource(R.string.cell_coach_removes, removed.sorted().joinToString(" "))
     return stringResource(R.string.cell_description, row + 1, column + 1, state) + suffix
 }
 

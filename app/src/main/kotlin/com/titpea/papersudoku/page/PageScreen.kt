@@ -6,6 +6,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
@@ -41,6 +42,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
@@ -97,11 +99,15 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
+import com.titpea.papersudoku.designsystem.FrauncesDisplay
 import com.titpea.papersudoku.designsystem.InkStamp
 import com.titpea.papersudoku.designsystem.PaperTheme
 import com.titpea.papersudoku.game.model.GameState
@@ -358,6 +364,7 @@ private fun BoardArea(
                         caption = formatElapsed(game.elapsedMillis / 1_000),
                         animate = state.justSolved,
                         size = (side * 0.5f).coerceAtMost(220.dp),
+                        seed = game.spec.key.hashCode(),
                         modifier = Modifier.testTag("solved-stamp"),
                     )
                 }
@@ -404,9 +411,13 @@ private fun WorkArea(
         }
     }
 
+    // Tools, note and solved note trade places along a short vertical axis, on the theme's motion.
+    val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val rise = with(LocalDensity.current) { 16.dp.roundToPx() }
     AnimatedContent(
         targetState = mode,
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        transitionSpec = { (fadeIn(effects) + slideInVertically(spatial) { rise }) togetherWith fadeOut(effects) },
         modifier = modifier.fillMaxWidth().heightIn(min = height).testTag("work-area"),
         label = "work-area",
     ) { target ->
@@ -512,22 +523,31 @@ private fun SolvedNote(
             .semantics { liveRegion = LiveRegionMode.Polite },
         verticalArrangement = Arrangement.Center,
     ) {
+        // The stamp carries the time; the note says how the page was done, then the time again
+        // for anyone not looking at the stamp (TalkBack reads this note, not the stamp).
         Text(
-            stringResource(R.string.solved_line, formatElapsed(game.elapsedMillis / 1_000)),
+            coachUsageLine(game.coach.deepest),
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.semantics { heading() },
         )
+        // Numerals are Fraunces everywhere: the time is set in it within the sentence.
+        val time = formatElapsed(game.elapsedMillis / 1_000)
+        val line = stringResource(R.string.solved_time, time)
+        val at = line.indexOf(time)
         Text(
-            coachUsageLine(game.coach.deepest),
-            style = MaterialTheme.typography.bodyMedium,
+            buildAnnotatedString {
+                append(line)
+                if (at >= 0) addStyle(SpanStyle(fontFamily = FrauncesDisplay, fontFeatureSettings = "lnum, tnum"), at, at + time.length)
+            },
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onShare) {
+        Spacer(Modifier.height(16.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            FilledTonalIconButton(onClick = onShare) {
                 Icon(painterResource(R.drawable.ic_share), contentDescription = stringResource(R.string.action_share))
             }
-            IconButton(onClick = onPrint) {
+            FilledTonalIconButton(onClick = onPrint) {
                 Icon(painterResource(R.drawable.ic_print), contentDescription = stringResource(R.string.action_print))
             }
             Spacer(Modifier.weight(1f))
@@ -574,9 +594,9 @@ private fun PageHeader(
                 Column {
                     Text(
                         text = if (spec.kind == PuzzleKind.Daily && day != null) {
-                            weekday(LocalDate.ofEpochDay(day), locale) + " · " + difficultyName(spec.difficulty)
+                            weekday(LocalDate.ofEpochDay(day), locale) + DOT + difficultyName(spec.difficulty)
                         } else {
-                            stringResource(R.string.practice) + " · " + difficultyName(spec.difficulty)
+                            stringResource(R.string.practice) + DOT + difficultyName(spec.difficulty)
                         },
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
