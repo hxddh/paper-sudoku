@@ -38,6 +38,9 @@
     <string name="coach_look_title">看看%1$s。</string>
     <string name="coach_answer">在%2$s填入 %1$d。</string>
     <string name="coach_then">排除之后，%1$s只剩一个答案。</string>
+    <string name="coach_next_step">下一步</string>
+    <string name="coach_tag_step">%1$s · 第 %2$d/%3$d 步</string>
+    <string name="coach_more">单靠这一步还定不出数字。</string>
     <string name="coach_none_title">现在没有简单的下一步。</string>
     <string name="coach_none_body">走一步之后再来看看。</string>
     <string name="coach_mistake_title">有个数字不对。</string>

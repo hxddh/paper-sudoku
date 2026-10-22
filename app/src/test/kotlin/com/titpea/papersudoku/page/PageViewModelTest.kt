@@ -2,6 +2,7 @@ package com.titpea.papersudoku.page
 
 import com.titpea.papersudoku.engine.CoachHint
 import com.titpea.papersudoku.engine.Difficulty
+import com.titpea.papersudoku.engine.SudokuEngine
 import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.PuzzleKind
@@ -65,6 +66,17 @@ class PageViewModelTest {
     private fun test(block: suspend TestScope.() -> Unit) = runTest(dispatcher) { block() }
 
     private fun PageViewModel.game(): GameState = checkNotNull(state.value.game)
+
+    /** Follows the Coach on a Tricky page until a placement needs two or more eliminations first. */
+    private fun multiStepPosition(page: Int): Pair<GameState, Int>? {
+        var game = GameState.new(Catalog.classic(Difficulty.Tricky, page))
+        val engine = SudokuEngine(game.spec.puzzle)
+        while (true) {
+            val hint = engine.hint(game.values.toIntArray()) as? CoachHint.Next ?: return null
+            if (hint.groundwork.size >= 2) return game to hint.groundwork.size
+            game = game.select(hint.placement.index).input(hint.placement.digit, true)
+        }
+    }
 
     private fun PageViewModel.solveFully() {
         val spec = game().spec
@@ -461,6 +473,70 @@ class PageViewModelTest {
         advanceUntilIdle()
         assertFalse(store.saved.containsKey(setAside.key))
         assertTrue(vm.game().spec.key != setAside.key)
+    }
+
+    @Test
+    fun `a practice page taken back before the next is dealt keeps saving`() = test {
+        val generator = StandardTestDispatcher(testScheduler)
+        val vm = viewModel(generator)
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.OpenPractice)
+        advanceUntilIdle()
+        val setAside = vm.game().spec
+        vm.onEvent(PageEvent.NextPractice)
+        // Practice tapped while the next page is still being dealt: the same page carries on.
+        vm.onEvent(PageEvent.OpenPractice)
+        advanceUntilIdle()
+        assertEquals(setAside.key, vm.game().spec.key)
+        val empty = setAside.givens.indexOfFirst { it == 0 }
+        vm.onEvent(PageEvent.Tap(empty))
+        vm.onEvent(PageEvent.Digit(setAside.solution[empty]))
+        vm.onEvent(PageEvent.Background)
+        advanceUntilIdle()
+        assertEquals(setAside.solution[empty], store.saved.getValue(setAside.key).first.values[empty])
+    }
+
+    @Test
+    fun `a practice page set aside stays aside when another page opens during the deal`() = test {
+        val generator = StandardTestDispatcher(testScheduler)
+        val vm = viewModel(generator)
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.OpenPractice)
+        advanceUntilIdle()
+        val setAside = vm.game().spec
+        vm.onEvent(PageEvent.NextPractice)
+        vm.onEvent(PageEvent.OpenDaily(today.toEpochDay()))
+        advanceUntilIdle()
+        assertEquals(Catalog.dailyKey(today.toEpochDay()), vm.game().spec.key)
+        assertFalse(store.saved.containsKey(setAside.key))
+        val offered = checkNotNull(store.latestUnsolvedPracticeKey())
+        assertEquals(Catalog.classicKey(setAside.difficulty, (setAside.number ?: 0) + 1), offered)
+    }
+
+    @Test
+    fun `the Coach explains every elimination before giving the answer`() = test {
+        val (game, needed) = (0 until 20).firstNotNullOf { multiStepPosition(it) }
+        store.save(game, 1)
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.OpenPractice)
+        advanceUntilIdle()
+        assertEquals(game.spec.key, vm.game().spec.key)
+        vm.onEvent(PageEvent.Coach)
+        vm.onEvent(PageEvent.CoachDeeper)
+        repeat(needed - 1) { i ->
+            assertEquals(2, vm.state.value.coach?.level)
+            assertEquals(i, vm.state.value.coach?.step)
+            assertFalse(checkNotNull(vm.state.value.coach).lastStep)
+            vm.onEvent(PageEvent.CoachDeeper)
+        }
+        val coach = checkNotNull(vm.state.value.coach)
+        assertEquals(2, coach.level)
+        assertTrue(coach.lastStep)
+        // Walking through the steps is still Why: the page stays clean until the answer.
+        assertEquals(2, vm.game().coach.deepest)
+        vm.onEvent(PageEvent.CoachDeeper)
+        assertEquals(3, vm.state.value.coach?.level)
     }
 
     @Test

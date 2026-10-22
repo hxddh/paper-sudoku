@@ -8,11 +8,8 @@ class SplitMix64(seed: Long) {
     private var state = seed
 
     fun nextLong(): Long {
-        state += -0x61c8864680b583ebL
-        var z = state
-        z = (z xor (z ushr 30)) * -0x40a7b892e31b1a47L
-        z = (z xor (z ushr 27)) * -0x6b2fb644ecceee15L
-        return z xor (z ushr 31)
+        state += GAMMA
+        return mix(state)
     }
 
     /** Uniform-enough integer in `0 until bound` for small bounds. */
@@ -27,6 +24,18 @@ class SplitMix64(seed: Long) {
             val tmp = list[i]
             list[i] = list[j]
             list[j] = tmp
+        }
+    }
+
+    companion object {
+        private const val GAMMA = -0x61c8864680b583ebL
+
+        /** SplitMix64's output function: a full-avalanche 64-bit hash, for deriving seeds. */
+        fun mix(value: Long): Long {
+            var z = value
+            z = (z xor (z ushr 30)) * -0x40a7b892e31b1a47L
+            z = (z xor (z ushr 27)) * -0x6b2fb644ecceee15L
+            return z xor (z ushr 31)
         }
     }
 }

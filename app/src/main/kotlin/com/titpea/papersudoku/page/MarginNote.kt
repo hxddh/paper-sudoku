@@ -118,6 +118,7 @@ fun MarginNote(
                         Text(
                             when {
                                 coach.level == 1 -> stringResource(R.string.coach_show_why)
+                                coach.level == 2 && !coach.lastStep -> stringResource(R.string.coach_next_step)
                                 coach.level == 2 -> stringResource(R.string.coach_show_answer)
                                 hint is CoachHint.Next -> stringResource(R.string.coach_place, hint.placement.digit)
                                 else -> stringResource(R.string.coach_erase)
@@ -190,10 +191,15 @@ private fun coachText(coach: CoachUi, geometry: Geometry): CoachText {
             )
         }
         is CoachHint.Next -> {
-            val lesson = hint.lesson
+            val lesson = checkNotNull(coach.lesson)
             val placement = hint.placement
-            // The technique the note actually teaches (the last step), not the hardest one involved.
-            val tag = techniqueName(lesson.technique)
+            // The technique of the step on the page, with where it falls when there are several.
+            val total = coach.steps.size
+            val tag = if (total > 1) {
+                stringResource(R.string.coach_tag_step, techniqueName(lesson.technique), coach.step + 1, total)
+            } else {
+                techniqueName(lesson.technique)
+            }
             val cell = cellLabel(geometry, placement.index)
             // The step's anchor stays the same from Look to Why; the tag already names the technique.
             val lookTitle = if (lesson is Placement && lesson.technique == Technique.NakedSingle) {
@@ -206,8 +212,12 @@ private fun coachText(coach: CoachUi, geometry: Geometry): CoachText {
                 2 -> CoachText(
                     tag = tag,
                     title = lookTitle,
-                    body = whyText(geometry, lesson) +
-                        if (lesson is Elimination) " " + stringResource(R.string.coach_then, cell) else "",
+                    body = whyText(geometry, lesson) + when {
+                        lesson !is Elimination -> ""
+                        // Only after the last elimination does the cell have a single answer.
+                        coach.lastStep -> " " + stringResource(R.string.coach_then, cell)
+                        else -> " " + stringResource(R.string.coach_more)
+                    },
                 )
                 else -> CoachText(
                     tag = tag,

@@ -38,6 +38,9 @@
     <string name="coach_look_title">Look at %1$s.</string>
     <string name="coach_answer">Place %1$d at %2$s.</string>
     <string name="coach_then">With that gone, %1$s has a single answer.</string>
+    <string name="coach_next_step">Next step</string>
+    <string name="coach_tag_step">%1$s · step %2$d of %3$d</string>
+    <string name="coach_more">That alone doesn’t settle a cell yet.</string>
     <string name="coach_none_title">Nothing simple right now.</string>
     <string name="coach_none_body">Look again after your next move.</string>
     <string name="coach_mistake_title">Something doesn\'t fit.</string>

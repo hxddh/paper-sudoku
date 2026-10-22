@@ -14,6 +14,7 @@ import com.titpea.papersudoku.data.GameStore
 import com.titpea.papersudoku.data.SettingsStore
 import com.titpea.papersudoku.data.UserSettings
 import com.titpea.papersudoku.engine.CoachHint
+import com.titpea.papersudoku.engine.Step
 import com.titpea.papersudoku.engine.SudokuEngine
 import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.GameState
@@ -22,6 +23,7 @@ import com.titpea.papersudoku.game.model.Practice
 import com.titpea.papersudoku.game.model.PuzzleKind
 import com.titpea.papersudoku.game.model.PuzzleSource
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -32,6 +34,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.LocalDate
@@ -45,8 +48,22 @@ object PageKeys {
         if (game.spec.kind == PuzzleKind.Daily) game.spec.key else PRACTICE
 }
 
-/** A Coach session: what it found and how far the player has asked it to go (1 look, 2 why, 3 answer). */
-data class CoachUi(val hint: CoachHint?, val level: Int)
+/**
+ * A Coach session: what it found and how far the player has asked it to go (1 look, 2 why,
+ * 3 answer). When a placement needs eliminations first, Why walks through each of them in turn
+ * ([step]), so everything the note says is true at the moment it says it.
+ */
+data class CoachUi(val hint: CoachHint?, val level: Int, val step: Int = 0) {
+    /** What the note explains in order: each elimination needed, or else the placement itself. */
+    val steps: List<Step>
+        get() = (hint as? CoachHint.Next)?.let { next -> next.groundwork.ifEmpty { listOf(next.placement) } }.orEmpty()
+
+    /** The step on the page now. */
+    val lesson: Step? get() = steps.getOrNull(step)
+
+    /** True once the note has reached the step the answer follows from. */
+    val lastStep: Boolean get() = step >= steps.lastIndex
+}
 
 data class PageUiState(
     val loading: Boolean = true,
@@ -127,6 +144,8 @@ class PageViewModel(
     private var loadJob: Job? = null
     private var recordJob: Job? = null
     private var discardedKey: String? = null
+    /** Deals the next practice page; outlives a load that is cancelled by opening another page. */
+    private var practiceDeal: Deferred<GameState>? = null
 
     init {
         viewModelScope.launch {
@@ -250,14 +269,16 @@ class PageViewModel(
         val coach = current.coach ?: return
         val game = current.game ?: return
         if (coach.hint == null || coach.level >= 3) return
-        val level = coach.level + 1
         val hint = coach.hint
+        // Why goes through each elimination before the answer is offered.
+        val next = if (coach.level == 2 && !coach.lastStep) coach.copy(step = coach.step + 1) else coach.copy(level = coach.level + 1)
         // Being shown which digit is wrong is not being given an answer: the page stays clean.
-        val recorded = if (hint is CoachHint.Mistake) minOf(level, 2) else level
-        _state.update { it.copy(game = game.coachReached(recorded), coach = coach.copy(level = level)) }
-        if (level >= 2 && hint is CoachHint.Next) {
+        val recorded = if (hint is CoachHint.Mistake) minOf(next.level, 2) else next.level
+        _state.update { it.copy(game = game.coachReached(recorded), coach = next) }
+        val lesson = next.lesson
+        if (next.level == 2 && lesson != null) {
             viewModelScope.launch {
-                updateSettings { it.copy(techniquesMet = it.techniquesMet + hint.lesson.technique) }
+                updateSettings { it.copy(techniquesMet = it.techniquesMet + lesson.technique) }
             }
         }
         scheduleSave()
@@ -362,6 +383,14 @@ class PageViewModel(
     private fun resumeCurrent() {
         if (!_state.value.loading) return
         loadJob?.cancel()
+        val game = _state.value.game
+        if (game != null && game.spec.key == discardedKey) {
+            // Taken back before the new page was dealt: keep it, and write it again in case the
+            // deal had already dropped its row.
+            practiceDeal?.cancel()
+            discardedKey = null
+            viewModelScope.launch { persist(game) }
+        }
         _state.update {
             val game = it.game
             it.copy(
@@ -375,11 +404,18 @@ class PageViewModel(
         // A page set aside unfinished is dropped, so the notebook never offers it again.
         saveJob?.cancel()
         _state.value.game?.takeIf { it.spec.kind == PuzzleKind.Classic && !it.solved }?.let { discardedKey = it.spec.key }
-        load(keepPrevious = false) {
+        // The deal runs on its own: if another page is opened meanwhile, the new practice page is
+        // still saved and the old one still dropped, so Practice never offers the page set aside.
+        val deal = viewModelScope.async {
             // A solve still being recorded counts towards the level of the next page.
             recordJob?.join()
-            newPractice().also { store.discardUnsolvedPractice(except = it.spec.key) }
+            newPractice().also {
+                store.save(it, clock.millis())
+                store.discardUnsolvedPractice(except = it.spec.key)
+            }
         }
+        practiceDeal = deal
+        load(keepPrevious = false) { deal.await() }
     }
 
     private suspend fun nextPracticeSpec() =
