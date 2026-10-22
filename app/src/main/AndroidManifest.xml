@@ -2,6 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- WorkManager (under the Glance widget) declares this for network-constrained work; the app
+         schedules none and promises no network, so it is removed from the merged manifest. -->
+    <uses-permission
+        android:name="android.permission.ACCESS_NETWORK_STATE"
+        tools:node="remove" />
+
     <application
         android:name=".SudokuApplication"
         android:allowBackup="true"

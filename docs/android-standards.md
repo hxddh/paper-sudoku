@@ -1,4 +1,4 @@
-# Android 开发规范 / Checklist — v4.0
+# Android 开发规范 / Checklist — v5.0
 
 > 基线：`targetSdk 36`、`compileSdk 37`、`minSdk 26`，Jetpack Compose + Material 3 Expressive
 > （`material3 1.5.0-beta01`）、Material 3 Adaptive 1.1、Navigation 3、Room 2.8、DataStore、Glance。
@@ -14,7 +14,7 @@
 - [x] 不锁方向、不禁止 resize；布局按窗口尺寸而非设备类型决定
 - [x] SplashScreen API（`core-splashscreen`），启动画面停留到主题设置读出，深色用户无纸色闪烁
 - [x] R8 + 资源压缩的 release 构建；kotlinx.serialization 自带 R8 规则
-- [x] 无 `INTERNET` 权限；Android 备份包含 Room 与 DataStore
+- [x] 无 `INTERNET` 与 `ACCESS_NETWORK_STATE`（合并清单中移除 WorkManager 声明），CI 对 release APK 检查；Android 备份包含 Room 与 DataStore
 - [ ] Play Data Safety、内容分级、隐私政策托管（文案已更新，提交待 owner）
 
 ## 1. 触控与视觉
