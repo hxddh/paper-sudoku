@@ -65,10 +65,12 @@ is no dynamic-color variant. Key: paper `#F4EFE5`, terracotta `#A8442F`, ink `#2
 ## Layout
 
 - Phone portrait: header, board (4dp margins for 9×9, 12dp for 6×6) sitting just above the work
-  area of height `max(176dp, toolbar + status + keypad)`; spare height goes above the board.
+  area of height `max(176dp, toolbar + status + keypad)`; most of the spare height goes above the
+  board (vertical bias 0.4), so it sits near the hand.
 - Window wider than tall and ≥ 560dp: board left at full height, header and work area right
   (40%, 320–440dp).
 - Wide windows with the notebook expanded: list-detail two panes; the page hides its back button.
+  Short windows (a phone on its side, height below 480dp) show one pane at a time.
 
 9×9 cells on a 390dp phone are ≈ 42dp; aiming with the loupe, digit pick-up and the keyboard make
 precise input independent of finger size. Every other target is ≥ 48dp.

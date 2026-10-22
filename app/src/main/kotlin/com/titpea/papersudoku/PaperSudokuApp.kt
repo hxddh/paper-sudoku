@@ -7,7 +7,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.layout.AnimatedPane
+import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
 import androidx.compose.material3.adaptive.layout.PaneAdaptedValue
 import androidx.compose.material3.adaptive.navigation.NavigableListDetailPaneScaffold
@@ -49,6 +51,7 @@ import com.titpea.papersudoku.page.PageViewModel
 import com.titpea.papersudoku.settings.SettingsScreen
 import com.titpea.papersudoku.share.printPuzzle
 import com.titpea.papersudoku.share.sharePage
+import androidx.window.core.layout.WindowSizeClass
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
@@ -129,7 +132,19 @@ private fun NotebookHome(
     val scope = rememberCoroutineScope()
     val todayKey = remember { PageKeys.daily(pageViewModel.state.value.today) }
     // Opening the app lands on today's page; back goes to the notebook.
+    // A phone on its side is wide but short: one pane at a time, so the page gets the whole window
+    // (and its board-beside-tools layout) instead of half of it.
+    val adaptiveInfo = currentWindowAdaptiveInfo()
+    val directive = remember(adaptiveInfo) {
+        val base = calculatePaneScaffoldDirective(adaptiveInfo)
+        if (adaptiveInfo.windowSizeClass.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND)) {
+            base
+        } else {
+            base.copy(maxHorizontalPartitions = 1)
+        }
+    }
     val navigator = rememberListDetailPaneScaffoldNavigator<String>(
+        scaffoldDirective = directive,
         initialDestinationHistory = listOf(
             ThreePaneScaffoldDestinationItem(ListDetailPaneScaffoldRole.List),
             ThreePaneScaffoldDestinationItem(ListDetailPaneScaffoldRole.Detail, todayKey),

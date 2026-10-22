@@ -120,6 +120,9 @@ fun NotebookScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // Items arrive together: inserting today above a visible card would leave the list
+            // scrolled past today under the app bar.
+            if (!state.loaded) return@LazyColumn
             state.todayPage?.let { page ->
                 item(key = "today") {
                     TodayCard(

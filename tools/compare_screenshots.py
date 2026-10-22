@@ -49,9 +49,9 @@ def main() -> int:
         if golden.size != reduced.size:
             failures.append(f"{shot.name}: size {reduced.size} != golden {golden.size}")
             continue
-        diff = ImageChops.difference(reduced, golden)
-        pixels = diff.getdata()
-        changed = sum(1 for p in pixels if max(p) > THRESHOLD)
+        r, g, b = ImageChops.difference(reduced, golden).split()
+        peak = ImageChops.lighter(ImageChops.lighter(r, g), b)
+        changed = peak.point(lambda v: 255 if v > THRESHOLD else 0).histogram()[255]
         fraction = changed / (reduced.width * reduced.height)
         status = "FAIL" if fraction > MAX_FRACTION else "ok"
         print(f"{status} {shot.name}: {fraction:.4%} of pixels changed")

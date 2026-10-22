@@ -53,6 +53,8 @@ data class NotebookUiState(
     val pages: Map<Long, PageEntry> = emptyMap(),
     val stamped: Int = 0,
     val techniquesMet: Set<Technique> = emptySet(),
+    /** False until the store has answered; the list stays empty so it opens at today, not below it. */
+    val loaded: Boolean = true,
 )
 
 /**
@@ -93,9 +95,10 @@ class NotebookViewModel(
                 pages = (pastDays + day).associateWith(::entry),
                 stamped = days.size,
                 techniquesMet = settings.techniquesMet,
+                loaded = true,
             )
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NotebookUiState(today = today.value))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NotebookUiState(today = today.value, loaded = false))
 
     /** Call when the app returns to the foreground, in case the date changed. */
     fun refreshDate() {

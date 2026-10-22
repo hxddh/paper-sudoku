@@ -64,6 +64,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -247,7 +248,8 @@ fun PageScreen(
                         state, onEvent,
                         Modifier.weight(1f).fillMaxWidth().widthIn(max = 720.dp).padding(horizontal = boardPadding),
                         boardModifier.then(focusRing).onGloballyPositioned { boardBounds = it.boundsInRoot() },
-                        alignment = Alignment.BottomCenter,
+                        // Most of the spare height above the board, so it sits near the hand.
+                        alignment = BiasAlignment(0f, 0.4f),
                     )
                     Spacer(Modifier.height(12.dp))
                     WorkArea(
