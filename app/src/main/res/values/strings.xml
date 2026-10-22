@@ -162,6 +162,6 @@
     <string name="cell_coach_removes">the Coach rules out %1$s</string>
     <string name="coach_step_progress">%3$s, part %1$d of %2$d</string>
     <string name="look_claiming">On this line, one digit can only sit inside one box. Look at that box.</string>
-    <string name="status_hint">Tap a cell, then a digit. Or press the board and slide to pick a cell.</string>
+    <string name="status_hint">Tap a cell, then a digit, or press and slide to aim.</string>
     <string name="list_separator">", "</string>
 </resources>

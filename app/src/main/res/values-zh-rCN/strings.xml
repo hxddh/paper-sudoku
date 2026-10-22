@@ -161,6 +161,6 @@
     <string name="page_pane">页面</string>
     <string name="coach_step_progress">%3$s，第 %1$d/%2$d 部分</string>
     <string name="look_claiming">这条线上，某个数字只能落在一个宫里，看看那个宫。</string>
-    <string name="status_hint">先点格子，再点数字；也可以按住盘面滑动选格。</string>
+    <string name="status_hint">先点格子再点数字，或按住滑动选格。</string>
     <string name="list_separator">"，"</string>
 </resources>

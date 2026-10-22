@@ -49,7 +49,7 @@ day is there. Finish a page and it is stamped. When you are stuck, the Coach wri
   faintly and offers Place. A wrong digit is pointed out first.
 - **Leaving** a page (back, notebook, background) stops the hidden clock.
 - **First page:** until the first digit is ever written, the status line reads "Tap a cell, then a
-  digit. Or press the board and slide to pick a cell." It is the app's only how-to.
+  digit, or press and slide to aim." (one line on a phone). It is the app's only how-to.
 - **Clean:** a page is clean unless the Coach gave its answer; pointing at a wrong digit does not
   count. The same rule drives stamps, practice levels and share text.
 

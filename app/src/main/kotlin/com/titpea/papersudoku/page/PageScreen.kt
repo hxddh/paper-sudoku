@@ -107,7 +107,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
-import com.titpea.papersudoku.designsystem.FrauncesDisplay
+import com.titpea.papersudoku.designsystem.FrauncesPrinted
 import com.titpea.papersudoku.designsystem.InkStamp
 import com.titpea.papersudoku.designsystem.PaperTheme
 import com.titpea.papersudoku.game.model.GameState
@@ -530,14 +530,14 @@ private fun SolvedNote(
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.semantics { heading() },
         )
-        // Numerals are Fraunces everywhere: the time is set in it within the sentence.
+        // Numerals are Fraunces everywhere: the time is set in its text cut within the sentence.
         val time = formatElapsed(game.elapsedMillis / 1_000)
         val line = stringResource(R.string.solved_time, time)
         val at = line.indexOf(time)
         Text(
             buildAnnotatedString {
                 append(line)
-                if (at >= 0) addStyle(SpanStyle(fontFamily = FrauncesDisplay, fontFeatureSettings = "lnum, tnum"), at, at + time.length)
+                if (at >= 0) addStyle(SpanStyle(fontFamily = FrauncesPrinted, fontFeatureSettings = "lnum, tnum"), at, at + time.length)
             },
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
