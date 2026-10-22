@@ -14,6 +14,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.titpea.papersudoku.game.model.GameState
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -38,7 +39,11 @@ data class GameResultEntity(
     val epochDay: Long? = null,
 )
 
-/** The in-progress (or finished) board for one puzzle, as [com.titpea.papersudoku.game.model.GameState] JSON. */
+/**
+ * The in-progress (or finished) board for one puzzle, as [com.titpea.papersudoku.game.model.GameState]
+ * JSON. [givens] and [grid] repeat the printed and current digits (one character per cell) so the
+ * notebook can draw its pages without decoding every game.
+ */
 @Entity(tableName = "saved_games")
 data class SavedGameEntity(
     @PrimaryKey val puzzleKey: String,
@@ -49,6 +54,20 @@ data class SavedGameEntity(
     val solved: Boolean,
     val json: String,
     val updatedAt: Long,
+    @ColumnInfo(defaultValue = "''") val givens: String = "",
+    @ColumnInfo(defaultValue = "''") val grid: String = "",
+)
+
+/** What the notebook and the widget need of a saved page. */
+data class SavedPageRow(
+    val puzzleKey: String,
+    val kind: String,
+    val difficulty: String,
+    val number: Int?,
+    val epochDay: Long?,
+    val solved: Boolean,
+    val givens: String,
+    val grid: String,
 )
 
 /** Per mode and difficulty. [bestSeconds] ignores games where the Coach gave the answer. */
@@ -116,11 +135,17 @@ interface SavedGameDao {
     @Query("SELECT * FROM saved_games WHERE puzzleKey = :puzzleKey")
     suspend fun get(puzzleKey: String): SavedGameEntity?
 
-    @Query("SELECT * FROM saved_games WHERE kind = 'Classic' AND solved = 0 ORDER BY updatedAt DESC LIMIT 1")
-    fun observeLatestUnsolvedPractice(): Flow<SavedGameEntity?>
+    @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind = 'Classic' AND solved = 0 ORDER BY updatedAt DESC LIMIT 1")
+    fun observeLatestUnsolvedPractice(): Flow<SavedPageRow?>
 
-    @Query("SELECT * FROM saved_games WHERE kind = 'Daily' AND epochDay >= :fromEpochDay ORDER BY epochDay DESC")
-    fun observeDailies(fromEpochDay: Long): Flow<List<SavedGameEntity>>
+    @Query("SELECT puzzleKey FROM saved_games WHERE kind = 'Classic' AND solved = 0 ORDER BY updatedAt DESC LIMIT 1")
+    suspend fun latestUnsolvedPracticeKey(): String?
+
+    @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind = 'Daily' AND epochDay >= :fromEpochDay ORDER BY epochDay DESC")
+    fun observeDailies(fromEpochDay: Long): Flow<List<SavedPageRow>>
+
+    @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE puzzleKey = :puzzleKey")
+    fun observePage(puzzleKey: String): Flow<SavedPageRow?>
 
     @Query("SELECT MAX(number) FROM saved_games WHERE kind = 'Classic' AND difficulty = :difficulty")
     suspend fun maxClassicNumber(difficulty: String): Int?
@@ -132,9 +157,11 @@ interface SavedGameDao {
     suspend fun discardUnsolvedPractice(except: String)
 }
 
+private const val PAGE_COLUMNS = "puzzleKey, kind, difficulty, number, epochDay, solved, givens, grid"
+
 @Database(
     entities = [GameResultEntity::class, SavedGameEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class SudokuDatabase : RoomDatabase() {
@@ -146,7 +173,7 @@ abstract class SudokuDatabase : RoomDatabase() {
 
         fun create(context: Context, name: String = NAME): SudokuDatabase =
             Room.databaseBuilder(context.applicationContext, SudokuDatabase::class.java, name)
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
     }
 }
@@ -178,3 +205,26 @@ val MIGRATION_1_2: Migration = object : Migration(1, 2) {
         )
     }
 }
+
+/** v2 → v3: printed and current digits beside the JSON, filled in from the saved games. */
+val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `saved_games` ADD COLUMN `givens` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `saved_games` ADD COLUMN `grid` TEXT NOT NULL DEFAULT ''")
+        val rows = buildList {
+            db.query("SELECT `puzzleKey`, `json` FROM `saved_games`").use { cursor ->
+                while (cursor.moveToNext()) add(cursor.getString(0) to cursor.getString(1))
+            }
+        }
+        for ((key, json) in rows) {
+            val game = GameState.decode(json) ?: continue
+            db.execSQL(
+                "UPDATE `saved_games` SET `givens` = ?, `grid` = ? WHERE `puzzleKey` = ?",
+                arrayOf(game.spec.givens.digits(), game.values.digits(), key),
+            )
+        }
+    }
+}
+
+/** One character per cell; puzzles are at most 9×9. */
+fun List<Int>.digits(): String = joinToString("")

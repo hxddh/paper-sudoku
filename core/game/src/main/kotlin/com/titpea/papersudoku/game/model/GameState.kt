@@ -111,7 +111,8 @@ data class GameState(
         )
     }
 
-    fun restart(): GameState = new(spec)
+    /** A clean board with the clock reset; the Coach's help stays on record. A solved page stays solved. */
+    fun restart(): GameState = if (solved) this else new(spec).copy(coach = coach)
 
     fun addElapsed(millis: Long): GameState =
         if (solved || millis <= 0) this else copy(elapsedMillis = elapsedMillis + millis)
@@ -138,7 +139,9 @@ data class GameState(
                 if (peers.contains(i)) DigitMask.remove(mask, digit) else mask
             }
         }
-        return copy(values = values.replace(index, digit), notes = newNotes)
+        val placed = copy(values = values.replace(index, digit), notes = newNotes)
+        // Every copy of the held digit is on the board: put it down.
+        return if (placed.lockedDigit != null && placed.remaining[placed.lockedDigit] <= 0) placed.copy(lockedDigit = null) else placed
     }
 
     private fun remember(): GameState {
