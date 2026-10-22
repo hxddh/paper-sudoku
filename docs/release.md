@@ -4,7 +4,7 @@
 
 - App name: **Paper Sudoku** / **纸上数独**
 - `applicationId`: `com.titpea.papersudoku`
-- Version: `5.0.0` (`versionCode 5`)
+- Version: `6.0.0` (`versionCode 6`)
 - Minimum SDK: 26
 - Target SDK: 36
 - Compile SDK: 37 (required by Material 3 Expressive `1.5.0-beta01`)

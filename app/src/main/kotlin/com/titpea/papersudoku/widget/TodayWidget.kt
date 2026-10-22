@@ -86,6 +86,8 @@ class TodayWidget : GlanceAppWidget() {
         val initial = pages.first()
         NewDayAlarm.schedule(context, date)
         val weekday = date.dayOfWeek.getDisplayName(JavaTextStyle.SHORT, context.resources.configuration.locales[0])
+        // The date in Fraunces, as in the app (Glance text can't use a bundled font).
+        val numeral = Numeral.render(context, date.dayOfMonth.toString())
         val open = Intent(context, MainActivity::class.java)
             .setAction(MainActivity.ACTION_OPEN_TODAY)
             // SINGLE_TOP with CLEAR_TOP: a running activity gets onNewIntent instead of being recreated.
@@ -121,7 +123,12 @@ class TodayWidget : GlanceAppWidget() {
                 if (wide) {
                     Column(modifier = GlanceModifier.defaultWeight()) {
                         Text(context.getString(R.string.today), style = TextStyle(color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Medium))
-                        Text(date.dayOfMonth.toString(), style = TextStyle(color = InkColor, fontSize = 34.sp))
+                        Image(
+                            provider = ImageProvider(numeral.bitmap),
+                            contentDescription = date.dayOfMonth.toString(),
+                            colorFilter = ColorFilter.tint(InkColor),
+                            modifier = GlanceModifier.size(numeral.width, numeral.height),
+                        )
                         // At the shortest size the weekday gives way, so the status always fits.
                         if (size.height >= 130.dp) {
                             Text(weekday, style = TextStyle(color = Muted, fontSize = 13.sp))
@@ -131,7 +138,7 @@ class TodayWidget : GlanceAppWidget() {
                     }
                     Spacer(GlanceModifier.width(8.dp))
                 }
-                Miniature(layers, side, context.getString(R.string.widget_page_description) + ", " + status)
+                Miniature(layers, side, context.getString(R.string.widget_page_description) + context.getString(R.string.list_separator) + status)
             }
         }
     }
@@ -276,5 +283,29 @@ object NewDayAlarm {
             context, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         alarms.setWindow(AlarmManager.RTC, at, WINDOW_MILLIS, pending)
+    }
+}
+
+/** A numeral drawn in Fraunces as an alpha mask, tinted like the miniature. */
+class Numeral(val bitmap: Bitmap, val width: Dp, val height: Dp) {
+    companion object {
+        private const val SIZE_DP = 36f
+
+        fun render(context: Context, text: String): Numeral {
+            val density = context.resources.displayMetrics.density
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = ResourcesCompat.getFont(context, R.font.fraunces) ?: Typeface.SERIF
+                textSize = SIZE_DP * density
+                fontFeatureSettings = "lnum"
+            }
+            val bounds = android.graphics.Rect()
+            paint.getTextBounds(text, 0, text.length, bounds)
+            val pad = (2 * density).toInt()
+            val w = bounds.width() + pad * 2
+            val h = bounds.height() + pad * 2
+            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ALPHA_8)
+            Canvas(bitmap).drawText(text, (pad - bounds.left).toFloat(), (pad - bounds.top).toFloat(), paint)
+            return Numeral(bitmap, (w / density).dp, (h / density).dp)
+        }
     }
 }

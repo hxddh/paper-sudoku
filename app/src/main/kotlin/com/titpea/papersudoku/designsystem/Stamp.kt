@@ -15,19 +15,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 
 /**
  * A rubber ink stamp: double ring, a dashed inner band, and two short lines of text. When
  * [animate] is true it lands with a short overshoot, like a hand pressing it onto the page.
+ *
+ * It is ink on the page, not a sticker over it: it multiplies into the paper (screens on the night
+ * page), so the digits beneath show through. [seed] (the page) sets its slight tilt and offset, so
+ * no two pages are stamped quite alike, and the same page always is.
  */
 @Composable
 fun InkStamp(
@@ -37,7 +46,13 @@ fun InkStamp(
     color: Color = MaterialTheme.colorScheme.primary,
     size: Dp = 168.dp,
     animate: Boolean = true,
+    seed: Int = 0,
 ) {
+    val hand = remember(seed) { java.util.Random(seed.toLong()) }
+    val tilt = remember(seed) { -14f + 8f * hand.nextFloat() }
+    val nudgeX = remember(seed) { (hand.nextFloat() - 0.5f) * 12f }
+    val nudgeY = remember(seed) { (hand.nextFloat() - 0.5f) * 12f }
+    val night = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val scale = remember { Animatable(if (animate) 1.6f else 1f) }
     val alpha = remember { Animatable(if (animate) 0f else 1f) }
     LaunchedEffect(animate) {
@@ -54,8 +69,11 @@ fun InkStamp(
             .graphicsLayer {
                 scaleX = scale.value
                 scaleY = scale.value
-                this.alpha = alpha.value * 0.92f
-                rotationZ = -10f
+                this.alpha = alpha.value * 0.88f
+                rotationZ = tilt
+                translationX = nudgeX.dp.toPx()
+                translationY = nudgeY.dp.toPx()
+                blendMode = if (night) BlendMode.Screen else BlendMode.Multiply
             },
         contentAlignment = Alignment.Center,
     ) {
@@ -82,19 +100,24 @@ fun InkStamp(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.clearAndSetSemantics {},
         ) {
+            // Cut letters, as on a rubber stamp: Fraunces capitals, spaced (CJK keeps its own face).
             Text(
-                text = title,
+                text = title.uppercase(),
                 color = color,
-                style = MaterialTheme.typography.headlineSmall,
-                fontSize = with(density) { (size / 7f).toSp() },
+                style = TextStyle(
+                    fontFamily = FrauncesDisplay,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.12.em,
+                ),
+                fontSize = with(density) { (size / 7.5f).toSp() },
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )
             Text(
                 text = caption,
                 color = color,
-                style = MaterialTheme.typography.labelMedium,
-                fontSize = with(density) { (size / 14f).toSp() },
+                style = TextStyle(fontFamily = FrauncesDisplay, fontFeatureSettings = "lnum, tnum"),
+                fontSize = with(density) { (size / 12f).toSp() },
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )

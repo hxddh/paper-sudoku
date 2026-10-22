@@ -72,7 +72,7 @@ class NotebookScreenTest {
         composeRule.onNodeWithTag("notebook-today").assertIsDisplayed().performClick()
         composeRule.onNodeWithTag("notebook-practice").performClick()
         composeRule.onNodeWithTag("notebook-practice")
-            .assert(hasContentDescription("2 more pages without the Coach’s answer to reach the next level", substring = true))
+            .assert(hasContentDescription("2 more clean pages to reach the next level", substring = true))
         composeRule.onNodeWithTag("open-settings").performClick()
         assertEquals(listOf(today), opened)
         assertTrue(practice)

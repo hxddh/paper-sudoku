@@ -9,6 +9,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import com.titpea.papersudoku.designsystem.FrauncesPen
@@ -35,17 +36,20 @@ fun PageThumbnail(
         val side = this.size.minDimension
         val cell = side / size
         drawRoundRect(ink.sheet, size = Size(side, side), cornerRadius = CornerRadius(side * 0.04f))
+        // Line weights in dp, as on the board: cells, then boxes, then the frame.
+        val cellLine = 0.75.dp.toPx()
+        val boxLine = 1.25.dp.toPx()
         for (i in 1 until size) {
             val v = i % boxCols == 0
             val h = i % boxRows == 0
-            drawLine(if (v) ink.boxLine else ink.gridLine, Offset(i * cell, 0f), Offset(i * cell, side), if (v) 1.5f else 0.7f)
-            drawLine(if (h) ink.boxLine else ink.gridLine, Offset(0f, i * cell), Offset(side, i * cell), if (h) 1.5f else 0.7f)
+            drawLine(if (v) ink.boxLine else ink.gridLine, Offset(i * cell, 0f), Offset(i * cell, side), if (v) boxLine else cellLine)
+            drawLine(if (h) ink.boxLine else ink.gridLine, Offset(0f, i * cell), Offset(side, i * cell), if (h) boxLine else cellLine)
         }
         drawRoundRect(
             ink.boxLine,
             size = Size(side, side),
             cornerRadius = CornerRadius(side * 0.04f),
-            style = Stroke(width = 1.5f),
+            style = Stroke(width = 1.5.dp.toPx()),
         )
         if (page == null) return@Canvas
         // Pixels → sp through the density, so the digits fit the cell at any font scale.

@@ -7,8 +7,8 @@ sealed interface CoachHint {
     data class Mistake(val index: Int, val digit: Int) : CoachHint
 
     /**
-     * The next placement, plus any eliminations that had to happen first ([groundwork]). The
-     * lesson is the hardest technique involved; the last groundwork step is the pattern to show.
+     * The next placement, plus the eliminations it needs first ([groundwork]), in order. Only
+     * eliminations the placement depends on are kept, so each one is worth explaining.
      */
     data class Next(
         val placement: Placement,
@@ -68,12 +68,42 @@ class SudokuEngine(private val puzzle: Puzzle) {
         if (board.isSolved) return null
         val groundwork = mutableListOf<Elimination>()
         repeat(MAX_GROUNDWORK) {
-            solver.nextSingle(board)?.let { return CoachHint.Next(it, groundwork.toList()) }
+            solver.nextSingle(board)?.let { return CoachHint.Next(it, essential(groundwork, it)) }
             val elimination = solver.nextElimination(board) ?: return null
             groundwork += elimination
             board.eliminate(elimination.removals)
         }
         return null
+    }
+
+    /**
+     * The eliminations [single] depends on. Working back from the single, an elimination is kept
+     * when it removed a candidate that something kept relies on; what it relies on in turn (its
+     * digits across its units, or every digit of a naked pair) is then needed as well. Whatever
+     * is dropped touched none of that, so the kept steps stay valid and still lead to the single.
+     */
+    private fun essential(groundwork: List<Elimination>, single: Placement): List<Elimination> {
+        if (groundwork.size < 2) return groundwork
+        val all = (1..geometry.size).fold(0) { mask, d -> mask or (1 shl d) }
+        val needed = IntArray(geometry.cellCount)
+        val unit = single.unit
+        if (single.technique == Technique.HiddenSingle && unit != null) {
+            for (cell in geometry.cells(unit)) needed[cell] = needed[cell] or (1 shl single.digit)
+        } else {
+            needed[single.index] = all
+        }
+        val kept = ArrayDeque<Elimination>()
+        for (step in groundwork.asReversed()) {
+            if (step.removals.none { needed[it.index] and (1 shl it.digit) != 0 }) continue
+            kept.addFirst(step)
+            if (step.technique == Technique.NakedPair) {
+                for (cell in step.patternCells) needed[cell] = all
+            } else {
+                val digits = step.digits.fold(0) { mask, d -> mask or (1 shl d) }
+                for (u in step.units) for (cell in geometry.cells(u)) needed[cell] = needed[cell] or digits
+            }
+        }
+        return kept.toList()
     }
 
     private companion object {

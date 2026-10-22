@@ -154,7 +154,7 @@ class PageScreenTest {
         var back = false
         show(Fixtures.page(game = Fixtures.solved()), onBack = { back = true })
         composeRule.onNodeWithTag("solved-stamp").assertExists()
-        composeRule.onNodeWithText("Solved · 2:05").assertIsDisplayed()
+        composeRule.onNodeWithText("Solved in 2:05").assertIsDisplayed()
         composeRule.onNodeWithTag("solved-next").performClick()
         assertTrue(back)
     }

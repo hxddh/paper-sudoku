@@ -14,18 +14,18 @@ class GoldenTest {
 
     @Test
     fun `dailies are pinned`() {
-        assertEquals("000402000500500206204001002000305000", Catalog.daily(20_000).givens.joinToString(""))
-        assertEquals("400301000640020000000060014000306002", Catalog.daily(20_382).givens.joinToString(""))
+        assertEquals("000002120004001300005200600013300000", Catalog.daily(20_000).givens.joinToString(""))
+        assertEquals("000062000450640000000043014000360000", Catalog.daily(20_382).givens.joinToString(""))
     }
 
     @Test
     fun `practice pages are pinned`() {
         assertEquals(
-            "005007020008001075070000004810030000050602010000010053300000040120400300040700900",
+            "926000000008065020007000400063000008070504030800000270001000300050670900000000165",
             Catalog.classic(Difficulty.Gentle, 0).givens.joinToString(""),
         )
         assertEquals(
-            "000809400730002080004000030000600005006010800500007000020000600070500023001903000",
+            "890000001401005200000004003007009000300040006000100300500800000003500907700000035",
             Catalog.classic(Difficulty.Tricky, 0).givens.joinToString(""),
         )
     }

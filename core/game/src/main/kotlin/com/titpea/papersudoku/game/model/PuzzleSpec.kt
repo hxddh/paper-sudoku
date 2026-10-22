@@ -4,6 +4,7 @@ import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.engine.Geometry
 import com.titpea.papersudoku.engine.Puzzle
 import com.titpea.papersudoku.engine.PuzzleGenerator
+import com.titpea.papersudoku.engine.SplitMix64
 import com.titpea.papersudoku.engine.Technique
 import kotlinx.serialization.Serializable
 
@@ -39,7 +40,7 @@ data class PuzzleSpec(
  */
 object Catalog {
     /** Bump when the generator changes; part of every seed. */
-    const val GENERATOR_VERSION: Long = 2
+    const val GENERATOR_VERSION: Long = 3
 
     /** Weekdays are gentle; the weekend Mini needs one elimination idea. */
     fun dailyDifficulty(epochDay: Long): Difficulty {
@@ -69,8 +70,13 @@ object Catalog {
         return spec(classicKey(difficulty, number), PuzzleKind.Classic, generated, number = number)
     }
 
+    /**
+     * Hashed, not stepped: SplitMix64 itself steps its state by a fixed constant, so seeds that
+     * differ by a multiple of it (as `n * constant` did up to 2) replay each other's draws, and a
+     * page whose generator retried could deal the same puzzle as a later page.
+     */
     private fun seed(stream: Long, n: Long): Long =
-        (GENERATOR_VERSION shl 56) xor (stream shl 48) xor (n * -0x61c8864680b583ebL)
+        SplitMix64.mix(SplitMix64.mix((GENERATOR_VERSION shl 32) xor stream) xor n)
 
     private fun spec(
         key: String,

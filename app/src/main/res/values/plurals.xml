@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <plurals name="notebook_summary">
-        <item quantity="one">%1$d page stamped.</item>
-        <item quantity="other">%1$d pages stamped.</item>
+        <item quantity="one">%1$d page stamped</item>
+        <item quantity="other">%1$d pages stamped</item>
     </plurals>
     <plurals name="practice_to_next">
-        <item quantity="one">One more page without the Coach’s answer to reach the next level</item>
-        <item quantity="other">%1$d more pages without the Coach’s answer to reach the next level</item>
+        <item quantity="one">One more clean page to reach the next level</item>
+        <item quantity="other">%1$d more clean pages to reach the next level</item>
     </plurals>
 </resources>
