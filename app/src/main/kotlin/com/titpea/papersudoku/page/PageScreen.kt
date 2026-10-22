@@ -240,26 +240,24 @@ fun PageScreen(
                     .weight(1f)
                     .fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
-                // 9×9 cells need the width; the board's edges are kept clear of the system back gesture.
+                // 9×9 cells need the width; the board itself keeps its edges from the back gesture.
                 val boardPadding = if (game?.size == 9) 4.dp else 12.dp
-                run {
-                    Column(content, horizontalAlignment = Alignment.CenterHorizontally) {
-                        BoardArea(
-                            state, onEvent,
-                            Modifier.weight(1f).fillMaxWidth().widthIn(max = 720.dp).padding(horizontal = boardPadding),
-                            boardModifier.then(focusRing).onGloballyPositioned { boardBounds = it.boundsInRoot() },
-                            alignment = Alignment.BottomCenter,
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        WorkArea(
-                            state, onEvent, onBack, onPrint, onShare,
-                            Modifier
-                                .widthIn(max = 640.dp)
-                                .padding(horizontal = 16.dp)
-                                .padding(bottom = 12.dp)
-                                .onGloballyPositioned { noteBounds = it.boundsInRoot() },
-                        )
-                    }
+                Column(content, horizontalAlignment = Alignment.CenterHorizontally) {
+                    BoardArea(
+                        state, onEvent,
+                        Modifier.weight(1f).fillMaxWidth().widthIn(max = 720.dp).padding(horizontal = boardPadding),
+                        boardModifier.then(focusRing).onGloballyPositioned { boardBounds = it.boundsInRoot() },
+                        alignment = Alignment.BottomCenter,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    WorkArea(
+                        state, onEvent, onBack, onPrint, onShare,
+                        Modifier
+                            .widthIn(max = 640.dp)
+                            .padding(horizontal = 16.dp)
+                            .padding(bottom = 12.dp)
+                            .onGloballyPositioned { noteBounds = it.boundsInRoot() },
+                    )
                 }
             }
 
