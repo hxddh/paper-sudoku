@@ -33,8 +33,7 @@ Right, then refined: three real bugs fixed, a new icon, and every screen brought
   back; it now does neither.
 - The Coach no longer claims a cell has a single answer when an earlier elimination it did not show
   was needed.
-- The splash screen follows a theme chosen in the app (Android 12+). The keypad never clips at
-  200% text. The Coach's line no longer runs across the board.
+- The keypad never clips at 200% text. The Coach's line no longer runs across the board.
 
 **Under the hood**
 - Seeds are hashed (generator version 3); tests check a year of dailies and 60 practice pages per

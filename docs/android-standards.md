@@ -12,7 +12,7 @@
 - [x] 单 Activity + Compose；`enableEdgeToEdge()`；不绘制假系统栏
 - [x] `enableOnBackInvokedCallback="true"`；预测性返回：Navigation 3（离开的页缩到 90%、圆角、抬起，随手指线性，提交时淡出；每页不透明，无重影）、list-detail 窗格（棋盘与缩略图交叉淡化）、教练批注随手势缩放并从松手处淡出
 - [x] 不锁方向、不禁止 resize；布局按窗口尺寸而非设备类型决定
-- [x] SplashScreen API（`core-splashscreen`），启动画面停留到主题设置读出；Android 12+ 用 `setApplicationNightMode` 让启动画面本身跟随应用内主题（`configChanges="uiMode"`，切换主题不重建）
+- [x] SplashScreen API（`core-splashscreen`），启动画面停留到主题设置读出，深色用户无纸色闪烁（启动画面自身跟随系统主题：`setApplicationNightMode` 没有“跟随系统”的取值，故不使用）
 - [x] R8 + 资源压缩的 release 构建；kotlinx.serialization 自带 R8 规则
 - [x] 无 `INTERNET` 与 `ACCESS_NETWORK_STATE`（合并清单中移除 WorkManager 声明），CI 对 release APK 检查；Android 备份包含 Room 与 DataStore
 - [ ] Play Data Safety、内容分级、隐私政策托管（文案已更新，提交待 owner）
