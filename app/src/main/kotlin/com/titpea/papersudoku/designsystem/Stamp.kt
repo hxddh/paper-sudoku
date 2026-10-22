@@ -24,7 +24,6 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 /**
  * A rubber ink stamp: double ring, a dashed inner band, and two short lines of text. When
@@ -77,7 +76,8 @@ fun InkStamp(
         }
         // The stamp is a picture: its lettering is sized to the ring, not to the font scale, and the
         // solved note beside the board says the same thing to TalkBack.
-        val fontScale = LocalDensity.current.fontScale
+        // Dp → sp through the density, which also undoes Android 14's non-linear font scaling.
+        val density = LocalDensity.current
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.clearAndSetSemantics {},
@@ -86,7 +86,7 @@ fun InkStamp(
                 text = title,
                 color = color,
                 style = MaterialTheme.typography.headlineSmall,
-                fontSize = (size.value / 7f / fontScale).sp,
+                fontSize = with(density) { (size / 7f).toSp() },
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )
@@ -94,7 +94,7 @@ fun InkStamp(
                 text = caption,
                 color = color,
                 style = MaterialTheme.typography.labelMedium,
-                fontSize = (size.value / 14f / fontScale).sp,
+                fontSize = with(density) { (size / 14f).toSp() },
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )

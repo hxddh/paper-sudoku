@@ -32,11 +32,14 @@ class FakeGameStore : GameStore {
         save(state, now)
         if (results.any { it.puzzleKey == result.puzzleKey }) return false
         results += result
+        stampedFlow.value = results.size
         return true
     }
 
-    override suspend fun nextClassicNumber(difficulty: Difficulty): Int =
-        (saved.values.mapNotNull { (g, _) -> g.spec.number.takeIf { g.spec.difficulty == difficulty } }.maxOrNull() ?: -1) + 1
+    override suspend fun nextClassicNumber(difficulty: Difficulty): Int {
+        val prefix = com.titpea.papersudoku.game.model.Catalog.classicPrefix(difficulty)
+        return (saved.keys.filter { it.startsWith(prefix) }.mapNotNull { it.removePrefix(prefix).toIntOrNull() }.maxOrNull() ?: -1) + 1
+    }
 
     override suspend fun pruneUnsolvedDailies(beforeEpochDay: Long) {
         savedFlow.update { map ->
@@ -69,6 +72,8 @@ class FakeGameStore : GameStore {
 
     override val cleanPractice: Flow<Map<Difficulty, Int>> = clean
     override val days: Flow<List<DayResult>> = daysFlow
+    private val stampedFlow = MutableStateFlow(0)
+    override val stampedCount: Flow<Int> = stampedFlow
 }
 
 class FakeSettings(initial: UserSettings = UserSettings()) : SettingsStore {

@@ -58,14 +58,18 @@ data class NotebookUiState(
 )
 
 /**
- * The notebook is the app's home and its journal at once: today on top, the practice stack, then
- * every earlier day. There is no streak — only stamped pages.
+ * The notebook is the app's home and its journal at once: today on top, the practice stack, the
+ * technique handbook, then the earlier days. It starts on the day the app arrived (or the earliest
+ * page it already holds), so a new notebook has no wall of blank days. There is no streak — only
+ * stamped pages.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class NotebookViewModel(
     store: GameStore,
     settingsStore: SettingsStore,
     private val clock: Clock,
+    /** The day the app was installed; the notebook's first page. */
+    private val firstDay: Long,
 ) : ViewModel() {
 
     private val today = MutableStateFlow(LocalDate.now(clock).toEpochDay())
@@ -76,12 +80,18 @@ class NotebookViewModel(
             store.days,
             store.unfinishedPractice,
             store.cleanPractice,
-            settingsStore.settings,
-        ) { dailies, days, practice, clean, settings ->
+            combine(settingsStore.settings, store.stampedCount, ::Pair),
+        ) { dailies, days, practice, clean, (settings, stampedCount) ->
             val saved = dailies.associateBy { it.epochDay }
             val results = days.associateBy { it.epochDay }
             fun entry(d: Long) = PageEntry(d, Catalog.dailyDifficulty(d), saved[d], results[d])
-            val pastDays = (1..DAYS_SHOWN).map { day - it }
+            // Pages restored from a backup may predate the install; they open the notebook instead.
+            val start = minOf(
+                firstDay,
+                dailies.minOfOrNull { it.epochDay ?: day } ?: day,
+                days.minOfOrNull { it.epochDay } ?: day,
+            )
+            val pastDays = (1..DAYS_SHOWN).map { day - it }.filter { it >= start }
             NotebookUiState(
                 today = day,
                 todayPage = entry(day),
@@ -93,7 +103,7 @@ class NotebookViewModel(
                 ),
                 pastDays = pastDays,
                 pages = (pastDays + day).associateWith(::entry),
-                stamped = days.size,
+                stamped = stampedCount,
                 techniquesMet = settings.techniquesMet,
                 loaded = true,
             )
@@ -109,7 +119,9 @@ class NotebookViewModel(
         const val DAYS_SHOWN = 365L
 
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
-            initializer { NotebookViewModel(container.gameStore, container.settingsStore, container.clock) }
+            initializer {
+                NotebookViewModel(container.gameStore, container.settingsStore, container.clock, container.firstDay)
+            }
         }
     }
 }

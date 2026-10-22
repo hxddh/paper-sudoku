@@ -3,6 +3,7 @@ package com.titpea.papersudoku.data
 import android.util.Log
 import androidx.room.withTransaction
 import com.titpea.papersudoku.engine.Difficulty
+import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.PuzzleKind
 import kotlinx.coroutines.Dispatchers
@@ -91,6 +92,9 @@ interface GameStore {
     val cleanPractice: Flow<Map<Difficulty, Int>>
 
     val days: Flow<List<DayResult>>
+
+    /** Every stamped page, dailies and practice. */
+    val stampedCount: Flow<Int>
 }
 
 class RoomGameStore(
@@ -130,8 +134,10 @@ class RoomGameStore(
         }
     }
 
+    // Numbered by the level the page was dealt at (its key), not the grade the generator reached,
+    // so a page that came out easier can never be dealt twice.
     override suspend fun nextClassicNumber(difficulty: Difficulty): Int =
-        (savedGames.maxClassicNumber(difficulty.name) ?: -1) + 1
+        (savedGames.maxClassicNumber(Catalog.classicPrefix(difficulty)) ?: -1) + 1
 
     override suspend fun pruneUnsolvedDailies(beforeEpochDay: Long) =
         savedGames.pruneUnsolvedDailies(beforeEpochDay)
@@ -160,6 +166,7 @@ class RoomGameStore(
     }
 
     override val days: Flow<List<DayResult>> = results.observeDays()
+    override val stampedCount: Flow<Int> = results.observeCount()
 
     private suspend fun entity(state: GameState, now: Long): SavedGameEntity {
         val spec = state.spec

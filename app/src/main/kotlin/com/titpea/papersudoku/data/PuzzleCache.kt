@@ -12,6 +12,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.time.LocalDate
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Generated pages kept on disk, so a page that was prepared ahead (tomorrow's daily, the next
@@ -22,7 +25,8 @@ class CachedPuzzleSource(
     private val directory: File,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : PuzzleSource {
-    private val lock = Mutex()
+    private val locks = ConcurrentHashMap<String, Mutex>()
+    private val pruned = AtomicBoolean(false)
 
     override suspend fun daily(epochDay: Long): PuzzleSpec =
         cached(Catalog.dailyKey(epochDay)) { Catalog.daily(epochDay) }
@@ -31,10 +35,23 @@ class CachedPuzzleSource(
         cached(Catalog.classicKey(difficulty, number)) { Catalog.classic(difficulty, number) }
 
     private suspend fun cached(key: String, generate: () -> PuzzleSpec): PuzzleSpec = withContext(dispatcher) {
-        // One generation at a time: a prefetch and an open of the same page share the work.
-        lock.withLock {
-            val file = File(directory, "$key-v${Catalog.GENERATOR_VERSION}.json")
+        if (pruned.compareAndSet(false, true)) prune()
+        // One generation per page at a time: a prefetch and an open of the same page share the
+        // work, while different pages do not wait for each other.
+        locks.getOrPut(key) { Mutex() }.withLock {
+            val file = File(directory, "$key$SUFFIX")
             read(file) ?: generate().also { write(file, it) }
+        }
+    }
+
+    /** Drops pages from older generators and dailies already in the past. */
+    private fun prune() {
+        val yesterday = LocalDate.now().toEpochDay() - 1
+        directory.listFiles()?.forEach { file ->
+            val name = file.name
+            val stale = !name.endsWith(SUFFIX) ||
+                (Catalog.dayOf(name.removeSuffix(SUFFIX))?.let { it < yesterday } ?: false)
+            if (stale) file.delete()
         }
     }
 
@@ -53,5 +70,6 @@ class CachedPuzzleSource(
 
     private companion object {
         val json = Json { ignoreUnknownKeys = true }
+        val SUFFIX = "-v${Catalog.GENERATOR_VERSION}.json"
     }
 }

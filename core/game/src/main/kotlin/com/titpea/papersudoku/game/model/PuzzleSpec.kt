@@ -49,8 +49,13 @@ object Catalog {
 
     fun dailyKey(epochDay: Long): String = "daily-$epochDay"
 
-    fun classicKey(difficulty: Difficulty, number: Int): String =
-        "classic-${difficulty.name.lowercase()}-$number"
+    /** The day of a daily key, or null for any other key. */
+    fun dayOf(key: String): Long? = key.takeIf { it.startsWith("daily-") }?.removePrefix("daily-")?.toLongOrNull()
+
+    fun classicKey(difficulty: Difficulty, number: Int): String = classicPrefix(difficulty) + number
+
+    /** Every practice page dealt at [difficulty] has a key starting with this. */
+    fun classicPrefix(difficulty: Difficulty): String = "classic-${difficulty.name.lowercase()}-"
 
     fun daily(epochDay: Long): PuzzleSpec {
         val difficulty = dailyDifficulty(epochDay)

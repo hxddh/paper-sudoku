@@ -158,12 +158,15 @@ fun PageScreen(
         }
     }
 
-    var confirmRestart by rememberSaveable { mutableStateOf(false) }
-    var confirmNextPractice by rememberSaveable { mutableStateOf(false) }
+    // Dialogs belong to the page they were opened on: another page arriving closes them.
+    val pageKey = state.game?.spec?.key
+    var confirmRestart by rememberSaveable(pageKey) { mutableStateOf(false) }
+    var confirmNextPractice by rememberSaveable(pageKey) { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     var pageFocused by remember { mutableStateOf(false) }
     val keyboardMode = LocalInputModeManager.current.inputMode == InputMode.Keyboard
-    LaunchedEffect(Unit) { if (onBack != null) runCatching { focusRequester.requestFocus() } }
+    // Each page that opens takes focus, so a keyboard works at once (also beside the notebook).
+    LaunchedEffect(pageKey) { if (pageKey != null) runCatching { focusRequester.requestFocus() } }
 
     // Ink connector between the Coach's note and the board, in this screen's coordinates.
     var origin by remember { mutableStateOf(Offset.Zero) }
