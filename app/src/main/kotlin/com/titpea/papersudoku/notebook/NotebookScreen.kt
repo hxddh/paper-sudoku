@@ -25,9 +25,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,6 +46,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -97,7 +95,7 @@ fun NotebookScreen(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
                     IconButton(onClick = onOpenSettings, modifier = Modifier.testTag("open-settings")) {
-                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings_title))
+                        Icon(painterResource(R.drawable.ic_settings), contentDescription = stringResource(R.string.settings_title))
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -350,7 +348,7 @@ private fun StampMark(clean: Boolean, modifier: Modifier, size: androidx.compose
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            Icons.Default.Check,
+            painterResource(R.drawable.ic_check),
             contentDescription = null,
             tint = if (clean) MaterialTheme.colorScheme.onPrimary else color,
             modifier = Modifier.size(size * 0.6f),
@@ -372,7 +370,7 @@ private fun TechniqueRow(technique: Technique, met: Boolean) {
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (met) Icon(Icons.Default.Check, contentDescription = null, tint = colors.onTertiaryContainer, modifier = Modifier.size(16.dp))
+                if (met) Icon(painterResource(R.drawable.ic_check), contentDescription = null, tint = colors.onTertiaryContainer, modifier = Modifier.size(16.dp))
             }
         },
         headlineContent = {

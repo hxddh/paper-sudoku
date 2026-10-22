@@ -1,6 +1,24 @@
 package com.titpea.papersudoku
 
 import androidx.activity.compose.ReportDrawnWhen
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.background
@@ -50,6 +68,7 @@ import com.titpea.papersudoku.page.PageEvent
 import com.titpea.papersudoku.page.PageKeys
 import com.titpea.papersudoku.page.PageScreen
 import com.titpea.papersudoku.page.PageViewModel
+import com.titpea.papersudoku.settings.LicencesScreen
 import com.titpea.papersudoku.settings.SettingsScreen
 import com.titpea.papersudoku.share.printPuzzle
 import com.titpea.papersudoku.share.sharePage
@@ -58,7 +77,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
-enum class Screen { Home, Settings }
+enum class Screen { Home, Settings, Licences }
 
 /**
  * Two destinations on a Navigation 3 back stack: the notebook (home) and Settings. The notebook
@@ -92,11 +111,18 @@ fun PaperSudokuApp(
         }
     }
 
+    // Shared axis for taps; for the back gesture, the leaving page shrinks and rounds under the
+    // finger like the system's back preview, revealing the page beneath. Linear in time, so a
+    // seeked gesture tracks the finger one to one.
+    val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val gesture = tween<Float>(durationMillis = BACK_PREVIEW_MILLIS, easing = LinearEasing)
+    val gestureOffset = tween<IntOffset>(durationMillis = BACK_PREVIEW_MILLIS, easing = LinearEasing)
+
     Box(
         Modifier
             .fillMaxSize()
             .background(PaperTheme.colors.background)
-            .paperGrain(grain)
             // Test tags double as resource ids for UI Automator (Macrobenchmark).
             .semantics { testTagsAsResourceId = true },
     ) {
@@ -104,8 +130,27 @@ fun PaperSudokuApp(
             NavDisplay(
                 backStack = backStack,
                 onBack = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
+                transitionSpec = {
+                    (slideInHorizontally(spatial) { it / 10 } + fadeIn(effects)) togetherWith
+                        (slideOutHorizontally(spatial) { -it / 10 } + fadeOut(effects))
+                },
+                popTransitionSpec = {
+                    (slideInHorizontally(spatial) { -it / 10 } + fadeIn(effects)) togetherWith
+                        (slideOutHorizontally(spatial) { it / 10 } + fadeOut(effects))
+                },
+                predictivePopTransitionSpec = {
+                    slideInHorizontally(gestureOffset) { -it / 20 } togetherWith
+                        (
+                            scaleOut(gesture, targetScale = 0.9f) +
+                                // Gone only at the very end, as the gesture commits.
+                                fadeOut(keyframes<Float> { durationMillis = BACK_PREVIEW_MILLIS; 1f at BACK_PREVIEW_MILLIS * 4 / 5 })
+                            )
+                },
                 entryProvider = { screen ->
                     NavEntry(screen) {
+                        // Every page is its own sheet of paper, so a page leaving never shows
+                        // the one beneath through it.
+                        PaperPage(grain) {
                         when (screen) {
                             Screen.Home -> NotebookHome(
                                 pageViewModel = pageViewModel,
@@ -121,10 +166,15 @@ fun PaperSudokuApp(
                                     settings = state.settings,
                                     versionName = versionName,
                                     onUpdate = { transform -> scope.launch { container.settingsStore.update(transform) } },
+                                    onOpenLicences = { if (backStack.lastOrNull() == Screen.Settings) backStack.add(Screen.Licences) },
                                     // Guarded: the leaving screen stays tappable while it animates out.
                                     onBack = { if (backStack.lastOrNull() == Screen.Settings) backStack.removeAt(backStack.lastIndex) },
                                 )
                             }
+                            Screen.Licences -> LicencesScreen(
+                                onBack = { if (backStack.lastOrNull() == Screen.Licences) backStack.removeAt(backStack.lastIndex) },
+                            )
+                        }
                         }
                     }
                 },
@@ -132,6 +182,35 @@ fun PaperSudokuApp(
         }
     }
 }
+
+/**
+ * A page of the notebook: opaque paper with its grain. While it leaves (a back gesture or a
+ * tap), its corners round and it lifts, so it reads as a sheet over the page beneath.
+ */
+@Composable
+private fun PaperPage(grain: ShaderBrush?, content: @Composable () -> Unit) {
+    val leaving = LocalNavAnimatedContentScope.current.transition
+        .animateFloat(label = "leaving") { if (it == EnterExitState.PostExit) 1f else 0f }
+    val background = PaperTheme.colors.background
+    Box(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                val f = leaving.value
+                if (f > 0f) {
+                    shape = RoundedCornerShape(LEAVING_CORNER.toPx() * f)
+                    clip = true
+                    shadowElevation = LEAVING_ELEVATION.toPx() * f
+                }
+            }
+            .background(background)
+            .paperGrain(grain),
+    ) { content() }
+}
+
+private const val BACK_PREVIEW_MILLIS = 400
+private val LEAVING_CORNER = 28.dp
+private val LEAVING_ELEVATION = 6.dp
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -205,7 +284,7 @@ private fun NotebookHome(
                         onOpenSettings = onOpenSettings,
                         selectedKey = if (twoPane) openKey else null,
                         boardTransition = { key ->
-                            Modifier.sharedElement(rememberSharedContentState("board-$key"), paneScope)
+                            Modifier.sharedBounds(rememberSharedContentState("board-$key"), paneScope)
                         },
                     )
                 }
@@ -226,8 +305,10 @@ private fun NotebookHome(
                         onShare = { sharePage(context, it) },
                         effects = pageViewModel.effects,
                         // Keyed by the page being opened, not the one still on screen while it loads.
+                        // Bounds, not element: the live board and the thumbnail cross-fade as
+                        // they fly, so a back gesture never swaps the board for a drawing at once.
                         boardModifier = if (boardKey != null) {
-                            Modifier.sharedElement(rememberSharedContentState("board-$boardKey"), paneScope)
+                            Modifier.sharedBounds(rememberSharedContentState("board-$boardKey"), paneScope)
                         } else {
                             Modifier
                         },

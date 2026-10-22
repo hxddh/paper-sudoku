@@ -3,7 +3,7 @@ package com.titpea.papersudoku.page
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -34,10 +34,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -58,9 +54,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -93,6 +89,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -102,6 +99,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
 import com.titpea.papersudoku.designsystem.InkStamp
@@ -112,6 +110,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 private enum class WorkMode { Play, Coach, Solved }
@@ -168,6 +167,10 @@ fun PageScreen(
     val keyboardMode = LocalInputModeManager.current.inputMode == InputMode.Keyboard
     // Each page that opens takes focus, so a keyboard works at once (also beside the notebook).
     LaunchedEffect(pageKey) { if (pageKey != null) runCatching { focusRequester.requestFocus() } }
+
+    // How far a back gesture has pulled the Coach's note away (it shrinks and fades with it).
+    val coachBack = remember { Animatable(0f) }
+    LaunchedEffect(state.coach == null) { if (state.coach != null) coachBack.snapTo(0f) }
 
     // Ink connector between the Coach's note and the board, in this screen's coordinates.
     var origin by remember { mutableStateOf(Offset.Zero) }
@@ -233,7 +236,7 @@ fun PageScreen(
                             verticalArrangement = Arrangement.Center,
                         ) {
                             WorkArea(
-                                state, onEvent, onBack, onPrint, onShare,
+                                state, onEvent, onBack, onPrint, onShare, coachBack,
                                 Modifier.onGloballyPositioned { noteBounds = it.boundsInRoot() },
                             )
                         }
@@ -257,7 +260,7 @@ fun PageScreen(
                     )
                     Spacer(Modifier.height(12.dp))
                     WorkArea(
-                        state, onEvent, onBack, onPrint, onShare,
+                        state, onEvent, onBack, onPrint, onShare, coachBack,
                         Modifier
                             .widthIn(max = 640.dp)
                             .padding(horizontal = 16.dp)
@@ -277,6 +280,7 @@ fun PageScreen(
                     note = noteBounds?.translate(-origin),
                     wide = wide,
                     key = coach,
+                    modifier = Modifier.graphicsLayer { alpha = 1f - coachBack.value },
                 )
             }
         }
@@ -370,9 +374,14 @@ private fun WorkArea(
     onBack: (() -> Unit)?,
     onPrint: (GameState) -> Unit,
     onShare: (GameState) -> Unit,
+    coachBack: Animatable<Float, AnimationVector1D>,
     modifier: Modifier = Modifier,
 ) {
     val game = state.game ?: return
+    // The note leaving keeps its words while it fades, though the session has already ended.
+    var lastCoach by remember { mutableStateOf(state.coach) }
+    if (state.coach != null) lastCoach = state.coach
+    val scope = rememberCoroutineScope()
     val mode = when {
         game.solved -> WorkMode.Solved
         state.coach != null -> WorkMode.Coach
@@ -383,16 +392,15 @@ private fun WorkArea(
     val fontScale = LocalDensity.current.fontScale.coerceIn(1f, 1.3f)
     val height = maxOf(NoteHeight * fontScale, ToolbarHeight + StatusHeight + keypadHeight(game.size))
 
-    // Predictive back: the note shrinks with the gesture and is put away on commit.
-    var backProgress by remember { mutableFloatStateOf(0f) }
+    // Predictive back: the note shrinks with the gesture; on commit it fades from where the
+    // finger left it, and a cancelled gesture eases it back.
     PredictiveBackHandler(enabled = mode == WorkMode.Coach) { progress ->
         try {
-            progress.collect { backProgress = it.progress }
+            progress.collect { coachBack.snapTo(it.progress) }
             onEvent(PageEvent.DismissCoach)
         } catch (e: CancellationException) {
+            scope.launch { coachBack.animateTo(0f) }
             throw e
-        } finally {
-            backProgress = 0f
         }
     }
 
@@ -412,17 +420,17 @@ private fun WorkArea(
                 StatusLine(game, onEvent, showHint = !state.settings.wroteFirstDigit)
                 Keypad(game, onEvent)
             }
-            WorkMode.Coach -> state.coach?.let { coach ->
+            WorkMode.Coach -> (state.coach ?: lastCoach)?.let { coach ->
                 MarginNote(
                     coach = coach,
                     geometry = game.spec.geometry,
                     onEvent = onEvent,
                     // The tools' height at normal sizes; with large text the note grows to show it all.
                     modifier = Modifier.fillMaxWidth().heightIn(min = height).graphicsLayer {
-                        val s = 1f - 0.06f * backProgress
+                        val s = 1f - 0.06f * coachBack.value
                         scaleX = s
                         scaleY = s
-                        alpha = 1f - 0.4f * backProgress
+                        alpha = 1f - 0.4f * coachBack.value
                     },
                 )
             } ?: Spacer(Modifier)
@@ -517,7 +525,7 @@ private fun SolvedNote(
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onShare) {
-                Icon(Icons.Default.Share, contentDescription = stringResource(R.string.action_share))
+                Icon(painterResource(R.drawable.ic_share), contentDescription = stringResource(R.string.action_share))
             }
             IconButton(onClick = onPrint) {
                 Icon(painterResource(R.drawable.ic_print), contentDescription = stringResource(R.string.action_print))
@@ -555,7 +563,7 @@ private fun PageHeader(
         navigationIcon = {
             if (onBack != null) {
                 IconButton(onClick = onBack, modifier = Modifier.testTag("page-back")) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.notebook))
+                    Icon(painterResource(R.drawable.ic_back), contentDescription = stringResource(R.string.notebook))
                 }
             }
         },
@@ -590,7 +598,7 @@ private fun PageHeader(
             if (game != null) {
                 Box {
                     IconButton(onClick = { menuOpen = true }, modifier = Modifier.testTag("page-menu")) {
-                        Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more_options))
+                        Icon(painterResource(R.drawable.ic_more), contentDescription = stringResource(R.string.more_options))
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         if (!game.solved) {
@@ -622,7 +630,7 @@ private fun PageHeader(
                         if (game.solved) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.action_share)) },
-                                leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                                leadingIcon = { Icon(painterResource(R.drawable.ic_share), contentDescription = null) },
                                 onClick = {
                                     menuOpen = false
                                     onShare(game)
@@ -643,8 +651,9 @@ private fun PageHeader(
 }
 
 /**
- * A fine ink line from the Coach's note to what it is talking about, drawn as if by pen each time
- * the note changes.
+ * A fine ink line from the Coach's note to the board's edge, ending in a short bracket beside the
+ * rows or columns the note is about, drawn as if by pen each time the note changes. It never
+ * crosses the grid: the tinted cells already show the place.
  */
 @Composable
 private fun InkConnector(
@@ -654,35 +663,41 @@ private fun InkConnector(
     note: Rect?,
     wide: Boolean,
     key: Any,
+    modifier: Modifier = Modifier,
 ) {
     if (board == null || note == null || focus.isEmpty()) return
     val color = PaperTheme.ink.margin
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val progress = remember { Animatable(0f) }
+    val spec = MaterialTheme.motionScheme.slowEffectsSpec<Float>()
     LaunchedEffect(key) {
         progress.snapTo(0f)
-        progress.animateTo(1f, tween(durationMillis = 450))
+        progress.animateTo(1f, spec)
     }
-    Canvas(Modifier.fillMaxSize().testTag("ink-connector")) {
+    Canvas(modifier.fillMaxSize().testTag("ink-connector")) {
         val cell = board.width / size
         val rows = focus.map { it / size }
         val cols = focus.map { it % size }
-        val box = Rect(
-            left = board.left + cols.min() * cell,
-            top = board.top + rows.min() * cell,
-            right = board.left + (cols.max() + 1) * cell,
-            bottom = board.top + (rows.max() + 1) * cell,
-        )
-        val start: Offset
-        val end: Offset
+        val gap = 4.dp.toPx()
         val path = Path()
+        val bracketFrom: Offset
+        val bracketTo: Offset
         if (wide) {
-            start = Offset(note.left, note.top + 24.dp.toPx())
-            end = Offset(box.right, box.center.y)
+            // The note sits beside the board: a bracket down the board's near edge, by the rows.
+            val x = if (rtl) board.left - gap else board.right + gap
+            bracketFrom = Offset(x, board.top + rows.min() * cell + cell * 0.2f)
+            bracketTo = Offset(x, board.top + (rows.max() + 1) * cell - cell * 0.2f)
+            val start = Offset(if (rtl) note.right else note.left, note.top + 24.dp.toPx())
+            val end = Offset(x, (bracketFrom.y + bracketTo.y) / 2f)
             path.moveTo(start.x, start.y)
             path.cubicTo((start.x + end.x) / 2f, start.y, (start.x + end.x) / 2f, end.y, end.x, end.y)
         } else {
-            start = Offset(note.left + 1.dp.toPx(), note.top)
-            end = Offset(box.center.x, box.bottom)
+            // The note sits under the board: a bracket along the bottom edge, under the columns.
+            val y = board.bottom + gap
+            bracketFrom = Offset(board.left + cols.min() * cell + cell * 0.2f, y)
+            bracketTo = Offset(board.left + (cols.max() + 1) * cell - cell * 0.2f, y)
+            val start = Offset(if (rtl) note.right - 1.dp.toPx() else note.left + 1.dp.toPx(), note.top)
+            val end = Offset((bracketFrom.x + bracketTo.x) / 2f, y)
             path.moveTo(start.x, start.y)
             path.cubicTo(start.x, (start.y + end.y) / 2f, end.x, (start.y + end.y) / 2f, end.x, end.y)
         }
@@ -690,7 +705,9 @@ private fun InkConnector(
         val partial = Path()
         measure.getSegment(0f, measure.length * progress.value, partial, true)
         drawPath(partial, color.copy(alpha = 0.8f), style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round))
-        if (progress.value >= 1f) drawCircle(color, radius = 3.dp.toPx(), center = end)
+        if (progress.value >= 1f) {
+            drawLine(color, bracketFrom, bracketTo, strokeWidth = 2.5.dp.toPx(), cap = StrokeCap.Round)
+        }
     }
 }
 
