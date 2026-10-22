@@ -1,4 +1,4 @@
-# Android 开发规范 / Checklist — v5.0
+# Android 开发规范 / Checklist — v6.0
 
 > 基线：`targetSdk 36`、`compileSdk 37`、`minSdk 26`，Jetpack Compose + Material 3 Expressive
 > （`material3 1.5.0-beta01`）、Material 3 Adaptive 1.1、Navigation 3、Room 2.8、DataStore、Glance。
@@ -10,9 +10,9 @@
 
 - [x] `targetSdk = 36`（Play 2026-08-31 起要求）、`compileSdk = 37`、`minSdk = 26`
 - [x] 单 Activity + Compose；`enableEdgeToEdge()`；不绘制假系统栏
-- [x] `enableOnBackInvokedCallback="true"`；预测性返回：Navigation 3、list-detail 窗格、教练批注随手势缩放
+- [x] `enableOnBackInvokedCallback="true"`；预测性返回：Navigation 3（离开的页缩到 90%、圆角、抬起，随手指线性，提交时淡出；每页不透明，无重影）、list-detail 窗格（棋盘与缩略图交叉淡化）、教练批注随手势缩放并从松手处淡出
 - [x] 不锁方向、不禁止 resize；布局按窗口尺寸而非设备类型决定
-- [x] SplashScreen API（`core-splashscreen`），启动画面停留到主题设置读出，深色用户无纸色闪烁
+- [x] SplashScreen API（`core-splashscreen`），启动画面停留到主题设置读出；Android 12+ 用 `setApplicationNightMode` 让启动画面本身跟随应用内主题（`configChanges="uiMode"`，切换主题不重建）
 - [x] R8 + 资源压缩的 release 构建；kotlinx.serialization 自带 R8 规则
 - [x] 无 `INTERNET` 与 `ACCESS_NETWORK_STATE`（合并清单中移除 WorkManager 声明），CI 对 release APK 检查；Android 备份包含 Room 与 DataStore
 - [ ] Play Data Safety、内容分级、隐私政策托管（文案已更新，提交待 owner）
@@ -21,28 +21,28 @@
 
 | 项 | 规则 | 当前 |
 |---|---|---|
-| 最小触控目标 | 48 × 48dp | 浮动工具栏 64dp 高；数字键 56dp 高、≥ 48dp 宽（含已填满的键）；状态行按钮 48dp；6×6 单元格 ≈ 61dp |
+| 最小触控目标 | 48 × 48dp | 浮动工具栏 64dp 高；数字键 56dp 高、≥ 44dp 宽（6×6 七键在 360dp 手机上的取舍，≥ 380dp 时 ≥ 48dp）；状态行按钮 48dp；6×6 单元格 ≈ 61dp |
 | 9×9 单元格 | 48dp | 手机竖屏 ≈ 42dp；按住滑动瞄准 + 放大镜让落点与手指大小无关；另有拿起数字、键盘、宽屏布局 |
 | 颜色角色 | 无基线紫色回退 | Paper / Night 定义全部 M3 角色（含 `surfaceContainer*`） |
 | 对比度 | 正文 4.5:1、图形 3:1 | 所有文字角色 ≥ 4.5:1；格线 3.07:1（Paper）/ 3.45:1（Night），宫线 5.9:1 / 6.9:1 |
-| 不只用颜色表意 | 冲突、错误、Coach | 冲突/错误加下划线 + 语义；Coach 步骤用实心/空心圆点并朗读“第 n 步” |
-| 字体 | sp；200% 不截断 | UI 文本 sp；顶栏、状态行、工作区随字号增高；棋盘数字与印章文字随图形大小缩放 |
+| 不只用颜色表意 | 冲突、错误、Coach | 冲突为点状下划线 + 语义（与红色标记形状不同）；Coach 步骤用实心/空心圆点并朗读 |
+| 字体 | sp；200% 不截断 | UI 文本 sp；顶栏、状态行、工作区随字号增高；卡片缩略图在大字号下缩小；分隔点前不换行；教练步骤在大字号下单独一行；棋盘、数字键与印章的数字按图形大小缩放 |
 | 动效 | 不承载关键信息 | 落笔、印章、面板过渡均为装饰性 |
 
 ## 2. 原生组件映射
 
 | UI | 使用 |
 |---|---|
-| 导航 | Navigation 3 `NavDisplay`（本子 / 设置） |
-| 本子与页面 | `NavigableListDetailPaneScaffold` + `AnimatedPane` + 共享元素 |
+| 导航 | Navigation 3 `NavDisplay`（本子 / 设置 / 开源许可），自定义 transition / pop / predictive pop |
+| 本子与页面 | `NavigableListDetailPaneScaffold` + `AnimatedPane` + `sharedBounds` |
 | 本子 | `LargeTopAppBar`（折叠）、`Surface` 卡片、`ListItem` |
 | 页面顶栏 | 透明小 `TopAppBar` |
-| 工具栏 | `HorizontalFloatingToolbar`、`FilledIconToggleButton`、`FilledIconButton` |
-| 数字键盘 | `ButtonGroup` 连接式按键 |
+| 工具栏 | `HorizontalFloatingToolbar`、`FilledIconToggleButton`、`FilledTonalIconButton`；图标为 Material Symbols Rounded 矢量 |
+| 数字键盘 | `ButtonGroup` 连接式按键，擦除为最后一键 |
 | 小组件 | Glance `GlanceAppWidget`（响应式尺寸、`appWidgetBackground`、系统圆角、`previewLayout`） |
 | 确认 | `AlertDialog`（重开、换一页练习） |
 | 加载 | Expressive `LoadingIndicator` |
-| 设置 | `ListItem` + `Switch`、`SingleChoiceSegmentedButtonRow`、系统按应用语言设置；触感跟随系统 |
+| 设置 | `ListItem` + `Switch`、`SingleChoiceSegmentedButtonRow`、系统按应用语言设置（外链图标）、开源许可页（OFL 与 Apache 全文）；顶栏滚动时上色；触感跟随系统 |
 | 打印 / 分享 | 系统 `PrintManager` / Sharesheet |
 
 ## 3. 无障碍与输入
@@ -53,7 +53,7 @@
 - [x] 双窗格本子：选中项 `selected`；窗格 `paneTitle`
 - [x] 键盘：方向键（仅棋盘获焦时）、1–9（始终写入）、Backspace、Ctrl+Z、N、H、Esc；键盘模式显示焦点框；系统快捷键帮助（Meta + /）
 - [x] 被系统接管的触摸（边缘返回、防误触）不写入；棋盘排除系统返回手势
-- [x] 中英双语，`localeConfig` 支持按应用切换语言
+- [x] 中英双语，`localeConfig` 支持按应用切换语言；朗读标签按语言连接（“, ” / “，”），不在代码里拼标点
 - [ ] TalkBack / Switch Access / Voice Access 真机手测
 - [ ] 200% 字体、显示大小、色盲模拟真机手测
 
@@ -80,9 +80,9 @@
 
 ## 6. 测试与 CI
 
-- [x] 引擎：几何、求解唯一性、生成确定性与评级、每一步逻辑推导与答案一致、X-Wing 定式
+- [x] 引擎：几何、求解唯一性、生成确定性与评级、每一步逻辑推导与答案一致、X-Wing 定式；一年每日题与每级 60 页练习无重复；跟随教练解题时每一步的排除都生效且最终确为唯一解
 - [x] `GameState`：输入、笔记整理、撤销、锁定、完成冻结、JSON 往返与篡改拒绝
-- [x] ViewModel：自动保存恢复、计时、只记一次、Coach 三级、错误提示、经典续玩、启动落到今天
+- [x] ViewModel：自动保存恢复、计时、只记一次、Coach 三级与多步讲解、错误提示、经典续玩、换页时切回或打开别页、启动落到今天
 - [x] Compose UI：棋盘语义、事件、Coach、完成页、宽布局；`AccessibilityChecks`
 - [x] Room 迁移仪器测试
 - [x] CI：JVM 测试、debug/release 构建、lint、schema 已提交检查、API 36 模拟器仪器测试

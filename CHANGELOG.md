@@ -1,5 +1,46 @@
 # Changelog
 
+## 6.0.0
+
+Right, then refined: three real bugs fixed, a new icon, and every screen brought to one standard.
+
+**Changed**
+- A new icon: one pen-blue 5, circled by the Coach's pencil. It reads at any size and as a themed
+  icon.
+- Going back is a page lifting off the notebook: with the back gesture the page shrinks and rounds
+  under your finger, and nothing shows through it any more. Taps slide pages along one axis.
+- Calmer colour: red belongs to the Coach, the stamp and the digit in hand. Your selection and the
+  pencil are ink blue; a clash is underlined in dots.
+- The keypad has Erase as its last key: two even rows on 9×9, one row on 6×6. The toolbar keeps
+  Undo, Pencil and the Coach.
+- The notebook lines up on one edge; today's date is said once; the two cards match; the handbook
+  is one compact card that marks only the techniques you have met. At large text, cards and the
+  Coach rearrange instead of breaking lines badly.
+- The Coach explains every step a placement needs, in order, and says a cell is settled only when
+  it is. Its note is in a quiet upright voice; asking for the answer is the quiet button and says
+  what it costs. Chinese steps are 提示 / 原因 / 答案.
+- The stamp is ink on the page, in cut capitals, tilted a little differently on every page. The
+  solved note leads with how the page was done.
+- One icon set throughout. Settings has a licences page with the full SIL OFL and Apache texts.
+- Words: "clean pages", "Start this page over", "Daily page" in shares; 独立完成 and 候选 in
+  Chinese.
+
+**Fixed**
+- Weekend dailies and harder practice pages no longer repeat earlier puzzles (a seeding flaw dealt
+  96 of 2026's dailies twice). Puzzles from now on differ from 5.0's; pages you have started or
+  finished are kept as they are.
+- A practice page set aside while the next one was still being prepared could stop saving, or come
+  back; it now does neither.
+- The Coach no longer claims a cell has a single answer when an earlier elimination it did not show
+  was needed.
+- The splash screen follows a theme chosen in the app (Android 12+). The keypad never clips at
+  200% text. The Coach's line no longer runs across the board.
+
+**Under the hood**
+- Seeds are hashed (generator version 3); tests check a year of dailies and 60 practice pages per
+  level for repeats, and that every Coach hint's steps lead to its placement.
+- Custom motion uses the theme's motion scheme; material-icons-core is gone.
+
 ## 5.0.0
 
 Everything that was found wrong in 4.0, fixed; the words and the Coach made exact.

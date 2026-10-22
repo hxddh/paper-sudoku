@@ -1,6 +1,6 @@
 # Paper Sudoku — Privacy Policy
 
-Last updated: 2026-10-22 (version 5.0)
+Last updated: 2026-10-22 (version 6.0)
 
 Paper Sudoku is an offline puzzle game. It does not require an account, does not contain ads or
 analytics, and does not request the `INTERNET` permission.

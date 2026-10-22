@@ -27,7 +27,8 @@ signing secrets exist (see [docs/release.md](docs/release.md)).
   three pages solved without the Coach's answer — singles, then pointing and pairs, then hidden
   pairs and X-Wings.
 - **A Coach in the margin.** Look → Why → Answer, with an ink line to the part of the board it is
-  talking about. It fills exactly the space of the tools, so the page never moves.
+  talking about; when a placement needs several eliminations, Why walks through each one. It fills
+  exactly the space of the tools, so the page never moves.
 - **Pen and paper.** Printed digits, your ink, pencil notes. Press and slide to aim at a cell
   (a loupe shows where you are); lift to write. Tap a digit with nothing selected to pick it up and
   write it across the page.
@@ -83,4 +84,6 @@ Docs: [design](docs/design.md) · [Android checklist](docs/android-standards.md)
 ## License notes
 
 Fraunces is © Undercase Type, SIL Open Font License 1.1
-([third_party/fraunces/OFL.txt](third_party/fraunces/OFL.txt)); the app bundles a Latin subset.
+([third_party/fraunces/OFL.txt](third_party/fraunces/OFL.txt)); the app bundles a Latin subset. Icons are
+Material Symbols Rounded (Apache 2.0). Both licences, and AndroidX's, are shown in full in the app
+(Settings → Open-source licences).

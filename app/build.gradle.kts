@@ -17,8 +17,8 @@ android {
         applicationId = "com.titpea.papersudoku"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "5.0.0"
+        versionCode = 6
+        versionName = "6.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
