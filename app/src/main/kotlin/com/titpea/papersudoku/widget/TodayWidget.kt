@@ -80,7 +80,8 @@ class TodayWidget : GlanceAppWidget() {
         val weekday = date.dayOfWeek.getDisplayName(JavaTextStyle.SHORT, context.resources.configuration.locales[0])
         val open = Intent(context, MainActivity::class.java)
             .setAction(MainActivity.ACTION_OPEN_TODAY)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            // SINGLE_TOP with CLEAR_TOP: a running activity gets onNewIntent instead of being recreated.
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
 
         provideContent {
             // Read inside the composition, so an update to a running session shows the latest page.
