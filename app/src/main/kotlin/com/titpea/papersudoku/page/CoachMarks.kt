@@ -11,8 +11,9 @@ import com.titpea.papersudoku.engine.UnitRef
 
 /**
  * What the board draws for a Coach session.
- * Level 1 tints where to look; level 2 adds the pattern, crossed-out candidates and (for singles)
- * the cell; level 3 adds the answer in faint ink.
+ * Level 1 tints where to look (and marks the cell, when the note names one); level 2 adds the
+ * pattern, crossed-out candidates and the cell the note talks about; level 3 adds the answer in
+ * faint ink. Whatever the note names is on the board.
  */
 @Immutable
 data class CoachMarks(
@@ -42,7 +43,9 @@ fun coachMarks(geometry: Geometry, values: List<Int>, coach: CoachUi?): CoachMar
                 is Elimination -> lesson.units.flatMap { geometry.cells(it).toList() }.toSet()
                 is Placement -> lessonUnit(geometry, lesson).let { geometry.cells(it).toSet() }
             }
-            if (level == 1) return CoachMarks(focus = focus)
+            // A naked single's note names its cell from the first step.
+            val namesCell = lesson is Placement && lesson.technique == Technique.NakedSingle
+            if (level == 1) return CoachMarks(focus = focus, target = placement.index.takeIf { namesCell })
             val pattern = when (lesson) {
                 is Elimination -> lesson.patternCells.toSet()
                 is Placement -> blockers(geometry, values, lesson)
@@ -55,7 +58,8 @@ fun coachMarks(geometry: Geometry, values: List<Int>, coach: CoachUi?): CoachMar
                 focus = focus,
                 pattern = pattern,
                 removals = removals,
-                target = placement.index.takeIf { lesson is Placement || level >= 3 },
+                // From Why on, the note ends at the cell to fill: it is marked too.
+                target = placement.index,
                 ghost = placement.digit.takeIf { level >= 3 },
             )
         }

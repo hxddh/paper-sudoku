@@ -262,7 +262,7 @@ private fun PracticeCard(
     val progress = if (next == null) {
         stringResource(R.string.practice_top_level)
     } else {
-        stringResource(R.string.practice_to_next, next)
+        pluralStringResource(R.plurals.practice_to_next, next, next)
     }
     val status = if (practice.saved != null) {
         stringResource(R.string.practice_continue, (practice.saved.number ?: 0) + 1)

@@ -73,7 +73,7 @@
 - [x] Room schema 导出到 `app/schemas`；v1 → v2 → v3 迁移与存储查询有仪器测试
 - [x] 本子读取投影列（`givens`/`grid`），不解码整局 JSON；JSON 编解码在 `Dispatchers.Default`
 - [x] 完成的保存与记录在同一事务
-- [x] 计时使用单调时钟，仅前台且未暂停时计时
+- [x] 计时使用单调时钟，仅页面在前台时计时
 - [x] 题目生成在 `Dispatchers.Default`；明日每日题与下一页练习预先生成并缓存（`cacheDir`）
 - [x] DataStore `ReplaceFileCorruptionHandler`
 - [x] 手写 `AppContainer`（规模不需要 Hilt）
@@ -83,7 +83,7 @@
 - [x] 引擎：几何、求解唯一性、生成确定性与评级、每一步逻辑推导与答案一致、X-Wing 定式
 - [x] `GameState`：输入、笔记整理、撤销、锁定、完成冻结、JSON 往返与篡改拒绝
 - [x] ViewModel：自动保存恢复、计时、只记一次、Coach 三级、错误提示、经典续玩、启动落到今天
-- [x] Compose UI：棋盘语义、事件、Coach、完成页、暂停、宽布局；`AccessibilityChecks`
+- [x] Compose UI：棋盘语义、事件、Coach、完成页、宽布局；`AccessibilityChecks`
 - [x] Room 迁移仪器测试
 - [x] CI：JVM 测试、debug/release 构建、lint、schema 已提交检查、API 36 模拟器仪器测试
 - [x] 截图矩阵（Paper/Night × 页面状态 × 宽屏 × 200% 字号）与已提交的基准图逐张比对

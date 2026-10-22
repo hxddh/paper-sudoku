@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -14,9 +15,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -48,7 +47,7 @@ import com.titpea.papersudoku.engine.UnitRef
 /**
  * The Coach writes in the margin: no card, no dialog — a pen rule down the side, the note in ink,
  * and three steps (look, why, answer). It fills exactly the space the tools use, so the page
- * never moves when it appears; a long note scrolls.
+ * never moves when it appears; with very large text it grows rather than hide words.
  */
 @Composable
 fun MarginNote(
@@ -60,7 +59,9 @@ fun MarginNote(
     val colors = MaterialTheme.colorScheme
     val ink = PaperTheme.ink
     val text = coachText(coach, geometry)
-    Row(modifier.fillMaxWidth().testTag("coach-panel")) {
+    // As tall as the note needs (at least what the caller asks), so large text is never hidden
+    // behind the actions; the rule runs the note's full height.
+    Row(modifier.fillMaxWidth().height(IntrinsicSize.Min).testTag("coach-panel")) {
         Box(
             Modifier
                 .padding(vertical = 4.dp)
@@ -73,13 +74,9 @@ fun MarginNote(
                 .weight(1f)
                 .padding(start = 14.dp)
                 .fillMaxHeight(),
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Column(
-                Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .semantics { liveRegion = LiveRegionMode.Polite },
-            ) {
+            Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = text.tag,
@@ -195,7 +192,8 @@ private fun coachText(coach: CoachUi, geometry: Geometry): CoachText {
         is CoachHint.Next -> {
             val lesson = hint.lesson
             val placement = hint.placement
-            val tag = techniqueName(hint.technique)
+            // The technique the note actually teaches (the last step), not the hardest one involved.
+            val tag = techniqueName(lesson.technique)
             val cell = cellLabel(geometry, placement.index)
             // The step's anchor stays the same from Look to Why; the tag already names the technique.
             val lookTitle = if (lesson is Placement && lesson.technique == Technique.NakedSingle) {
@@ -268,7 +266,8 @@ private fun lookTip(technique: Technique): String = stringResource(
     when (technique) {
         Technique.HiddenSingle -> R.string.look_hidden_single
         Technique.NakedSingle -> R.string.look_naked_single
-        Technique.Pointing, Technique.Claiming -> R.string.look_locked
+        Technique.Pointing -> R.string.look_locked
+        Technique.Claiming -> R.string.look_claiming
         Technique.NakedPair -> R.string.look_naked_pair
         Technique.HiddenPair -> R.string.look_hidden_pair
         Technique.XWing -> R.string.look_x_wing

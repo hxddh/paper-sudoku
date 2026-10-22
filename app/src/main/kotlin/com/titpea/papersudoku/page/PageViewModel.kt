@@ -225,6 +225,10 @@ class PageViewModel(
         }
         scheduleSave()
         feedback?.let { _effects.trySend(it) }
+        // The one-line how-to is shown until the player writes a first digit.
+        if (after.values != before.values && !current.settings.wroteFirstDigit) {
+            viewModelScope.launch { updateSettings { it.copy(wroteFirstDigit = true) } }
+        }
     }
 
     // endregion

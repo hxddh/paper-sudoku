@@ -17,10 +17,11 @@ fun shareText(context: Context, game: GameState): String {
     val spec = game.spec
     val difficulty = res.getString(difficultyRes(spec.difficulty))
     val time = formatElapsed(game.elapsedMillis / 1_000)
-    val coach = res.getString(if (game.coach.deepest == 0) R.string.share_clean else R.string.share_coached)
+    // Clean means the Coach never gave an answer (the same rule as stamps and practice levels).
+    val coach = res.getString(if (game.coach.deepest < 3) R.string.share_clean else R.string.share_coached)
     val day = spec.epochDay
     val heading = if (spec.kind == PuzzleKind.Daily && day != null) {
-        val date = LocalDate.ofEpochDay(day).format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM))
+        val date = LocalDate.ofEpochDay(day).format(DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG))
         res.getString(R.string.share_heading_daily, date)
     } else {
         res.getString(R.string.share_heading_classic, (spec.number ?: 0) + 1)

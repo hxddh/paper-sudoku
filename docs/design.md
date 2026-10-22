@@ -11,7 +11,8 @@ day is there. Finish a page and it is stamped. When you are stuck, the Coach wri
    (tools, Coach, solved note) keeps one height (it grows only for very large text).
 3. **Teach, don't tell.** The Coach answers last, and only with the techniques every generated
    puzzle is graded with.
-4. **Calm.** No streaks, no visible clock, no red marks unless digits truly clash.
+4. **Calm.** No streaks, no visible clock, no error marks unless digits truly clash (terracotta
+   is the ink of the stamp, the Coach and the one digit in hand — never a scolding).
 5. **Native first.** Material 3 / Expressive components and adaptive scaffolds everywhere except
    the board, the one hand-drawn surface.
 

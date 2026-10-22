@@ -21,7 +21,7 @@ signing secrets exist (see [docs/release.md](docs/release.md)).
 ## What it is
 
 - **A notebook, not a menu.** Today's 6×6 page on top (gentle on weekdays, steady at the
-  weekend), the practice stack, then every earlier day. Stamped pages show their time; there is no
+  weekend), the practice stack, the technique handbook, then every earlier day since you started. Stamped pages show their time; there is no
   streak.
 - **Practice that follows you.** One never-ending stack of 9×9 pages whose difficulty rises after
   three pages solved without the Coach's answer — singles, then pointing and pairs, then hidden
@@ -34,7 +34,7 @@ signing secrets exist (see [docs/release.md](docs/release.md)).
 - **Quiet.** The clock is hidden while you play and pauses itself when you leave. No ads,
   accounts, analytics or network.
 
-Also: print any page or save it as PDF, share a spoiler-free result, a home-screen widget with
+Also: print a blank copy of any page or save it as PDF, share a spoiler-free result, a home-screen widget with
 today's page, English and 简体中文, TalkBack, hardware keyboard, tablets and foldables (notebook
 and page side by side).
 

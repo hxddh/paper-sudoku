@@ -11,7 +11,7 @@ The app stores only the data needed to run the game locally:
 
 - your games (board, notes, undo history, time, how much the Coach helped) in a local Room
   database;
-- finished-puzzle results (mode, difficulty, time, Coach use, date) for the journal;
+- finished-puzzle results (mode, difficulty, time, Coach use, date) for the notebook;
 - settings (theme, note tidying, techniques you have met) in Android DataStore.
 
 The home-screen widget reads today's page from the same local database.
