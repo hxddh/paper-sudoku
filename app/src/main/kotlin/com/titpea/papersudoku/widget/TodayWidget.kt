@@ -161,6 +161,18 @@ class TodayWidget : GlanceAppWidget() {
             }
         }
 
+        /** Redraws placed widgets now, then calls [done] whether or not that succeeded. */
+        fun updateNow(context: Context, done: () -> Unit) {
+            val app = context.applicationContext
+            scope.launch {
+                try {
+                    runCatching { TodayWidget().updateAll(app) }
+                } finally {
+                    done()
+                }
+            }
+        }
+
         /** The launcher's own widget radius (Android 12+; older launchers draw square widgets). */
         private fun systemCorners(): GlanceModifier =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -240,8 +252,12 @@ class TodayWidgetReceiver : GlanceAppWidgetReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             // A new day, or the clock or time zone moved: today's page may be a different one.
-            NewDayAlarm.ACTION_NEW_DAY, Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED ->
-                TodayWidget.requestUpdate(context)
+            NewDayAlarm.ACTION_NEW_DAY, Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED -> {
+                // The broadcast may be all that keeps the process alive: hold it until the redraw
+                // (which also schedules the next midnight) is done.
+                val result = goAsync()
+                TodayWidget.updateNow(context) { result.finish() }
+            }
             else -> super.onReceive(context, intent)
         }
     }

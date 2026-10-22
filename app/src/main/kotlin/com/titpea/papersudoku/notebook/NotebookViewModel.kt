@@ -76,7 +76,8 @@ class NotebookViewModel(
 
     val state: StateFlow<NotebookUiState> = today.flatMapLatest { day ->
         combine(
-            store.dailies(day - DAYS_SHOWN),
+            // Unfinished dailies are pruned after a day, so every saved daily is few enough to read.
+            store.dailies(0),
             store.days,
             store.unfinishedPractice,
             store.cleanPractice,
@@ -91,7 +92,7 @@ class NotebookViewModel(
                 dailies.minOfOrNull { it.epochDay ?: day } ?: day,
                 days.minOfOrNull { it.epochDay } ?: day,
             )
-            val pastDays = (1..DAYS_SHOWN).map { day - it }.filter { it >= start }
+            val pastDays = (day - 1 downTo start).toList()
             NotebookUiState(
                 today = day,
                 todayPage = entry(day),
@@ -116,8 +117,6 @@ class NotebookViewModel(
     }
 
     companion object {
-        const val DAYS_SHOWN = 365L
-
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 NotebookViewModel(container.gameStore, container.settingsStore, container.clock, container.firstDay)

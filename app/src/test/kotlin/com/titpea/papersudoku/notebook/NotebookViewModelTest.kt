@@ -57,6 +57,15 @@ class NotebookViewModelTest {
     }
 
     @Test
+    fun `a notebook older than a year still reaches its first day and pages`() = runTest(dispatcher) {
+        store.save(GameState.new(Catalog.daily(today - 500)), now = 1)
+        val state = viewModel(firstDay = today - 400).loaded()
+        assertEquals(500, state.pastDays.size)
+        assertEquals(today - 500, state.pastDays.last())
+        assertFalse(state.pages.getValue(today - 500).saved == null)
+    }
+
+    @Test
     fun `pages from before the install (a restored backup) open the notebook`() = runTest(dispatcher) {
         store.save(GameState.new(Catalog.daily(today - 10)), now = 1)
         val state = viewModel(firstDay = today).loaded()
