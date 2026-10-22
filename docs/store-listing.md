@@ -1,5 +1,10 @@
 # Paper Sudoku — Store Listing Draft
 
+## Icon
+
+`docs/assets/icon-512.png` (512 × 512, Play's hi-res icon), rendered from `docs/assets/icon.svg`, which is
+the launcher icon's visible area. Play applies its own mask and shadow, so the file is full-bleed.
+
 ## Short description (80 characters max — this one is 72)
 
 A Sudoku notebook: one page a day, a Coach in the margin, fully offline.

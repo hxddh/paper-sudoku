@@ -29,7 +29,7 @@ day is there. Finish a page and it is stamped. When you are stuck, the Coach wri
 | Coach | margin note: 2dp ink rule, tag + steps, note in pen italic, two actions |
 | Transitions | shared element thumbnail ↔ board; ink connector drawn by pen (450ms) |
 | Widget | Glance: date, status, page miniature drawn as tinted layers (follows day/night); opens today |
-| Icon | adaptive: paper background, one cell's nine pencil marks in ink blue with the fitting 5 ringed in terracotta; monochrome layer for themed icons |
+| Icon | adaptive: paper background, a Fraunces Italic 5 in pen blue circled by a tapered terracotta pencil ring (the Coach marking an answer); readable at 36dp; monochrome layer for themed icons |
 
 ## Interaction
 
