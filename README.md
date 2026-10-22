@@ -55,6 +55,11 @@ Requirements: JDK 17, Android SDK platform 37.0 + build-tools 37.0.0, `local.pro
 ./gradlew :benchmark:connectedBenchmarkAndroidTest
 ```
 
+The screenshot matrix is compared with the goldens in `app/src/androidTest/screenshots`
+(`tools/compare_screenshots.py`, half size, small tolerance). For a pull request CI also pushes the
+reduced captures to `captures/pr-<number>`; after an intended visual change, fetch that branch,
+review the images and commit them as the new goldens.
+
 ## Architecture
 
 ```
@@ -66,8 +71,9 @@ Requirements: JDK 17, Android SDK platform 37.0 + build-tools 37.0.0, `local.pro
 
 - Home is a Navigation 3 back stack (Notebook, Settings). The notebook is a Material 3 adaptive
   `NavigableListDetailPaneScaffold`: pages list and open page, one pane or two.
-- `GameState` is immutable and saved as JSON in Room after every move; results are recorded once
-  per puzzle. Room schema 2 is unchanged from 2.0.
+- `GameState` is immutable and saved as JSON in Room after every move, with the printed and
+  current digits beside it for the notebook (schema 3); a solve is saved and recorded in one
+  transaction, once per puzzle. Upcoming pages are generated ahead into a disk cache.
 - One custom-drawn surface (the board); everything else is Material 3 / Expressive.
 
 Docs: [design](docs/design.md) · [Android checklist](docs/android-standards.md) ·

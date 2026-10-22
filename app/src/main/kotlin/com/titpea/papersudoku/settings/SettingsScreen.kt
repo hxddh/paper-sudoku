@@ -7,6 +7,12 @@ import android.provider.Settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -34,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -54,8 +61,10 @@ fun SettingsScreen(
 ) {
     Scaffold(
         containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
                 title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -66,9 +75,12 @@ fun SettingsScreen(
             )
         },
     ) { padding ->
+        val direction = LocalLayoutDirection.current
         LazyColumn(
             modifier = Modifier.fillMaxSize().testTag("settings"),
             contentPadding = PaddingValues(
+                start = padding.calculateStartPadding(direction),
+                end = padding.calculateEndPadding(direction),
                 top = padding.calculateTopPadding(),
                 bottom = padding.calculateBottomPadding() + 24.dp,
             ),
@@ -121,14 +133,6 @@ fun SettingsScreen(
                     body = stringResource(R.string.settings_auto_clear_desc),
                     checked = settings.autoClearNotes,
                     onChange = { v -> onUpdate { it.copy(autoClearNotes = v) } },
-                )
-            }
-            item {
-                SwitchRow(
-                    title = stringResource(R.string.settings_haptics),
-                    body = stringResource(R.string.settings_haptics_desc),
-                    checked = settings.haptics,
-                    onChange = { v -> onUpdate { it.copy(haptics = v) } },
                 )
             }
             item { Header(stringResource(R.string.settings_about)) }

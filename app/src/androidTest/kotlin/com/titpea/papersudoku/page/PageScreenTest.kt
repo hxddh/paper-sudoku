@@ -12,10 +12,12 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
@@ -169,5 +171,21 @@ class PageScreenTest {
     fun thePageHeaderHidesBackWhenTheNotebookIsBeside() {
         show(Fixtures.page(), onBack = null)
         composeRule.onNodeWithTag("page-back").assertDoesNotExist()
+    }
+
+    @Test
+    fun eachCellIsOneStopForTalkBack() {
+        show(Fixtures.page(game = Fixtures.practice()))
+        val given = Fixtures.practice().spec.givens.indexOfFirst { it != 0 }
+        composeRule.onNodeWithTag("cell-$given").onChildren().assertCountEquals(0)
+    }
+
+    @Test
+    fun aSolvedPageIsAnnouncedAndCannotBeRestarted() {
+        show(Fixtures.page(game = Fixtures.solved()))
+        composeRule.onNodeWithTag("solved-panel")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        composeRule.onNodeWithTag("page-menu").performClick()
+        composeRule.onNodeWithText("Restart this puzzle").assertDoesNotExist()
     }
 }

@@ -6,3 +6,6 @@ HSPLcom/titpea/papersudoku/engine/**;->**(**)**
 Lcom/titpea/papersudoku/engine/**;
 HSPLcom/titpea/papersudoku/game/model/**;->**(**)**
 Lcom/titpea/papersudoku/game/model/**;
+# Saved pages are JSON: the decoder is on the path to the first page.
+HSPLkotlinx/serialization/json/**;->**(**)**
+Lkotlinx/serialization/json/**;

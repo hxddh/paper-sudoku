@@ -109,4 +109,32 @@ class GameStateTest {
         val s = GameState.new(spec).coachAsked().coachReached(3).coachAsked()
         assertEquals(CoachUsage(asks = 2, deepest = 3), s.coach)
     }
+
+    @Test
+    fun `restart clears the board but keeps the coach on record`() {
+        val s = GameState.new(spec).select(empty).input(answer, true).coachAsked().coachReached(3).addElapsed(5_000)
+        val restarted = s.restart()
+        assertEquals(spec.givens, restarted.values)
+        assertEquals(0L, restarted.elapsedMillis)
+        assertEquals(3, restarted.coach.deepest)
+    }
+
+    @Test
+    fun `a solved page cannot be restarted`() {
+        var s = GameState.new(spec)
+        for (i in spec.solution.indices) if (spec.givens[i] == 0) s = s.select(i).input(spec.solution[i], true)
+        s = s.settle(now = 1)
+        assertEquals(s, s.restart())
+    }
+
+    @Test
+    fun `the held digit is put down once every copy is placed`() {
+        val digit = spec.solution[empty]
+        val cells = spec.solution.indices.filter { spec.solution[it] == digit && spec.givens[it] == 0 }
+        var s = GameState.new(spec).toggleLock(digit)
+        for (cell in cells.dropLast(1)) s = s.tap(cell, autoClearNotes = true)
+        assertEquals(digit, s.lockedDigit)
+        s = s.tap(cells.last(), autoClearNotes = true)
+        assertNull(s.lockedDigit)
+    }
 }

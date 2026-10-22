@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +53,7 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -70,17 +72,18 @@ import com.titpea.papersudoku.engine.DigitMask
 import com.titpea.papersudoku.game.model.GameState
 import kotlin.math.roundToInt
 
-enum class BoardAction { Notes, Erase, Coach }
+enum class BoardAction { Erase }
 
 /**
  * The page: the one custom-drawn surface in the app.
  *
  * Touch: press and slide to aim. The cell under the finger is previewed (and magnified in a loupe
  * once the finger moves), and the tap is committed where the finger lifts. A plain tap behaves as
- * usual. This keeps 9×9 precise on phones without shrinking the grid or zooming.
+ * usual; a touch the system takes over (an edge back swipe, palm rejection) commits nothing. This
+ * keeps 9×9 precise on phones without shrinking the grid or zooming.
  *
- * Accessibility: every cell is its own node with row/column, value, notes and state, a click
- * action, and Notes / Erase / Coach custom actions; digits are Text.
+ * Accessibility: every cell is one node (one swipe) with row/column, value or notes, the Coach's
+ * marks and state, a click action and an Erase custom action.
  *
  * Writing layers: printed givens (Fraunces), the pen (Fraunces italic, ink blue), pencil notes
  * (system sans). Clashes carry an underline as well as color.
@@ -127,6 +130,8 @@ fun Board(
                 .size(side)
                 .background(ink.sheet, RoundedCornerShape(6.dp))
                 .border(1.5.dp, ink.boxLine, RoundedCornerShape(6.dp))
+                // Slides that start at the board's edges stay with the board, not the back gesture.
+                .systemGestureExclusion()
                 .pointerInput(enabled, size, cellPx) {
                     if (!enabled) return@pointerInput
                     fun cellAt(p: Offset): Int {
@@ -139,10 +144,15 @@ fun Board(
                         var current = cellAt(down.position)
                         aimed = current
                         var sliding = false
+                        var lifted = false
                         while (true) {
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            if (!change.pressed) break
+                            if (!change.pressed) {
+                                // A cancelled touch arrives as an already-consumed lift.
+                                lifted = !change.isConsumed
+                                break
+                            }
                             if (!sliding && (change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
                                 sliding = true
                             }
@@ -159,7 +169,7 @@ fun Board(
                         }
                         aimed = null
                         loupeAt = null
-                        currentOnTap(current)
+                        if (lifted) currentOnTap(current)
                     }
                 },
         ) {
@@ -181,7 +191,7 @@ fun Board(
                                 isSelected = selected == index,
                                 related = related && showContent,
                                 sameDigit = showContent && highlightDigit != null && game.values[index] == highlightDigit,
-                                highlightDigit = highlightDigit,
+                                noteHighlight = highlightDigit?.takeIf { showContent && DigitMask.contains(game.notes[index], it) },
                                 conflict = index in conflicts && showContent,
                                 marks = marks,
                                 enabled = enabled,
@@ -212,34 +222,38 @@ fun Board(
                     )
                 }
             }
-            val at = loupeAt
-            val target = aimed
-            if (at != null && target != null) {
-                Loupe(
-                    game = game,
-                    index = target,
-                    finger = at,
-                    boardPx = with(density) { side.toPx() },
-                )
-            }
+            // Read through lambdas, so following the finger re-lays out only the loupe.
+            Loupe(
+                game = game,
+                index = { aimed },
+                finger = { loupeAt },
+                boardPx = with(density) { side.toPx() },
+            )
         }
     }
 }
 
 /** A magnified view of the aimed cell, held above the finger so the finger never hides it. */
 @Composable
-private fun Loupe(game: GameState, index: Int, finger: Offset, boardPx: Float) {
+private fun Loupe(game: GameState, index: () -> Int?, finger: () -> Offset?, boardPx: Float) {
+    val visible = finger() != null
+    val target = index() ?: return
+    if (!visible) return
     val density = LocalDensity.current
     val diameter = 76.dp
     val lift = 96.dp
     val d = with(density) { diameter.toPx() }
-    val x = (finger.x - d / 2f).coerceIn(-d / 4f, boardPx - d * 0.75f)
-    val y = (finger.y - with(density) { lift.toPx() } - d / 2f).coerceAtLeast(-d * 0.9f)
-    val value = game.values[index]
+    val liftPx = with(density) { lift.toPx() }
+    val value = game.values[target]
     val size = game.size
     Surface(
         modifier = Modifier
-            .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
+            .offset {
+                val at = finger() ?: Offset.Zero
+                val x = (at.x - d / 2f).coerceIn(-d / 4f, boardPx - d * 0.75f)
+                val y = (at.y - liftPx - d / 2f).coerceAtLeast(-d * 0.9f)
+                IntOffset(x.roundToInt(), y.roundToInt())
+            }
             .size(diameter)
             .testTag("loupe"),
         shape = CircleShape,
@@ -252,14 +266,14 @@ private fun Loupe(game: GameState, index: Int, finger: Offset, boardPx: Float) {
                 Text(
                     value.toString(),
                     style = TextStyle(
-                        fontFamily = if (game.isGiven(index)) FrauncesPrinted else FrauncesPen,
+                        fontFamily = if (game.isGiven(target)) FrauncesPrinted else FrauncesPen,
                         fontSize = 36.sp,
-                        color = if (game.isGiven(index)) PaperTheme.ink.printed else PaperTheme.ink.pen,
+                        color = if (game.isGiven(target)) PaperTheme.ink.printed else PaperTheme.ink.pen,
                     ),
                 )
-            } else if (game.notes[index] != 0) {
+            } else if (game.notes[target] != 0) {
                 Text(
-                    DigitMask.digits(game.notes[index]).joinToString(" "),
+                    DigitMask.digits(game.notes[target]).joinToString(" "),
                     style = MaterialTheme.typography.labelLarge,
                     color = PaperTheme.ink.pencil,
                     textAlign = TextAlign.Center,
@@ -267,7 +281,7 @@ private fun Loupe(game: GameState, index: Int, finger: Offset, boardPx: Float) {
                 )
             }
             Text(
-                stringResource(R.string.loupe_label, index / size + 1, index % size + 1),
+                stringResource(R.string.loupe_label, target / size + 1, target % size + 1),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp),
@@ -289,7 +303,8 @@ private fun Cell(
     isSelected: Boolean,
     related: Boolean,
     sameDigit: Boolean,
-    highlightDigit: Int?,
+    /** The highlighted digit, when this cell's notes contain it. */
+    noteHighlight: Int?,
     conflict: Boolean,
     marks: CoachMarks,
     enabled: Boolean,
@@ -334,10 +349,12 @@ private fun Cell(
         lastValue = value
     }
 
-    val description = cellDescription(row, column, value, notes, given, conflict)
-    val notesLabel = stringResource(R.string.notes)
+    val description = cellDescription(
+        row, column, value, notes, given, conflict,
+        ghost = marks.ghost.takeIf { isTarget && value == 0 },
+        removed = removed,
+    )
     val eraseLabel = stringResource(R.string.erase)
-    val coachLabel = stringResource(R.string.coach)
     val outline = colors.primary
 
     Box(
@@ -351,21 +368,22 @@ private fun Cell(
                     Modifier
                 },
             )
-            .semantics {
+            // The digit and note texts below are drawing only; the cell speaks for itself, once.
+            .clearAndSetSemantics {
                 collectionItemInfo = CollectionItemInfo(row, 1, column, 1)
-                role = Role.Button
                 contentDescription = description
                 selected = isSelected
                 if (enabled) {
+                    role = Role.Button
                     onClick {
                         onTap(index)
                         true
                     }
-                    customActions = listOf(
-                        CustomAccessibilityAction(notesLabel) { onCellAction(index, BoardAction.Notes); true },
-                        CustomAccessibilityAction(eraseLabel) { onCellAction(index, BoardAction.Erase); true },
-                        CustomAccessibilityAction(coachLabel) { onCellAction(index, BoardAction.Coach); true },
-                    )
+                    if (!given && (value != 0 || notes != 0)) {
+                        customActions = listOf(
+                            CustomAccessibilityAction(eraseLabel) { onCellAction(index, BoardAction.Erase); true },
+                        )
+                    }
                 }
             },
         contentAlignment = Alignment.Center,
@@ -406,7 +424,7 @@ private fun Cell(
             )
             isTarget && marks.ghost != null -> Text(
                 text = marks.ghost.toString(),
-                color = colors.primary.copy(alpha = 0.55f),
+                color = colors.primary.copy(alpha = 0.78f),
                 textAlign = TextAlign.Center,
                 style = TextStyle(fontFamily = FrauncesPen, fontSize = digitSize),
             )
@@ -415,7 +433,7 @@ private fun Cell(
                 removed = removed,
                 size = size,
                 noteSize = noteSize,
-                highlightDigit = highlightDigit,
+                highlightDigit = noteHighlight,
             )
         }
     }
@@ -473,6 +491,8 @@ private fun cellDescription(
     notes: Int,
     given: Boolean,
     conflict: Boolean,
+    ghost: Int?,
+    removed: Set<Int>,
 ): String {
     val state = when {
         value == 0 && notes != 0 -> stringResource(R.string.cell_notes, DigitMask.digits(notes).joinToString(" "))
@@ -480,6 +500,8 @@ private fun cellDescription(
         given -> stringResource(R.string.cell_given, value)
         else -> stringResource(R.string.cell_entered, value)
     }
-    val suffix = if (conflict) ", " + stringResource(R.string.cell_conflict) else ""
+    var suffix = if (conflict) ", " + stringResource(R.string.cell_conflict) else ""
+    if (ghost != null) suffix += ", " + stringResource(R.string.cell_coach_answer, ghost)
+    if (removed.isNotEmpty()) suffix += ", " + stringResource(R.string.cell_coach_removes, removed.sorted().joinToString(" "))
     return stringResource(R.string.cell_description, row + 1, column + 1, state) + suffix
 }

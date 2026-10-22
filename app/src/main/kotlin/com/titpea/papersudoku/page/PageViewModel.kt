@@ -1,8 +1,11 @@
 package com.titpea.papersudoku.page
 
+import android.util.Log
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.titpea.papersudoku.AppContainer
@@ -10,15 +13,15 @@ import com.titpea.papersudoku.data.GameResult
 import com.titpea.papersudoku.data.GameStore
 import com.titpea.papersudoku.data.SettingsStore
 import com.titpea.papersudoku.data.UserSettings
-import com.titpea.papersudoku.data.latestUnsolvedPractice
 import com.titpea.papersudoku.engine.CoachHint
 import com.titpea.papersudoku.engine.SudokuEngine
 import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.GameState
+import com.titpea.papersudoku.game.model.GeneratingPuzzleSource
 import com.titpea.papersudoku.game.model.Practice
 import com.titpea.papersudoku.game.model.PuzzleKind
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
+import com.titpea.papersudoku.game.model.PuzzleSource
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -30,7 +33,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.time.Clock
 import java.time.LocalDate
 
@@ -38,6 +40,7 @@ import java.time.LocalDate
 object PageKeys {
     const val PRACTICE = "practice"
     fun daily(epochDay: Long): String = Catalog.dailyKey(epochDay)
+    fun dayOf(key: String): Long? = key.removePrefix("daily-").takeIf { key.startsWith("daily-") }?.toLongOrNull()
     fun of(game: GameState): String =
         if (game.spec.kind == PuzzleKind.Daily) game.spec.key else PRACTICE
 }
@@ -64,6 +67,9 @@ sealed interface PageEvent {
     data class Tap(val index: Int) : PageEvent
     data class Select(val index: Int) : PageEvent
     data class Digit(val digit: Int) : PageEvent
+
+    /** A digit typed on a keyboard: always written into the selection, never picked up. */
+    data class TypeDigit(val digit: Int) : PageEvent
     data object ClearLock : PageEvent
     data object Erase : PageEvent
     data object Undo : PageEvent
@@ -76,8 +82,12 @@ sealed interface PageEvent {
     data object Background : PageEvent
     data object Restart : PageEvent
     data class OpenDaily(val epochDay: Long) : PageEvent
+    data object OpenToday : PageEvent
     data object OpenPractice : PageEvent
     data object NextPractice : PageEvent
+
+    /** The stamp has landed; rotating or reopening the page will not land it again. */
+    data object StampLanded : PageEvent
 }
 
 /** One-off feedback for haptics. */
@@ -98,7 +108,9 @@ class PageViewModel(
     private val settingsStore: SettingsStore,
     private val clock: Clock,
     private val ticker: () -> Long,
-    private val generatorDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val puzzles: PuzzleSource = GeneratingPuzzleSource(),
+    private val savedState: SavedStateHandle = SavedStateHandle(),
+    /** Called when today's daily is saved at a moment worth redrawing the widget for. */
     private val onDailySaved: () -> Unit = {},
 ) : ViewModel() {
 
@@ -121,7 +133,13 @@ class PageViewModel(
         viewModelScope.launch {
             store.pruneUnsolvedDailies(today() - KEEP_UNFINISHED_DAILY_DAYS)
         }
-        openDaily(today())
+        // After process death, reopen the page that was on the desk.
+        val open = savedState.get<String>(OPEN_PAGE)
+        when {
+            open == PageKeys.PRACTICE -> openPractice()
+            open != null && PageKeys.dayOf(open) != null -> openDaily(PageKeys.dayOf(open)!!)
+            else -> openDaily(today())
+        }
     }
 
     fun onEvent(event: PageEvent) {
@@ -130,6 +148,10 @@ class PageViewModel(
             is PageEvent.Tap -> mutate { it.tap(event.index, settings.autoClearNotes) }
             is PageEvent.Select -> mutate { it.select(event.index) }
             is PageEvent.Digit -> digit(event.digit)
+            is PageEvent.TypeDigit -> mutate { g ->
+                val selected = g.selected
+                if (selected != null && g.isEditable(selected)) g.input(event.digit, settings.autoClearNotes) else g
+            }
             PageEvent.ClearLock -> mutate(PageEffect.Toggled) { g -> g.lockedDigit?.let { g.toggleLock(it) } ?: g }
             PageEvent.Erase -> mutate { it.erase() }
             PageEvent.Undo -> mutate { it.undo() }
@@ -142,8 +164,10 @@ class PageViewModel(
             PageEvent.Background -> onBackground()
             PageEvent.Restart -> restart()
             is PageEvent.OpenDaily -> openDaily(event.epochDay)
+            PageEvent.OpenToday -> openDaily(today())
             PageEvent.OpenPractice -> openPractice()
             PageEvent.NextPractice -> nextPractice()
+            PageEvent.StampLanded -> _state.update { it.copy(justSolved = false) }
         }
     }
 
@@ -224,7 +248,7 @@ class PageViewModel(
         val hint = coach.hint
         if (level >= 2 && hint is CoachHint.Next) {
             viewModelScope.launch {
-                settingsStore.update { it.copy(techniquesMet = it.techniquesMet + hint.technique) }
+                updateSettings { it.copy(techniquesMet = it.techniquesMet + hint.technique) }
             }
         }
         scheduleSave()
@@ -268,7 +292,7 @@ class PageViewModel(
     private fun onBackground() {
         foreground = false
         _state.update { it.copy(game = foldClock(it), runningSince = null) }
-        saveNow()
+        saveNow(notifyWidget = true)
     }
 
     private fun foldClock(state: PageUiState): GameState? {
@@ -282,7 +306,9 @@ class PageViewModel(
     // region Pages
 
     private fun restart() {
-        val game = _state.value.game ?: return
+        val current = _state.value
+        val game = current.game ?: return
+        if (current.loading || game.solved) return
         _state.update {
             it.copy(
                 game = game.restart(),
@@ -295,18 +321,22 @@ class PageViewModel(
     }
 
     private fun openDaily(epochDay: Long) {
+        // Choosing a page is the reference point for the midnight turn in [onForeground].
+        _state.update { it.copy(today = today()) }
         val current = _state.value.game
         if (current != null && current.spec.key == Catalog.dailyKey(epochDay) && !_state.value.loading) return
         load {
-            store.load(Catalog.dailyKey(epochDay))
-                ?: GameState.new(withContext(generatorDispatcher) { Catalog.daily(epochDay) })
+            store.load(Catalog.dailyKey(epochDay)) ?: GameState.new(puzzles.daily(epochDay))
         }
     }
 
     private fun openPractice() {
+        _state.update { it.copy(today = today()) }
         val current = _state.value.game
         if (current != null && current.spec.kind == PuzzleKind.Classic && !current.solved) return
-        load { store.latestUnsolvedPractice() ?: newPractice() }
+        load {
+            store.latestUnsolvedPracticeKey()?.let { store.load(it) } ?: newPractice()
+        }
     }
 
     private fun nextPractice() {
@@ -317,17 +347,22 @@ class PageViewModel(
         }
     }
 
+    private suspend fun nextPracticeSpec() =
+        Practice.level(store.cleanPractice.first()).let { level -> level to store.nextClassicNumber(level) }
+
     private suspend fun newPractice(): GameState {
-        val level = Practice.level(store.cleanPractice.first())
-        val number = store.nextClassicNumber(level)
-        return GameState.new(withContext(generatorDispatcher) { Catalog.classic(level, number) })
+        val (level, number) = nextPracticeSpec()
+        return GameState.new(puzzles.classic(level, number))
     }
 
     private fun load(keepPrevious: Boolean = true, source: suspend () -> GameState) {
         loadJob?.cancel()
         // Stop the current page's clock now: preparing the next page is not time spent on it.
         _state.update { it.copy(game = foldClock(it), runningSince = null, loading = true, coach = null) }
-        loadJob = viewModelScope.launch { show(source(), keepPrevious) }
+        loadJob = viewModelScope.launch {
+            show(source(), keepPrevious)
+            prepareAhead()
+        }
     }
 
     private suspend fun show(next: GameState, keepPrevious: Boolean) {
@@ -342,7 +377,21 @@ class PageViewModel(
                 justSolved = false,
             ).withDerived()
         }
+        savedState[OPEN_PAGE] = PageKeys.of(next)
         persist(next)
+    }
+
+    /** Tomorrow's daily and the next practice page are generated now, so they open instantly. */
+    private suspend fun prepareAhead() {
+        try {
+            puzzles.daily(today() + 1)
+            val (level, number) = nextPracticeSpec()
+            puzzles.classic(level, number)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not prepare the next pages", e)
+        }
     }
 
     // endregion
@@ -350,8 +399,8 @@ class PageViewModel(
     private fun record(game: GameState) {
         val spec = game.spec
         viewModelScope.launch {
-            persist(game)
-            store.recordOnce(
+            store.saveSolved(
+                game,
                 GameResult(
                     puzzleKey = spec.key,
                     kind = spec.kind,
@@ -362,14 +411,31 @@ class PageViewModel(
                     completedAt = game.solvedAt ?: clock.millis(),
                     epochDay = spec.epochDay,
                 ),
+                clock.millis(),
             )
-            settingsStore.update { it.copy(techniquesMet = it.techniquesMet + spec.hardest) }
+            notifyWidget(game)
+            updateSettings { it.copy(techniquesMet = it.techniquesMet + spec.hardest) }
         }
     }
 
-    private suspend fun persist(game: GameState) {
+    private suspend fun persist(game: GameState, notifyWidget: Boolean = false) {
         store.save(game, clock.millis())
-        if (game.spec.kind == PuzzleKind.Daily) onDailySaved()
+        if (notifyWidget) notifyWidget(game)
+    }
+
+    /** The widget shows today's daily; it is redrawn when that page is solved or put away. */
+    private fun notifyWidget(game: GameState) {
+        if (game.spec.kind == PuzzleKind.Daily && game.spec.epochDay == today()) onDailySaved()
+    }
+
+    private suspend fun updateSettings(transform: (UserSettings) -> UserSettings) {
+        try {
+            settingsStore.update(transform)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not update settings", e)
+        }
     }
 
     private fun scheduleSave() {
@@ -380,10 +446,10 @@ class PageViewModel(
         }
     }
 
-    private fun saveNow() {
+    private fun saveNow(notifyWidget: Boolean = false) {
         saveJob?.cancel()
         val game = _state.value.game ?: return
-        saveJob = viewModelScope.launch { persist(game) }
+        saveJob = viewModelScope.launch { persist(game, notifyWidget) }
     }
 
     private fun engineFor(game: GameState): SudokuEngine {
@@ -405,6 +471,8 @@ class PageViewModel(
     companion object {
         private const val SAVE_DEBOUNCE_MILLIS = 400L
         private const val KEEP_UNFINISHED_DAILY_DAYS = 365L
+        private const val OPEN_PAGE = "open_page"
+        private const val TAG = "PageViewModel"
 
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
             initializer {
@@ -413,6 +481,8 @@ class PageViewModel(
                     settingsStore = container.settingsStore,
                     clock = container.clock,
                     ticker = container.ticker,
+                    puzzles = container.puzzles,
+                    savedState = createSavedStateHandle(),
                     onDailySaved = container.onDailySaved,
                 )
             }

@@ -8,25 +8,27 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -38,6 +40,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,13 +61,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -79,7 +83,8 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.utf16CodePoint
 import androidx.compose.ui.layout.boundsInRoot
@@ -87,10 +92,12 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -101,6 +108,7 @@ import com.titpea.papersudoku.designsystem.PaperTheme
 import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.PuzzleKind
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import java.time.LocalDate
@@ -109,6 +117,12 @@ private enum class WorkMode { Play, Coach, Solved }
 
 /** Minimum height of the work area under the board; the Coach and the solved note use the same. */
 private val NoteHeight: Dp = 176.dp
+
+/** The quiet line between the tools and the keys; a 48dp target when it is a button. */
+private val StatusHeight: Dp = 48.dp
+
+/** How long the stamp takes to land before it stops replaying on rotation or reopening. */
+private const val STAMP_LANDING_MILLIS = 1_200L
 
 /**
  * One page: a slim header, the board as large as the window allows, and the work area — tools,
@@ -129,11 +143,10 @@ fun PageScreen(
     effects: Flow<PageEffect> = emptyFlow(),
     boardModifier: Modifier = Modifier,
 ) {
+    // Standard feedback types go through the view, so the system's touch-feedback setting applies.
     val haptics = LocalHapticFeedback.current
-    val hapticsOn by rememberUpdatedState(state.settings.haptics)
     LaunchedEffect(effects) {
         effects.collect { effect ->
-            if (!hapticsOn) return@collect
             haptics.performHapticFeedback(
                 when (effect) {
                     PageEffect.Placed -> HapticFeedbackType.KeyboardTap
@@ -148,7 +161,9 @@ fun PageScreen(
     var confirmRestart by rememberSaveable { mutableStateOf(false) }
     var confirmNextPractice by rememberSaveable { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+    var pageFocused by remember { mutableStateOf(false) }
+    val keyboardMode = LocalInputModeManager.current.inputMode == InputMode.Keyboard
+    LaunchedEffect(Unit) { if (onBack != null) runCatching { focusRequester.requestFocus() } }
 
     // Ink connector between the Coach's note and the board, in this screen's coordinates.
     var origin by remember { mutableStateOf(Offset.Zero) }
@@ -162,13 +177,14 @@ fun PageScreen(
                 .fillMaxSize()
                 .onGloballyPositioned { origin = it.boundsInRoot().topLeft }
                 .focusRequester(focusRequester)
-                .onPreviewKeyEvent { handleKey(it, state, onEvent) }
+                .onFocusChanged { pageFocused = it.isFocused }
+                .onKeyEvent { handleKey(it, state, onEvent, arrows = pageFocused) }
                 .focusable()
                 .testTag("page"),
         ) {
             val wide = maxWidth > maxHeight && maxWidth >= 560.dp
             val panel = (maxWidth * 0.4f).coerceIn(320.dp, 440.dp)
-            Column(Modifier.fillMaxSize()) {
+            val header = @Composable {
                 PageHeader(
                     state = state,
                     onBack = onBack,
@@ -183,21 +199,33 @@ fun PageScreen(
                         }
                     },
                 )
-                val content = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                val boardPadding = if (game?.size == 9) 4.dp else 12.dp
-                if (wide) {
-                    Row(content.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                        BoardArea(
-                            state, onEvent, hapticsOn,
-                            Modifier.weight(1f).fillMaxHeight(),
-                            boardModifier.onGloballyPositioned { boardBounds = it.boundsInRoot() },
-                        )
+            }
+            val focusRing = if (pageFocused && keyboardMode) {
+                Modifier.border(2.dp, MaterialTheme.colorScheme.secondary, MaterialTheme.shapes.small)
+            } else {
+                Modifier
+            }
+            if (wide) {
+                Row(
+                    Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                ) {
+                    BoardArea(
+                        state, onEvent,
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .windowInsetsPadding(WindowInsets.statusBars)
+                            .padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
+                        boardModifier.then(focusRing).onGloballyPositioned { boardBounds = it.boundsInRoot() },
+                        alignment = Alignment.Center,
+                    )
+                    Column(Modifier.width(panel).fillMaxHeight().padding(end = 8.dp)) {
+                        header()
                         Column(
-                            Modifier.width(panel).fillMaxHeight().verticalScroll(rememberScrollState()),
+                            Modifier.weight(1f).verticalScroll(rememberScrollState()),
                             verticalArrangement = Arrangement.Center,
                         ) {
                             WorkArea(
@@ -206,23 +234,32 @@ fun PageScreen(
                             )
                         }
                     }
-                } else {
-                    Column(content, horizontalAlignment = Alignment.CenterHorizontally) {
-                        BoardArea(
-                            state, onEvent, hapticsOn,
-                            Modifier.weight(1f).fillMaxWidth().widthIn(max = 720.dp).padding(horizontal = boardPadding),
-                            boardModifier.onGloballyPositioned { boardBounds = it.boundsInRoot() },
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        WorkArea(
-                            state, onEvent, onBack, onPrint, onShare,
-                            Modifier
-                                .widthIn(max = 640.dp)
-                                .padding(horizontal = 16.dp)
-                                .padding(bottom = 12.dp)
-                                .onGloballyPositioned { noteBounds = it.boundsInRoot() },
-                        )
-                    }
+                }
+            } else Column(Modifier.fillMaxSize()) {
+                header()
+                val content = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+                // 9×9 cells need the width; the board itself keeps its edges from the back gesture.
+                val boardPadding = if (game?.size == 9) 4.dp else 12.dp
+                Column(content, horizontalAlignment = Alignment.CenterHorizontally) {
+                    BoardArea(
+                        state, onEvent,
+                        Modifier.weight(1f).fillMaxWidth().widthIn(max = 720.dp).padding(horizontal = boardPadding),
+                        boardModifier.then(focusRing).onGloballyPositioned { boardBounds = it.boundsInRoot() },
+                        // Most of the spare height above the board, so it sits near the hand.
+                        alignment = BiasAlignment(0f, 0.4f),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    WorkArea(
+                        state, onEvent, onBack, onPrint, onShare,
+                        Modifier
+                            .widthIn(max = 640.dp)
+                            .padding(horizontal = 16.dp)
+                            .padding(bottom = 12.dp)
+                            .onGloballyPositioned { noteBounds = it.boundsInRoot() },
+                    )
                 }
             }
 
@@ -272,12 +309,12 @@ fun PageScreen(
 private fun BoardArea(
     state: PageUiState,
     onEvent: (PageEvent) -> Unit,
-    hapticsOn: Boolean,
     modifier: Modifier,
     boardModifier: Modifier,
+    alignment: Alignment,
 ) {
     val haptics = LocalHapticFeedback.current
-    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+    BoxWithConstraints(modifier, contentAlignment = alignment) {
         val side = minOf(maxWidth, maxHeight).coerceAtMost(720.dp)
         Box(Modifier.size(side), contentAlignment = Alignment.Center) {
             val game = state.game
@@ -294,16 +331,20 @@ private fun BoardArea(
                         onEvent(PageEvent.Select(index))
                         onEvent(
                             when (action) {
-                                BoardAction.Notes -> PageEvent.ToggleNotes
                                 BoardAction.Erase -> PageEvent.Erase
-                                BoardAction.Coach -> PageEvent.Coach
                             },
                         )
                     },
-                    onAimMove = { if (hapticsOn) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick) },
+                    onAimMove = { haptics.performHapticFeedback(HapticFeedbackType.SegmentTick) },
                     modifier = Modifier.fillMaxSize().then(boardModifier),
                 )
                 if (game.solved) {
+                    if (state.justSolved) {
+                        LaunchedEffect(game.spec.key) {
+                            delay(STAMP_LANDING_MILLIS)
+                            onEvent(PageEvent.StampLanded)
+                        }
+                    }
                     InkStamp(
                         title = stringResource(R.string.stamp_title),
                         caption = formatElapsed(game.elapsedMillis / 1_000),
@@ -333,9 +374,10 @@ private fun WorkArea(
         state.coach != null -> WorkMode.Coach
         else -> WorkMode.Play
     }
-    // The note grows with the user's font scale so large text never hides the explanation.
-    val fontScale = LocalDensity.current.fontScale.coerceIn(1f, 2f)
-    val height = maxOf(NoteHeight * fontScale, ToolbarHeight + 28.dp + keypadHeight(game.size))
+    // The work area keeps one height so the page does not jump between tools, Coach and solved note.
+    // With large text it may grow, and the note scrolls, rather than squeezing the board.
+    val fontScale = LocalDensity.current.fontScale.coerceIn(1f, 1.3f)
+    val height = maxOf(NoteHeight * fontScale, ToolbarHeight + StatusHeight + keypadHeight(game.size))
 
     // Predictive back: the note shrinks with the gesture and is put away on commit.
     var backProgress by remember { mutableFloatStateOf(0f) }
@@ -353,12 +395,12 @@ private fun WorkArea(
     AnimatedContent(
         targetState = mode,
         transitionSpec = { fadeIn() togetherWith fadeOut() },
-        modifier = modifier.fillMaxWidth().heightIn(min = height).height(height).testTag("work-area"),
+        modifier = modifier.fillMaxWidth().heightIn(min = height).testTag("work-area"),
         label = "work-area",
     ) { target ->
         when (target) {
             WorkMode.Play -> Column(
-                Modifier.fillMaxSize(),
+                Modifier.fillMaxWidth().heightIn(min = height),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Bottom,
             ) {
@@ -371,7 +413,8 @@ private fun WorkArea(
                     coach = coach,
                     geometry = game.spec.geometry,
                     onEvent = onEvent,
-                    modifier = Modifier.fillMaxSize().graphicsLayer {
+                    // A fixed height: the note scrolls inside rather than pushing the board.
+                    modifier = Modifier.fillMaxWidth().height(height).graphicsLayer {
                         val s = 1f - 0.06f * backProgress
                         scaleX = s
                         scaleY = s
@@ -395,7 +438,7 @@ private fun WorkArea(
                     onBack != null -> stringResource(R.string.solved_back_to_notebook)
                     else -> stringResource(R.string.solved_open_practice)
                 },
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxWidth().heightIn(min = height),
             )
         }
     }
@@ -413,13 +456,18 @@ private fun StatusLine(game: GameState, onEvent: (PageEvent) -> Unit) {
     Box(
         Modifier
             .fillMaxWidth()
-            .height(28.dp)
+            .heightIn(min = StatusHeight)
             .semantics { liveRegion = LiveRegionMode.Polite },
         contentAlignment = Alignment.Center,
     ) {
         if (held != null) {
-            TextButton(onClick = { onEvent(PageEvent.ClearLock) }, modifier = Modifier.testTag("status-holding")) {
-                Text(text, style = MaterialTheme.typography.labelMedium)
+            TextButton(
+                onClick = { onEvent(PageEvent.ClearLock) },
+                colors = ButtonDefaults.textButtonColors(contentColor = PaperTheme.ink.pencil),
+                contentPadding = PaddingValues(horizontal = 12.dp),
+                modifier = Modifier.heightIn(min = StatusHeight).testTag("status-holding"),
+            ) {
+                Text(text, style = MaterialTheme.typography.labelLarge)
             }
         } else if (text.isNotEmpty()) {
             Text(text, style = MaterialTheme.typography.labelMedium, color = PaperTheme.ink.pencil)
@@ -436,10 +484,16 @@ private fun SolvedNote(
     nextLabel: String,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier.testTag("solved-panel"), verticalArrangement = Arrangement.Center) {
+    Column(
+        modifier
+            .testTag("solved-panel")
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        verticalArrangement = Arrangement.Center,
+    ) {
         Text(
             stringResource(R.string.solved_line, formatElapsed(game.elapsedMillis / 1_000)),
             style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.semantics { heading() },
         )
         Text(
             coachUsageLine(game.coach.deepest),
@@ -525,13 +579,15 @@ private fun PageHeader(
                         Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more_options))
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.menu_restart)) },
-                            onClick = {
-                                menuOpen = false
-                                onRestart()
-                            },
-                        )
+                        if (!game.solved) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.menu_restart)) },
+                                onClick = {
+                                    menuOpen = false
+                                    onRestart()
+                                },
+                            )
+                        }
                         if (game.spec.kind == PuzzleKind.Classic) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.menu_next_practice)) },
@@ -567,6 +623,8 @@ private fun PageHeader(
             containerColor = Color.Transparent,
             scrolledContainerColor = Color.Transparent,
         ),
+        // Two lines of title: at large font scales the bar grows instead of clipping them.
+        expandedHeight = maxOf(TopAppBarDefaults.TopAppBarExpandedHeight, (48 * LocalDensity.current.fontScale + 12).dp),
     )
 }
 
@@ -633,7 +691,7 @@ private fun ConfirmDialog(title: Int, body: Int, confirm: Int, onConfirm: () -> 
     )
 }
 
-private fun handleKey(event: KeyEvent, state: PageUiState, onEvent: (PageEvent) -> Unit): Boolean {
+private fun handleKey(event: KeyEvent, state: PageUiState, onEvent: (PageEvent) -> Unit, arrows: Boolean): Boolean {
     if (event.type != KeyEventType.KeyDown) return false
     val game = state.game ?: return false
     if (event.key == Key.Escape) {
@@ -662,10 +720,11 @@ private fun handleKey(event: KeyEvent, state: PageUiState, onEvent: (PageEvent) 
     }
 
     return when (event.key) {
-        Key.DirectionUp -> moveTo(row - 1, column)
-        Key.DirectionDown -> moveTo(row + 1, column)
-        Key.DirectionLeft -> moveTo(row, column - 1)
-        Key.DirectionRight -> moveTo(row, column + 1)
+        // Arrows that reach here from a focused button belong to focus navigation, not the board.
+        Key.DirectionUp -> arrows && moveTo(row - 1, column)
+        Key.DirectionDown -> arrows && moveTo(row + 1, column)
+        Key.DirectionLeft -> arrows && moveTo(row, column - 1)
+        Key.DirectionRight -> arrows && moveTo(row, column + 1)
         Key.Backspace, Key.Delete -> {
             onEvent(PageEvent.Erase)
             true
@@ -687,8 +746,8 @@ private fun handleKey(event: KeyEvent, state: PageUiState, onEvent: (PageEvent) 
         else -> {
             val digit = event.utf16CodePoint - '0'.code
             if (digit in 1..size) {
-                if (game.selected == null && game.lockedDigit == null) onEvent(PageEvent.Select(current))
-                onEvent(PageEvent.Digit(digit))
+                if (game.selected == null) onEvent(PageEvent.Select(current))
+                onEvent(PageEvent.TypeDigit(digit))
                 true
             } else {
                 false

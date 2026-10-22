@@ -1,6 +1,7 @@
 package com.titpea.papersudoku.page
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +28,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
@@ -86,7 +90,12 @@ fun MarginNote(
                     if (coach.hint != null) LevelSteps(coach.level)
                 }
                 Spacer(Modifier.height(4.dp))
-                Text(text.title, style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
+                Text(
+                    text.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.onSurface,
+                    modifier = Modifier.semantics { heading() },
+                )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text.body,
@@ -128,14 +137,26 @@ fun MarginNote(
 private fun LevelSteps(level: Int) {
     val colors = MaterialTheme.colorScheme
     val labels = listOf(R.string.coach_step_look, R.string.coach_step_why, R.string.coach_step_answer)
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+    val progress = stringResource(R.string.coach_step_progress, level, labels.size, stringResource(labels[level - 1]))
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.clearAndSetSemantics { contentDescription = progress },
+    ) {
         labels.forEachIndexed { i, label ->
             val reached = i < level
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Filled for steps taken, hollow for steps ahead: shape as well as colour.
                 Box(
                     Modifier
-                        .size(6.dp)
-                        .background(if (reached) colors.primary else colors.outlineVariant, CircleShape),
+                        .size(7.dp)
+                        .then(
+                            if (reached) {
+                                Modifier.background(colors.primary, CircleShape)
+                            } else {
+                                Modifier.border(1.dp, colors.onSurfaceVariant, CircleShape)
+                            },
+                        ),
                 )
                 Spacer(Modifier.width(3.dp))
                 Text(
