@@ -110,7 +110,7 @@ fun NotebookScreen(
     ) { padding ->
         val direction = LocalLayoutDirection.current
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().testTag("notebook-list"),
             contentPadding = PaddingValues(
                 start = padding.calculateStartPadding(direction) + 16.dp,
                 end = padding.calculateEndPadding(direction) + 16.dp,

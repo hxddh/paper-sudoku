@@ -26,6 +26,9 @@ def reduce(path: Path) -> Image.Image:
 
 def main() -> int:
     captured, goldens = Path(sys.argv[1]), Path(sys.argv[2])
+    if not captured.is_dir():
+        print(f"No captures at {captured} (the device tests did not get that far)")
+        return 1
     reduced_dir = captured / "reduced"
     reduced_dir.mkdir(exist_ok=True)
     shots = sorted(p for p in captured.glob("*.png"))

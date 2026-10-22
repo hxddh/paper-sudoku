@@ -7,6 +7,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.hasTestTag
 import androidx.test.espresso.accessibility.AccessibilityChecks
 import com.titpea.papersudoku.data.DayResult
 import com.titpea.papersudoku.data.PageSummary
@@ -70,7 +72,7 @@ class NotebookScreenTest {
         composeRule.onNodeWithTag("notebook-today").assertIsDisplayed().performClick()
         composeRule.onNodeWithTag("notebook-practice").performClick()
         composeRule.onNodeWithTag("notebook-practice")
-            .assert(hasContentDescription("Clean pages to the next level: 2", substring = true))
+            .assert(hasContentDescription("2 more pages without the Coach’s answer to reach the next level", substring = true))
         composeRule.onNodeWithTag("open-settings").performClick()
         assertEquals(listOf(today), opened)
         assertTrue(practice)
@@ -84,6 +86,8 @@ class NotebookScreenTest {
                 NotebookScreen(state = state(), onOpenDay = {}, onOpenPractice = {}, onOpenSettings = {})
             }
         }
+        // Earlier days come after the handbook: scroll the list to them.
+        composeRule.onNodeWithTag("notebook-list").performScrollToNode(hasTestTag("page-row-${today - 1}"))
         composeRule.onNodeWithTag("page-row-${today - 1}").assertExists()
         composeRule.onNodeWithText("Stamped · 2:14", substring = true).assertExists()
     }

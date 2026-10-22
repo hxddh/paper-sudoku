@@ -158,9 +158,24 @@ jobs:
             adb shell settings put system user_rotation 1; sleep 5
             adb exec-out screencap -p > app/build/outputs/paper-sudoku-landscape.png
             adb shell settings put system user_rotation 0; sleep 2
-            ./gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true
+            ./gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true || touch app/build/ui-tests-failed
             adb pull /sdcard/Android/data/com.titpea.papersudoku/files/screenshots app/build/outputs/screenshots || true
-            ./gradlew --no-daemon :benchmark:connectedBenchmarkAndroidTest
+            ./gradlew --no-daemon :benchmark:connectedBenchmarkAndroidTest || touch app/build/benchmark-failed
+            test ! -e app/build/ui-tests-failed && test ! -e app/build/benchmark-failed
+
+      # Gradle only links the report; name each failed test and its message in the log.
+      - name: Failed device tests
+        if: failure()
+        run: |
+          for f in $(find app/build/outputs/androidTest-results benchmark/build/outputs/androidTest-results -name "*.xml" 2>/dev/null); do
+            python3 - "$f" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          for case in ET.parse(sys.argv[1]).iter("testcase"):
+              for failure in list(case.findall("failure")) + list(case.findall("error")):
+                  print(f"FAILED {case.get('classname')}#{case.get('name')}")
+                  print("\n".join((failure.text or failure.get("message") or "").splitlines()[:25]))
+          PY
+          done
 
       # The screenshot matrix renders fixed pages; any visual change must update the goldens.
       - name: Compare screenshots with goldens
