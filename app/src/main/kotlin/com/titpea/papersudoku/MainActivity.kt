@@ -38,6 +38,9 @@ class MainActivity : ComponentActivity() {
         var settingsLoaded = false
         splash.setKeepOnScreenCondition { !settingsLoaded }
         if (savedInstanceState == null) handle(intent)
+        // Fully drawn is reported during a draw; make sure a drawn frame follows it, so tools that
+        // time to the frame after the report (Macrobenchmark's time to full display) find one.
+        fullyDrawnReporter.addOnReportDrawnListener { window.decorView.postInvalidateOnAnimation() }
 
         setContent {
             val settingsFlow = remember { container.settingsStore.settings.map<UserSettings, UserSettings?> { it } }
