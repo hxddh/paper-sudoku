@@ -152,6 +152,8 @@ jobs:
 
       # The screenshot matrix renders fixed pages; any visual change must update the goldens.
       - name: Compare screenshots with goldens
+        # Also when a later device step (the benchmark) failed: the captures are already pulled.
+        if: always()
         run: |
           pip install --quiet pillow
           python3 tools/compare_screenshots.py app/build/outputs/screenshots app/src/androidTest/screenshots
