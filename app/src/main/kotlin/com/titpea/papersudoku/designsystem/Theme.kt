@@ -128,8 +128,9 @@ private fun inkFor(scheme: ColorScheme, dark: Boolean) = PaperInk(
     printed = scheme.onSurface,
     pen = scheme.secondary,
     pencil = scheme.onSurfaceVariant,
-    gridLine = scheme.outlineVariant,
-    boxLine = scheme.outline,
+    // Cell lines hold 3:1 against the sheet (WCAG 1.4.11); box lines are a clear step darker.
+    gridLine = if (dark) Color(0xFF6E675B) else Color(0xFF9C9081),
+    boxLine = if (dark) Color(0xFFA39A8A) else Color(0xFF6B6256),
     sheet = scheme.surfaceContainerLowest,
     grain = if (dark) Color.White else Color(0xFF3B2A14),
     margin = scheme.primary,

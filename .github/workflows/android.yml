@@ -44,6 +44,10 @@ jobs:
       - name: Build debug APKs and release APK
         run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease :benchmark:assembleBenchmark -PpaperSudoku.sideload=true
 
+      # The hand-written Baseline Profile must survive R8 and land in the APK for profileinstaller.
+      - name: Baseline Profile is packaged
+        run: unzip -l app/build/outputs/apk/release/app-release.apk | grep -E "assets/dexopt/baseline\.prof$"
+
       - name: Run lint
         run: ./gradlew --no-daemon :app:lintDebug
 
@@ -143,6 +147,12 @@ jobs:
             ./gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true
             adb pull /sdcard/Android/data/com.titpea.papersudoku/files/screenshots app/build/outputs/screenshots || true
             ./gradlew --no-daemon :benchmark:connectedBenchmarkAndroidTest
+
+      # The screenshot matrix renders fixed pages; any visual change must update the goldens.
+      - name: Compare screenshots with goldens
+        run: |
+          pip install --quiet pillow
+          python3 tools/compare_screenshots.py app/build/outputs/screenshots app/src/androidTest/screenshots
 
       - name: Upload instrumentation report
         if: always()

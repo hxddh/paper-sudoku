@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.sp
 import com.titpea.papersudoku.designsystem.FrauncesPen
 import com.titpea.papersudoku.designsystem.FrauncesPrinted
 import com.titpea.papersudoku.designsystem.PaperTheme
-import com.titpea.papersudoku.game.model.GameState
+import com.titpea.papersudoku.data.PageSummary
 
 /**
  * A miniature of a page as it was left: printed digits, the player's ink, and the grid. Without a
@@ -24,7 +24,7 @@ import com.titpea.papersudoku.game.model.GameState
  */
 @Composable
 fun PageThumbnail(
-    game: GameState?,
+    page: PageSummary?,
     size: Int,
     modifier: Modifier = Modifier,
     boxRows: Int = if (size == 6) 2 else 3,
@@ -48,12 +48,12 @@ fun PageThumbnail(
             cornerRadius = CornerRadius(side * 0.04f),
             style = Stroke(width = 1.5f),
         )
-        if (game == null) return@Canvas
+        if (page == null) return@Canvas
         val fontSize = (cell * 0.62f / density / fontScale).sp
-        for (index in game.values.indices) {
-            val value = game.values[index]
+        for (index in 0 until size * size) {
+            val value = page.valueAt(index)
             if (value == 0) continue
-            val given = game.isGiven(index)
+            val given = page.isGiven(index)
             val layout = measurer.measure(
                 value.toString(),
                 TextStyle(

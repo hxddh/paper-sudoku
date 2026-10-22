@@ -90,8 +90,6 @@
     <string name="settings_play">Play</string>
     <string name="settings_auto_clear">Tidy notes</string>
     <string name="settings_auto_clear_desc">Writing a digit removes it from notes in the same row, column and box.</string>
-    <string name="settings_haptics">Haptics</string>
-    <string name="settings_haptics_desc">A light tap when you write, a firmer one on a clash.</string>
     <string name="settings_about">About</string>
     <string name="settings_version">Version %1$s</string>
     <string name="settings_privacy_title">Privacy</string>
@@ -121,7 +119,7 @@
     <string name="next_practice_confirm">New page</string>
     <string name="notebook">Notebook</string>
     <string name="notebook_earlier">Earlier pages</string>
-    <string name="notebook_summary">%1$d pages stamped. No streaks, just pages.</string>
+    <string name="page_stamped_coached">Stamped with the Coach’s answer · %1$s</string>
     <string name="notebook_summary_empty">Finish a page and it gets a stamp.</string>
     <string name="notebook_techniques">Techniques</string>
     <string name="page_blank">Blank page</string>
@@ -140,11 +138,16 @@
     <string name="solved_line">Solved · %1$s</string>
     <string name="solved_next_practice">Next page</string>
     <string name="solved_open_practice">Practice</string>
-    <string name="status_holding">Holding %1$d · tap cells to write it · tap here to put it down</string>
+    <string name="status_holding">Holding %1$d · Put down</string>
     <string name="status_pencil">Pencil: digits go in as notes</string>
     <string name="today">Today</string>
     <string name="widget_page_description">Today’s page</string>
     <string name="widget_stamped">Stamped</string>
     <string name="widget_name">Today’s page</string>
     <string name="widget_description">Today’s Sudoku page at a glance</string>
+    <string name="widget_preview_day" translatable="false">21</string>
+    <string name="page_pane">Page</string>
+    <string name="cell_coach_answer">the Coach suggests %1$d</string>
+    <string name="cell_coach_removes">the Coach rules out %1$s</string>
+    <string name="coach_step_progress">Step %1$d of %2$d: %3$s</string>
 </resources>

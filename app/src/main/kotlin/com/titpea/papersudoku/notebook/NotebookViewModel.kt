@@ -8,11 +8,11 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.titpea.papersudoku.AppContainer
 import com.titpea.papersudoku.data.DayResult
 import com.titpea.papersudoku.data.GameStore
+import com.titpea.papersudoku.data.PageSummary
 import com.titpea.papersudoku.data.SettingsStore
 import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.engine.Technique
 import com.titpea.papersudoku.game.model.Catalog
-import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.Practice
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -29,7 +29,7 @@ data class PageEntry(
     val epochDay: Long,
     val difficulty: Difficulty,
     /** The saved page, if it has been opened. */
-    val game: GameState?,
+    val saved: PageSummary?,
     val result: DayResult?,
 ) {
     val stamped: Boolean get() = result != null
@@ -40,7 +40,8 @@ data class PracticeEntry(
     val level: Difficulty,
     /** Clean pages still needed for the next level; null at the top. */
     val toNextLevel: Int?,
-    val game: GameState?,
+    /** The unfinished page that will be continued, if any. */
+    val saved: PageSummary?,
 )
 
 data class NotebookUiState(
@@ -75,7 +76,7 @@ class NotebookViewModel(
             store.cleanPractice,
             settingsStore.settings,
         ) { dailies, days, practice, clean, settings ->
-            val saved = dailies.associateBy { it.spec.epochDay }
+            val saved = dailies.associateBy { it.epochDay }
             val results = days.associateBy { it.epochDay }
             fun entry(d: Long) = PageEntry(d, Catalog.dailyDifficulty(d), saved[d], results[d])
             val pastDays = (1..DAYS_SHOWN).map { day - it }
@@ -84,9 +85,9 @@ class NotebookViewModel(
                 todayPage = entry(day),
                 // An unfinished page keeps the level it was dealt at, whatever the progression says now.
                 practice = PracticeEntry(
-                    level = practice?.spec?.difficulty ?: Practice.level(clean),
+                    level = practice?.difficulty ?: Practice.level(clean),
                     toNextLevel = Practice.remainingToAdvance(clean),
-                    game = practice,
+                    saved = practice,
                 ),
                 pastDays = pastDays,
                 pages = (pastDays + day).associateWith(::entry),

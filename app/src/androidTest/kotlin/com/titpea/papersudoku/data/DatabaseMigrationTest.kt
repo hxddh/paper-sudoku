@@ -12,31 +12,21 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** A v1 install (Room schema 1) upgrades in place and keeps its results. */
+/** Older installs upgrade in place and keep their results and pages; the store's queries hold. */
 class DatabaseMigrationTest {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val name = "migration-test.db"
 
     @Before
-    fun createVersion1() {
+    fun clear() {
         context.deleteDatabase(name)
-        val file = context.getDatabasePath(name)
-        file.parentFile?.mkdirs()
-        SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `game_results` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
-                    "`mode` TEXT NOT NULL, `durationSeconds` INTEGER NOT NULL, `hints` INTEGER NOT NULL, " +
-                    "`completedAt` INTEGER NOT NULL)",
-            )
-            db.execSQL("INSERT INTO game_results (mode, durationSeconds, hints, completedAt) VALUES ('mini', 95, 1, 1000)")
-            db.execSQL("INSERT INTO game_results (mode, durationSeconds, hints, completedAt) VALUES ('classic', 600, 0, 2000)")
-            db.version = 1
-        }
+        context.getDatabasePath(name).parentFile?.mkdirs()
     }
 
     @After
@@ -44,8 +34,24 @@ class DatabaseMigrationTest {
         context.deleteDatabase(name)
     }
 
+    private fun raw(version: Int, block: SQLiteDatabase.() -> Unit) {
+        SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(name), null).use { db ->
+            db.block()
+            db.version = version
+        }
+    }
+
     @Test
-    fun migratesV1ResultsAndStoresV2Games() = runBlocking {
+    fun migratesV1Results() = runBlocking {
+        raw(version = 1) {
+            execSQL(
+                "CREATE TABLE IF NOT EXISTS `game_results` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`mode` TEXT NOT NULL, `durationSeconds` INTEGER NOT NULL, `hints` INTEGER NOT NULL, " +
+                    "`completedAt` INTEGER NOT NULL)",
+            )
+            execSQL("INSERT INTO game_results (mode, durationSeconds, hints, completedAt) VALUES ('mini', 95, 1, 1000)")
+            execSQL("INSERT INTO game_results (mode, durationSeconds, hints, completedAt) VALUES ('classic', 600, 0, 2000)")
+        }
         val database = SudokuDatabase.create(context, name)
         try {
             assertEquals(2, database.resultDao().count())
@@ -54,19 +60,82 @@ class DatabaseMigrationTest {
             // The v1 mini used a hint (the old Coach revealed digits), so it is not a clean best.
             assertEquals(null, stats.single { it.mode == "mini" }.bestSeconds)
             assertEquals(600L, stats.single { it.mode == "classic" }.bestSeconds)
+        } finally {
+            database.close()
+        }
+    }
 
-            val store = RoomGameStore(database.savedGameDao(), database.resultDao())
-            val game = GameState.new(Catalog.classic(Difficulty.Gentle, 0))
-            store.save(game, now = 5)
+    @Test
+    fun migratesV2PagesWithTheirDigits() = runBlocking {
+        val game = GameState.new(Catalog.daily(20_000)).let { it.select(it.spec.givens.indexOfFirst { v -> v == 0 }).input(1, true) }
+        raw(version = 2) {
+            execSQL(
+                "CREATE TABLE IF NOT EXISTS `game_results` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`mode` TEXT NOT NULL, `durationSeconds` INTEGER NOT NULL, `hints` INTEGER NOT NULL, " +
+                    "`completedAt` INTEGER NOT NULL, `puzzleKey` TEXT NOT NULL DEFAULT '', " +
+                    "`difficulty` TEXT NOT NULL DEFAULT '', `coachLevel` INTEGER NOT NULL DEFAULT 0, `epochDay` INTEGER)",
+            )
+            execSQL("CREATE INDEX IF NOT EXISTS `index_game_results_puzzleKey` ON `game_results` (`puzzleKey`)")
+            execSQL(
+                "CREATE TABLE IF NOT EXISTS `saved_games` (`puzzleKey` TEXT NOT NULL, `kind` TEXT NOT NULL, " +
+                    "`difficulty` TEXT NOT NULL, `number` INTEGER, `epochDay` INTEGER, `solved` INTEGER NOT NULL, " +
+                    "`json` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`puzzleKey`))",
+            )
+            execSQL(
+                "INSERT INTO saved_games VALUES (?, 'Daily', 'Gentle', NULL, 20000, 0, ?, 7)",
+                arrayOf(game.spec.key, game.encode()),
+            )
+            execSQL("INSERT INTO saved_games VALUES ('broken', 'Daily', 'Gentle', NULL, 20001, 0, '{not json', 8)")
+        }
+        val database = SudokuDatabase.create(context, name)
+        try {
+            val store = RoomGameStore(database)
             assertEquals(game, store.load(game.spec.key))
-            assertEquals(game, store.unfinishedPractice.first())
-            assertEquals(listOf<GameState>(), store.dailies(0).first())
+            val page = store.dailies(0).first().single()
+            assertEquals(PageSummary.of(game), page)
+            assertNull(store.load("broken"))
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun storeQueries() = runBlocking {
+        val database = SudokuDatabase.create(context, name)
+        try {
+            val store = RoomGameStore(database)
+            val practice = GameState.new(Catalog.classic(Difficulty.Gentle, 0))
+            store.save(practice, now = 5)
+            assertEquals(practice, store.load(practice.spec.key))
+            assertEquals(PageSummary.of(practice), store.unfinishedPractice.first())
+            assertEquals(practice.spec.key, store.latestUnsolvedPracticeKey())
             assertEquals(1, store.nextClassicNumber(Difficulty.Gentle))
 
-            val result = GameResult(game.spec.key, PuzzleKind.Classic, Difficulty.Gentle, 300, 0, 0, 10, null)
-            assertTrue(store.recordOnce(result))
-            assertFalse(store.recordOnce(result))
-            assertEquals(3, database.resultDao().count())
+            // Setting a page aside drops it; numbering continues past the replacement.
+            val next = GameState.new(Catalog.classic(Difficulty.Gentle, 1))
+            store.save(next, now = 6)
+            store.discardUnsolvedPractice(except = next.spec.key)
+            assertNull(store.load(practice.spec.key))
+            assertEquals(2, store.nextClassicNumber(Difficulty.Gentle))
+
+            // Unfinished dailies before the cut-off are pruned; the day itself is kept.
+            val old = GameState.new(Catalog.daily(100))
+            val kept = GameState.new(Catalog.daily(101))
+            store.save(old, now = 1)
+            store.save(kept, now = 1)
+            store.pruneUnsolvedDailies(beforeEpochDay = 101)
+            assertNull(store.load(old.spec.key))
+            assertEquals(listOf(kept.spec.key), store.dailies(0).first().map { it.key })
+
+            // A solve is saved and recorded together, once; answered solves are not clean.
+            val result = GameResult(next.spec.key, PuzzleKind.Classic, Difficulty.Gentle, 300, 1, 3, 10, null)
+            assertTrue(store.saveSolved(next, result, now = 9))
+            assertFalse(store.saveSolved(next, result, now = 10))
+            assertEquals(1, database.resultDao().count())
+            assertEquals(emptyMap<Difficulty, Int>(), store.cleanPractice.first())
+            val daily = GameResult(kept.spec.key, PuzzleKind.Daily, Difficulty.Gentle, 50, 0, 0, 11, 101)
+            assertTrue(store.saveSolved(kept, daily, now = 11))
+            assertEquals(listOf(DayResult(101, 0, 50)), store.days.first())
         } finally {
             database.close()
         }

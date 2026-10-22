@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.DropdownMenuItem
@@ -173,15 +174,16 @@ private fun DigitKey(
         bottomEnd = if (last) outer else inner,
     )
     val done = left <= 0
+    // Paper keys with printed ink; the held digit is the one red key. Pencil mode greys the ink.
     val container = when {
         held -> colors.primary
-        pencil -> colors.surfaceContainerHighest
-        else -> colors.secondaryContainer
+        pencil -> colors.surfaceContainer
+        else -> colors.surfaceContainerHigh
     }
     val content = when {
         held -> colors.onPrimary
         pencil -> colors.onSurfaceVariant
-        else -> colors.onSecondaryContainer
+        else -> colors.onSurface
     }
     val description = when {
         held -> stringResource(R.string.keypad_held, digit)
@@ -191,6 +193,7 @@ private fun DigitKey(
     Box(
         modifier = modifier
             .height(KeyHeight)
+            .widthIn(min = 48.dp)
             .clip(shape)
             .background(container)
             .clickable(

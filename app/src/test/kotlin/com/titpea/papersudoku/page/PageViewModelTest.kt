@@ -5,6 +5,8 @@ import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.PuzzleKind
+import androidx.lifecycle.SavedStateHandle
+import com.titpea.papersudoku.game.model.GeneratingPuzzleSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -49,8 +51,16 @@ class PageViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun viewModel(generator: kotlinx.coroutines.CoroutineDispatcher = dispatcher) =
-        PageViewModel(store, settings, clock, ticker = { now }, generatorDispatcher = generator, onDailySaved = { dailySaves++ })
+    private fun viewModel(
+        generator: kotlinx.coroutines.CoroutineDispatcher = dispatcher,
+        savedState: SavedStateHandle = SavedStateHandle(),
+    ) = PageViewModel(
+        store, settings, clock,
+        ticker = { now },
+        puzzles = GeneratingPuzzleSource(generator),
+        savedState = savedState,
+        onDailySaved = { dailySaves++ },
+    )
 
     private fun test(block: suspend TestScope.() -> Unit) = runTest(dispatcher) { block() }
 
@@ -75,7 +85,11 @@ class PageViewModelTest {
         assertEquals(Difficulty.Gentle, game.spec.difficulty)
         assertFalse(vm.state.value.loading)
         assertTrue(store.saved.containsKey(game.spec.key))
-        assertTrue(dailySaves > 0)
+        // The widget is redrawn when the page is put away or solved, not on every save.
+        assertEquals(0, dailySaves)
+        vm.onEvent(PageEvent.Background)
+        advanceUntilIdle()
+        assertEquals(1, dailySaves)
     }
 
     @Test
@@ -140,7 +154,7 @@ class PageViewModelTest {
     }
 
     @Test
-    fun `solving records exactly once, even after a restart`() = test {
+    fun `solving records exactly once`() = test {
         val vm = viewModel()
         advanceUntilIdle()
         vm.onEvent(PageEvent.Foreground)
@@ -152,10 +166,11 @@ class PageViewModelTest {
         assertEquals(1, store.results.size)
         assertEquals(90L, store.results.single().durationSeconds)
         assertTrue(vm.game().spec.hardest in settings.flow.value.techniquesMet)
-        vm.onEvent(PageEvent.Restart)
-        assertFalse(vm.game().solved)
-        vm.solveFully()
+        vm.onEvent(PageEvent.OpenPractice)
         advanceUntilIdle()
+        vm.onEvent(PageEvent.OpenDaily(today.toEpochDay()))
+        advanceUntilIdle()
+        assertTrue(vm.game().solved)
         assertEquals(1, store.results.size)
     }
 
@@ -280,5 +295,88 @@ class PageViewModelTest {
         val next = vm.game().spec
         assertTrue(next.key != setAside.key && next.key != replacement.key)
         assertEquals((replacement.number ?: 0) + 1, next.number)
+    }
+
+    @Test
+    fun `opening yesterday's finished page after midnight keeps it open`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.solveFully()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.Background)
+        instant = Instant.parse("2026-10-22T07:00:00Z")
+        vm.onEvent(PageEvent.OpenDaily(today.toEpochDay()))
+        vm.onEvent(PageEvent.Foreground)
+        advanceUntilIdle()
+        assertEquals(Catalog.dailyKey(today.toEpochDay()), vm.game().spec.key)
+    }
+
+    @Test
+    fun `restarting keeps the coach on record and a solved page cannot restart`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.Coach)
+        vm.onEvent(PageEvent.CoachDeeper)
+        vm.onEvent(PageEvent.CoachDeeper)
+        vm.onEvent(PageEvent.Restart)
+        assertEquals(3, vm.game().coach.deepest)
+        vm.solveFully()
+        advanceUntilIdle()
+        assertEquals(3, store.results.single().coachLevel)
+        val solved = vm.game()
+        vm.onEvent(PageEvent.Restart)
+        assertEquals(solved, vm.game())
+    }
+
+    @Test
+    fun `a typed digit never picks a digit up`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        val spec = vm.game().spec
+        val given = spec.givens.indexOfFirst { it != 0 }
+        val empty = spec.givens.indexOfFirst { it == 0 }
+        vm.onEvent(PageEvent.Select(given))
+        vm.onEvent(PageEvent.TypeDigit(spec.solution[empty]))
+        assertNull(vm.game().lockedDigit)
+        vm.onEvent(PageEvent.Select(empty))
+        vm.onEvent(PageEvent.TypeDigit(spec.solution[empty]))
+        assertEquals(spec.solution[empty], vm.game().values[empty])
+    }
+
+    @Test
+    fun `after process death the open page comes back`() = test {
+        val handle = SavedStateHandle()
+        val vm = viewModel(savedState = handle)
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.OpenPractice)
+        advanceUntilIdle()
+        val practice = vm.game().spec.key
+        val restored = viewModel(savedState = SavedStateHandle(handle.keys().associateWith { handle.get<Any>(it) }))
+        advanceUntilIdle()
+        assertEquals(practice, restored.game().spec.key)
+    }
+
+    @Test
+    fun `the stamp lands once`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.solveFully()
+        advanceUntilIdle()
+        assertTrue(vm.state.value.justSolved)
+        vm.onEvent(PageEvent.StampLanded)
+        assertFalse(vm.state.value.justSolved)
+        assertEquals(1, dailySaves)
+    }
+
+    @Test
+    fun `solving an earlier day does not redraw today's widget`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.OpenDaily(today.toEpochDay() - 3))
+        advanceUntilIdle()
+        vm.solveFully()
+        advanceUntilIdle()
+        assertTrue(vm.game().solved)
+        assertEquals(0, dailySaves)
     }
 }

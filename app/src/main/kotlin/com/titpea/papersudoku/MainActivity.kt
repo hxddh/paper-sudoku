@@ -1,5 +1,6 @@
 package com.titpea.papersudoku
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.KeyboardShortcutGroup
@@ -17,20 +18,32 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.titpea.papersudoku.data.ThemeMode
 import com.titpea.papersudoku.data.UserSettings
 import com.titpea.papersudoku.designsystem.SudokuTheme
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 
 class MainActivity : ComponentActivity() {
 
+    private val openToday = Channel<Unit>(Channel.CONFLATED)
+
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         val container = (application as SudokuApplication).container
-        val versionName = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
+        val versionName = BuildConfig.VERSION_NAME
+        // Hold the splash until the theme is known, so a dark-theme choice never flashes paper.
+        var settingsLoaded = false
+        splash.setKeepOnScreenCondition { !settingsLoaded }
+        if (savedInstanceState == null) handle(intent)
 
         setContent {
-            val settings by container.settingsStore.settings
-                .collectAsStateWithLifecycle(initialValue = UserSettings())
+            val loaded by container.settingsStore.settings
+                .map<UserSettings, UserSettings?> { it }
+                .collectAsStateWithLifecycle(initialValue = null)
+            val settings = loaded ?: return@setContent
+            settingsLoaded = true
             val darkTheme = when (settings.theme) {
                 ThemeMode.System -> isSystemInDarkTheme()
                 ThemeMode.Light -> false
@@ -43,9 +56,23 @@ class MainActivity : ComponentActivity() {
                         isAppearanceLightNavigationBars = !darkTheme
                     }
                 }
-                PaperSudokuApp(container, versionName)
+                PaperSudokuApp(container, versionName, openToday.receiveAsFlow())
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handle(intent)
+    }
+
+    private fun handle(intent: Intent?) {
+        if (intent?.action == ACTION_OPEN_TODAY) openToday.trySend(Unit)
+    }
+
+    companion object {
+        /** Sent by the home-screen widget: show today's page. */
+        const val ACTION_OPEN_TODAY = "com.titpea.papersudoku.action.OPEN_TODAY"
     }
 
     /** Lists the hardware-keyboard shortcuts in the system helper (Meta + /). */

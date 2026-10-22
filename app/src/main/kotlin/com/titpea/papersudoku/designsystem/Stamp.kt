@@ -19,6 +19,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -73,12 +75,18 @@ fun InkStamp(
                 ),
             )
         }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // The stamp is a picture: its lettering is sized to the ring, not to the font scale, and the
+        // solved note beside the board says the same thing to TalkBack.
+        val fontScale = LocalDensity.current.fontScale
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.clearAndSetSemantics {},
+        ) {
             Text(
                 text = title,
                 color = color,
                 style = MaterialTheme.typography.headlineSmall,
-                fontSize = (size.value / 7f).sp,
+                fontSize = (size.value / 7f / fontScale).sp,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )
@@ -86,6 +94,7 @@ fun InkStamp(
                 text = caption,
                 color = color,
                 style = MaterialTheme.typography.labelMedium,
+                fontSize = (size.value / 14f / fontScale).sp,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )

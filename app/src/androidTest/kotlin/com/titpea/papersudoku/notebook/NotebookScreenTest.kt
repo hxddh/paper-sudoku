@@ -9,6 +9,7 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.espresso.accessibility.AccessibilityChecks
 import com.titpea.papersudoku.data.DayResult
+import com.titpea.papersudoku.data.PageSummary
 import com.titpea.papersudoku.designsystem.SudokuTheme
 import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.game.model.Catalog
@@ -37,7 +38,7 @@ class NotebookScreenTest {
             PageEntry(
                 epochDay = day,
                 difficulty = Catalog.dailyDifficulty(day),
-                game = if (day == today) Fixtures.fresh else null,
+                saved = if (day == today) PageSummary.of(Fixtures.fresh) else null,
                 result = if (day == today - 1) DayResult(day, 0, 134) else null,
             )
         }

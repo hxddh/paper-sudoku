@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import com.titpea.papersudoku.data.DayResult
+import com.titpea.papersudoku.data.PageSummary
 import com.titpea.papersudoku.designsystem.PaperTheme
 import com.titpea.papersudoku.designsystem.SudokuTheme
 import com.titpea.papersudoku.engine.Difficulty
@@ -66,7 +67,7 @@ class ScreenshotMatrixTest {
             PageEntry(
                 epochDay = day,
                 difficulty = Catalog.dailyDifficulty(day),
-                game = game,
+                saved = game?.let(PageSummary::of),
                 result = when (day) {
                     today - 1 -> DayResult(day, 3, 301)
                     today - 2 -> DayResult(day, 0, 125)
@@ -79,7 +80,7 @@ class ScreenshotMatrixTest {
             state = NotebookUiState(
                 today = today,
                 todayPage = pages.getValue(today),
-                practice = PracticeEntry(Difficulty.Steady, 2, Fixtures.practice()),
+                practice = PracticeEntry(Difficulty.Steady, 2, PageSummary.of(Fixtures.practice())),
                 pastDays = past,
                 pages = pages,
                 stamped = 3,
@@ -134,7 +135,7 @@ class ScreenshotMatrixTest {
             composeRule.mainClock.advanceTimeBy(1_000)
             val bitmap = composeRule.onRoot().captureToImage().asAndroidBitmap()
             assertTrue("${shot.name} rendered blank", bitmap.hasVisibleContent())
-            File(dir, "${shot.name}.jpg").outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 82, it) }
+            File(dir, "${shot.name}.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
     }
 

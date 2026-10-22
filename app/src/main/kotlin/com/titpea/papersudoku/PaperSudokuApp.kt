@@ -1,5 +1,6 @@
 package com.titpea.papersudoku
 
+import androidx.activity.compose.ReportDrawnWhen
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.background
@@ -15,6 +16,7 @@ import androidx.compose.material3.adaptive.layout.ThreePaneScaffoldDestinationIt
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
@@ -25,6 +27,8 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.platform.LocalContext
@@ -45,7 +49,8 @@ import com.titpea.papersudoku.page.PageViewModel
 import com.titpea.papersudoku.settings.SettingsScreen
 import com.titpea.papersudoku.share.printPuzzle
 import com.titpea.papersudoku.share.sharePage
-import java.time.LocalDate
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
 enum class Screen { Home, Settings }
@@ -57,7 +62,12 @@ enum class Screen { Home, Settings }
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun PaperSudokuApp(container: AppContainer, versionName: String) {
+fun PaperSudokuApp(
+    container: AppContainer,
+    versionName: String,
+    /** Emits when the widget asks for today's page. */
+    openTodayRequests: Flow<Unit> = emptyFlow(),
+) {
     val backStack: SnapshotStateList<Screen> = rememberSaveable(
         saver = listSaver(save = { stack -> stack.map { it.name } }, restore = { names -> names.map(Screen::valueOf).toMutableStateList() }),
     ) { mutableStateListOf(Screen.Home) }
@@ -85,6 +95,8 @@ fun PaperSudokuApp(container: AppContainer, versionName: String) {
                                 pageViewModel = pageViewModel,
                                 notebookViewModel = notebookViewModel,
                                 onOpenSettings = { backStack.add(Screen.Settings) },
+                                openTodayRequests = openTodayRequests,
+                                onShowHome = { while (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
                             )
                             Screen.Settings -> {
                                 val state by pageViewModel.state.collectAsStateWithLifecycle()
@@ -109,12 +121,13 @@ private fun NotebookHome(
     pageViewModel: PageViewModel,
     notebookViewModel: NotebookViewModel,
     onOpenSettings: () -> Unit,
+    openTodayRequests: Flow<Unit>,
+    onShowHome: () -> Unit,
 ) {
     val page by pageViewModel.state.collectAsStateWithLifecycle()
-    val notebook by notebookViewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val todayKey = remember { PageKeys.daily(LocalDate.now().toEpochDay()) }
+    val todayKey = remember { PageKeys.daily(pageViewModel.state.value.today) }
     // Opening the app lands on today's page; back goes to the notebook.
     val navigator = rememberListDetailPaneScaffoldNavigator<String>(
         initialDestinationHistory = listOf(
@@ -126,17 +139,30 @@ private fun NotebookHome(
         navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] == PaneAdaptedValue.Expanded
     val openKey = page.game?.let(PageKeys::of)
 
+    // Fully drawn once a page is on the desk (Macrobenchmark's time to full display).
+    ReportDrawnWhen { page.game != null && !page.loading }
     LifecycleStartEffect(Unit) {
         notebookViewModel.refreshDate()
         onStopOrDispose { }
     }
+    LaunchedEffect(openTodayRequests) {
+        openTodayRequests.collect {
+            onShowHome()
+            pageViewModel.onEvent(PageEvent.OpenToday)
+            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, PageKeys.daily(pageViewModel.state.value.today))
+        }
+    }
+    val notebookTitle = stringResource(R.string.notebook)
+    val pageTitle = stringResource(R.string.page_pane)
 
     SharedTransitionLayout {
         NavigableListDetailPaneScaffold(
             navigator = navigator,
             listPane = {
-                AnimatedPane {
+                AnimatedPane(Modifier.semantics { paneTitle = notebookTitle }) {
                     val paneScope = this
+                    // Collected only while the list is on screen; on phones it is hidden behind the page.
+                    val notebook by notebookViewModel.state.collectAsStateWithLifecycle()
                     NotebookScreen(
                         state = notebook,
                         onOpenDay = { day ->
@@ -156,7 +182,7 @@ private fun NotebookHome(
                 }
             },
             detailPane = {
-                AnimatedPane {
+                AnimatedPane(Modifier.semantics { paneTitle = pageTitle }) {
                     val paneScope = this
                     // The hidden clock runs only while the page is on screen.
                     LifecycleStartEffect(Unit) {

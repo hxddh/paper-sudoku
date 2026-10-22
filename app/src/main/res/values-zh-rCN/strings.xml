@@ -90,8 +90,6 @@
     <string name="settings_play">玩法</string>
     <string name="settings_auto_clear">自动整理笔记</string>
     <string name="settings_auto_clear_desc">填入数字时，同行、同列、同宫笔记中的该数字自动擦除。</string>
-    <string name="settings_haptics">触感反馈</string>
-    <string name="settings_haptics_desc">写入时轻触反馈，冲突时更明显。</string>
     <string name="settings_about">关于</string>
     <string name="settings_version">版本 %1$s</string>
     <string name="settings_privacy_title">隐私</string>
@@ -121,7 +119,7 @@
     <string name="next_practice_confirm">换一页</string>
     <string name="notebook">本子</string>
     <string name="notebook_earlier">往日</string>
-    <string name="notebook_summary">已盖章 %1$d 页。没有连续打卡，只有一页页纸。</string>
+    <string name="page_stamped_coached">教练给过答案 · 已盖章 · %1$s</string>
     <string name="notebook_summary_empty">做完一页，就盖一个章。</string>
     <string name="notebook_techniques">技巧手册</string>
     <string name="page_blank">空白页</string>
@@ -140,11 +138,15 @@
     <string name="solved_line">完成 · %1$s</string>
     <string name="solved_next_practice">下一页</string>
     <string name="solved_open_practice">去练习</string>
-    <string name="status_holding">拿着 %1$d · 点格子写入 · 点这里放下</string>
+    <string name="status_holding">拿着 %1$d · 放下</string>
     <string name="status_pencil">铅笔模式：数字记为笔记</string>
     <string name="today">今天</string>
     <string name="widget_page_description">今天这一页</string>
     <string name="widget_stamped">已盖章</string>
     <string name="widget_name">今天这一页</string>
     <string name="widget_description">一眼看到今天的数独页</string>
+    <string name="cell_coach_answer">教练建议填 %1$d</string>
+    <string name="cell_coach_removes">教练排除 %1$s</string>
+    <string name="page_pane">页面</string>
+    <string name="coach_step_progress">第 %1$d 步，共 %2$d 步：%3$s</string>
 </resources>

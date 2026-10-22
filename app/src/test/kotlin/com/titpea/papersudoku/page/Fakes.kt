@@ -4,7 +4,7 @@ import com.titpea.papersudoku.data.DayResult
 import com.titpea.papersudoku.data.GameResult
 import com.titpea.papersudoku.data.GameStore
 import com.titpea.papersudoku.data.SettingsStore
-import com.titpea.papersudoku.data.StatsRow
+import com.titpea.papersudoku.data.PageSummary
 import com.titpea.papersudoku.data.UserSettings
 import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.game.model.GameState
@@ -19,7 +19,6 @@ class FakeGameStore : GameStore {
     val saved: Map<String, Pair<GameState, Long>> get() = savedFlow.value
     val results = mutableListOf<GameResult>()
     val clean = MutableStateFlow<Map<Difficulty, Int>>(emptyMap())
-    private val statsFlow = MutableStateFlow<List<StatsRow>>(emptyList())
     private val daysFlow = MutableStateFlow<List<DayResult>>(emptyList())
 
     override suspend fun load(puzzleKey: String): GameState? =
@@ -27,6 +26,13 @@ class FakeGameStore : GameStore {
 
     override suspend fun save(state: GameState, now: Long) {
         savedFlow.update { it + (state.spec.key to (state to now)) }
+    }
+
+    override suspend fun saveSolved(state: GameState, result: GameResult, now: Long): Boolean {
+        save(state, now)
+        if (results.any { it.puzzleKey == result.puzzleKey }) return false
+        results += result
+        return true
     }
 
     override suspend fun nextClassicNumber(difficulty: Difficulty): Int =
@@ -44,22 +50,24 @@ class FakeGameStore : GameStore {
         }
     }
 
-    override suspend fun recordOnce(result: GameResult): Boolean {
-        if (results.any { it.puzzleKey == result.puzzleKey }) return false
-        results += result
-        return true
+    override suspend fun latestUnsolvedPracticeKey(): String? =
+        saved.values.filter { (g, _) -> g.spec.kind == PuzzleKind.Classic && !g.solved }.maxByOrNull { it.second }?.first?.spec?.key
+
+    override fun dailies(fromEpochDay: Long): Flow<List<PageSummary>> = savedFlow.map { map ->
+        map.values.map { it.first }
+            .filter { it.spec.kind == PuzzleKind.Daily && (it.spec.epochDay ?: 0) >= fromEpochDay }
+            .map(PageSummary::of)
     }
 
-    override fun dailies(fromEpochDay: Long): Flow<List<GameState>> = savedFlow.map { map ->
-        map.values.map { it.first }.filter { it.spec.kind == PuzzleKind.Daily && (it.spec.epochDay ?: 0) >= fromEpochDay }
-    }
+    override fun page(puzzleKey: String): Flow<PageSummary?> =
+        savedFlow.map { map -> map[puzzleKey]?.first?.let(PageSummary::of) }
 
-    override val unfinishedPractice: Flow<GameState?> = savedFlow.map { map ->
+    override val unfinishedPractice: Flow<PageSummary?> = savedFlow.map { map ->
         map.values.filter { (g, _) -> g.spec.kind == PuzzleKind.Classic && !g.solved }.maxByOrNull { it.second }?.first
+            ?.let(PageSummary::of)
     }
 
     override val cleanPractice: Flow<Map<Difficulty, Int>> = clean
-    override val stats: Flow<List<StatsRow>> = statsFlow
     override val days: Flow<List<DayResult>> = daysFlow
 }
 
