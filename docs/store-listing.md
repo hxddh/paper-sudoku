@@ -42,7 +42,7 @@ privacy/data-safety updates must be designed before release.
 ## Screenshot plan
 
 `StoreScreenshotsTest` draws them at Play's sizes (phone 1080×1920, 9:16; tablet 1080×608,
-16:9); CI publishes them under `store/` on the PR's captures branch. The matrix captures are
+16:9); CI publishes them under `store/` on the PR's captures branch; the current set is in `docs/store/`. The matrix captures are
 not used: at 540×1200 they are taller than Play's 2:1 limit.
 
 1. A practice page with pencil marks (Paper)
