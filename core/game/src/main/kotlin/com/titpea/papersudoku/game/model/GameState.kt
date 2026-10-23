@@ -117,9 +117,12 @@ data class GameState(
         if (!isEditable(index) || values[index] == 0) return this
         val digit = values[index]
         val before = history.lastOrNull { it.values[index] != digit }
-        val peers = spec.geometry.peers[index]
+        val geometry = spec.geometry
+        val peers = geometry.peers[index]
+        // Only where the digit is still possible: a later placement may have ruled it out again.
+        fun stillPossible(i: Int) = geometry.peers[i].none { it != index && values[it] == digit }
         val restored = notes.mapIndexed { i, mask ->
-            if (before != null && i in peers && values[i] == 0 && DigitMask.contains(before.notes[i], digit)) {
+            if (before != null && i in peers && values[i] == 0 && DigitMask.contains(before.notes[i], digit) && stillPossible(i)) {
                 mask or (1 shl digit)
             } else {
                 mask

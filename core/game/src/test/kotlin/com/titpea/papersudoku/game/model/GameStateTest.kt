@@ -73,8 +73,10 @@ class GameStateTest {
 
     @Test
     fun `erasing a mistake gives back the pencil marks the wrong digit crossed out`() {
-        val wrong = (1..spec.size).first { it != answer }
-        val peer = spec.geometry.peers[empty].first { spec.givens[it] == 0 }
+        // A wrong digit the peer could still hold: nothing printed around it rules it out.
+        val (peer, wrong) = spec.geometry.peers[empty].filter { spec.givens[it] == 0 }.firstNotNullOf { p ->
+            (1..spec.size).firstOrNull { d -> d != answer && spec.geometry.peers[p].none { it != empty && spec.givens[it] == d } }?.let { p to it }
+        }
         val noted = GameState.new(spec).select(peer).toggleNotesMode().input(wrong, true).toggleNotesMode()
         val slip = noted.select(empty).input(wrong, true)
         assertFalse(DigitMask.contains(slip.notes[peer], wrong))
@@ -84,6 +86,31 @@ class GameStateTest {
         // One undo takes the whole correction back.
         assertEquals(slip.values, erased.undo().values)
         assertEquals(slip.notes, erased.undo().notes)
+    }
+
+    @Test
+    fun `erasing a mistake does not give back a mark a later digit ruled out`() {
+        val classic = Catalog.classic(Difficulty.Tricky, 0)
+        val geometry = classic.geometry
+        // A wrong digit, a pencilled cell it crosses out, and a correct placement of the same digit
+        // that also sees that cell (and does not see the wrong one).
+        val empty = classic.givens.indices.filter { classic.givens[it] == 0 }
+        val case = empty.asSequence().flatMap { wrong ->
+            geometry.peers[wrong].asSequence().filter { classic.givens[it] == 0 }.flatMap { marked ->
+                val digit = classic.solution[marked]
+                geometry.peers[marked].asSequence()
+                    .filter { it != wrong && classic.givens[it] == 0 && classic.solution[it] != digit && !geometry.sees(it, wrong) }
+                    .mapNotNull { later -> empty.firstOrNull { classic.solution[it] == classic.solution[later] && geometry.sees(it, marked) && it != wrong && !geometry.sees(it, wrong) }?.let { Triple(wrong, marked, it) } }
+                    .filter { (w, _, l) -> classic.solution[w] != classic.solution[l] }
+            }
+        }.first()
+        val (wrong, marked, later) = case
+        val digit = classic.solution[later]
+        val start = GameState.new(classic).select(marked).toggleNotesMode().input(digit, true).toggleNotesMode()
+        val slipped = start.select(wrong).input(digit, true).select(later).input(digit, true)
+        val erased = slipped.eraseMistake(wrong)
+        assertEquals(0, erased.values[wrong])
+        assertFalse(DigitMask.contains(erased.notes[marked], digit))
     }
 
     @Test
