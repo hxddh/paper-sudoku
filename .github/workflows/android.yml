@@ -159,7 +159,8 @@ jobs:
       - name: Failed device tests
         if: failure()
         run: |
-          for f in $(find app/build/outputs/androidTest-results benchmark/build/outputs/androidTest-results -name "*.xml" 2>/dev/null); do
+          # Result files are named after the device ("TEST-test(AVD) - 16-_app-.xml"): read whole lines.
+          find app/build/outputs/androidTest-results benchmark/build/outputs/androidTest-results -name "*.xml" 2>/dev/null | while IFS= read -r f; do
             python3 - "$f" <<'PY'
           import sys, xml.etree.ElementTree as ET
           for case in ET.parse(sys.argv[1]).iter("testcase"):
