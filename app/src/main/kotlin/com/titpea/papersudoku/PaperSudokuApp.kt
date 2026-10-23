@@ -25,7 +25,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.layout.AnimatedPane
 import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
@@ -228,7 +228,7 @@ private fun NotebookHome(
     // Opening the app lands on today's page; back goes to the notebook.
     // A phone on its side is wide but short: one pane at a time, so the page gets the whole window
     // (and its board-beside-tools layout) instead of half of it.
-    val adaptiveInfo = currentWindowAdaptiveInfo()
+    val adaptiveInfo = currentWindowAdaptiveInfoV2()
     val directive = remember(adaptiveInfo) {
         val base = calculatePaneScaffoldDirective(adaptiveInfo)
         if (adaptiveInfo.windowSizeClass.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND)) {
