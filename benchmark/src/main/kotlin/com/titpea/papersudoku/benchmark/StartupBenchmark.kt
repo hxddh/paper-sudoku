@@ -50,7 +50,8 @@ class StartupBenchmark {
         // The benchmark build is minified like a release: a missing board is a failure, not a skip.
         val board = checkNotNull(device.wait(Until.findObject(By.res("sudoku-board")), 5_000)) { "No board on today's page" }
         val b = board.visibleBounds
-        val cell = b.width() / 9
+        // Today's daily is a 6×6 page: one tap per row, down the diagonal.
+        val cell = b.width() / 6
         // Select a cell, then write in it from the keypad: the frames measured include a digit
         // landing, its candidates being tidied, and the keypad's counts changing.
         for (i in 0 until 6) {

@@ -99,7 +99,11 @@ jobs:
           if [ -f "paper-sudoku-$version.apk" ]; then
             "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "paper-sudoku-$version.apk"
           else
-            jarsigner -verify "paper-sudoku-$version.aab"
+            # jarsigner exits 0 even for an unsigned jar; require its "verified" verdict. (-strict
+            # would also fail on the self-signed upload certificate's chain warnings.)
+            out=$(jarsigner -verify "paper-sudoku-$version.aab")
+            echo "$out"
+            echo "$out" | grep -q "^jar verified" || { echo "::error::The AAB is not signed"; exit 1; }
           fi
 
       - name: Create GitHub release
