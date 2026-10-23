@@ -12,6 +12,10 @@ name: Release
 #
 # It can also be started from the Actions tab (or the API) with a tag name; the release then
 # creates that tag on the commit being built.
+#
+# Before anything is built (tools/ci/release-preflight.sh): the tag must be v<versionName> or
+# v<versionName>-sideload, CHANGELOG.md must have notes for that version, and the commit must be
+# on main with a passing "Android CI" run (push to main) for that exact commit.
 on:
   push:
     tags: ["v*"]
@@ -23,7 +27,8 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: write # to create the release
+  actions: read # to read the Android CI runs in the preflight
 
 jobs:
   release:
@@ -32,8 +37,16 @@ jobs:
     env:
       TAG: ${{ inputs.tag || github.ref_name }}
     steps:
+      # The write token stays out of .git/config: only the release step receives it.
       - name: Check out
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Preflight (tag, version, notes, main, CI)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: sh tools/ci/release-preflight.sh "$TAG" "$GITHUB_SHA"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v6
