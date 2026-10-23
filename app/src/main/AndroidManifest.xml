@@ -55,8 +55,11 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/today_widget_info" />
         </receiver>
+        <!-- WorkManager's foreground service: the app never runs work in the foreground. The
+             class lives in WorkManager (a Glance dependency), which lint does not resolve here. -->
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"
+            tools:ignore="MissingClass"
             tools:node="remove" />
     </application>
 
