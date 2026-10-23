@@ -124,7 +124,7 @@ class DatabaseMigrationTest {
             for ((game, updatedAt) in listOf(daily to 7L, practice to 8L)) {
                 execSQL(
                     "INSERT INTO saved_games VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?)",
-                    arrayOf(
+                    arrayOf<Any?>(
                         game.spec.key, game.spec.kind.name, game.spec.difficulty.name, game.spec.number,
                         game.spec.epochDay, game.encode(), updatedAt, game.spec.givens.digits(), game.values.digits(),
                     ),
