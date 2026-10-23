@@ -57,14 +57,15 @@ import androidx.compose.ui.semantics.CollectionInfo
 import androidx.compose.ui.semantics.CollectionItemInfo
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.collectionInfo
 import androidx.compose.ui.semantics.collectionItemInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -300,7 +301,11 @@ private fun Loupe(game: GameState, index: () -> Int?, finger: () -> Offset?, boa
                 IntOffset(x.roundToInt(), y.roundToInt())
             }
             .size(diameter)
-            .testTag("loupe"),
+            .testTag("loupe")
+            // A sighted aid that lives only while a finger is down: TalkBack never aims, and the
+            // selected cell already says where the finger is. Hidden, it does not count as
+            // covering the cells under it.
+            .clearAndSetSemantics { hideFromAccessibility() },
         shape = CircleShape,
         color = PaperTheme.ink.sheet,
         shadowElevation = 6.dp,
