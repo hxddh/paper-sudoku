@@ -158,7 +158,7 @@
     <string name="page_pane">Page</string>
     <string name="cell_coach_answer">the Coach suggests %1$d</string>
     <string name="cell_coach_removes">the Coach rules out %1$s</string>
-    <string name="coach_step_progress">%1$s, %2$d of %3$d</string>
+    <string name="coach_step_why_spoken">Why, step %1$d of %2$d</string>
     <string name="look_claiming">On this line, one digit can only sit inside one box. Look at that box.</string>
     <string name="status_hint">Tap a cell, then a digit. Or hold and slide to zoom in.</string>
     <string name="list_separator">", "</string>
@@ -177,6 +177,7 @@
     <string name="box_bottom_right">the bottom-right box</string>
     <string name="widget_ready">Ready when you are</string>
     <string name="solved_level_up">Next pages are %1$s.</string>
+    <string name="solved_daily_waiting">Today’s page is waiting.</string>
     <string name="solved_daily_close">A new page tomorrow.</string>
     <string name="page_answer_shown">answer shown</string>
     <string name="contents_title">Contents</string>

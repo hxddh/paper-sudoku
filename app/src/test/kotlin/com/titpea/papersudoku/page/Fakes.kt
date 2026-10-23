@@ -28,6 +28,14 @@ class FakeGameStore : GameStore {
         savedFlow.update { it + (state.spec.key to (state to now)) }
     }
 
+    override suspend fun forget(puzzleKey: String) {
+        savedFlow.update { it - puzzleKey }
+    }
+
+    override suspend fun forgetUntouchedDailies() {
+        savedFlow.update { map -> map.filterValues { (g, _) -> !(g.spec.kind == PuzzleKind.Daily && g.untouched) } }
+    }
+
     override suspend fun saveSolved(state: GameState, result: GameResult, now: Long): Boolean {
         save(state, now)
         if (results.any { it.puzzleKey == result.puzzleKey }) return false

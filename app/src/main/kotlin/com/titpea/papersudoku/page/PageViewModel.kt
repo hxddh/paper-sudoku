@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
 
 /** Stable identity of what the page pane shows, used by the list-detail navigator. */
@@ -160,6 +161,16 @@ class PageViewModel(
         viewModelScope.launch {
             settingsStore.settings.collect { settings -> _state.update { it.copy(settings = settings) } }
         }
+        // Pages saved by earlier versions just for being opened are not begun.
+        viewModelScope.launch {
+            try {
+                store.forgetUntouchedDailies()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not tidy unbegun pages", e)
+            }
+        }
         // After process death, reopen the page that was on the desk.
         val open = savedState.get<String>(OPEN_PAGE)
         when {
@@ -246,6 +257,8 @@ class PageViewModel(
                 runningSince = running,
                 coach = if (boardChanged) null else it.coach,
                 justSolved = after.solved && !before.solved,
+                // A solve is dated now: an earlier day's page finished today points at today's.
+                today = if (after.solved && !before.solved) today() else it.today,
             ).withDerived()
         }
         scheduleSave()
@@ -296,7 +309,7 @@ class PageViewModel(
         val autoClear = _state.value.settings.autoClearNotes
         when (val hint = coach.hint) {
             is CoachHint.Next -> mutate { it.placeHint(hint.placement.index, hint.placement.digit, autoClear) }
-            is CoachHint.Mistake -> mutate { it.select(hint.index).erase() }
+            is CoachHint.Mistake -> mutate { it.eraseMistake(hint.index) }
             null -> Unit
         }
     }
@@ -310,9 +323,13 @@ class PageViewModel(
         val today = today()
         val previous = _state.value
         // Left open on a finished daily past midnight: the new day's page is the one to show. The
-        // reference day is the day the page was chosen, so it is not moved here.
+        // reference day is the day the page was chosen or solved, so it is not moved here; an
+        // older page only being looked at stays where it is.
         val game = previous.game
-        if (today > previous.today && game != null && game.solved && game.spec.epochDay == previous.today) {
+        val solvedOn = game?.solvedAt?.let { Instant.ofEpochMilli(it).atZone(clock.zone).toLocalDate().toEpochDay() }
+        if (today > previous.today && game != null && game.solved && game.spec.kind == PuzzleKind.Daily &&
+            (game.spec.epochDay == previous.today || solvedOn == previous.today)
+        ) {
             openDaily(today)
             return
         }
@@ -512,7 +529,9 @@ class PageViewModel(
     private suspend fun persist(game: GameState, notifyWidget: Boolean = false) {
         // A practice page set aside is never written back (a late save would revive it).
         if (game.spec.key == discardedKey && !game.solved) return
-        store.save(game, clock.millis())
+        // A daily only looked at is not begun: nothing is kept, so the notebook and the widget
+        // still offer it as a fresh page (and a page undone back to blank is fresh again).
+        if (game.spec.kind == PuzzleKind.Daily && game.untouched) store.forget(game.spec.key) else store.save(game, clock.millis())
         if (notifyWidget) notifyWidget(game)
     }
 

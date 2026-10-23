@@ -593,6 +593,8 @@ private fun solvedOutlook(game: GameState, state: PageUiState): Outlook? = when 
     }
     // Today's page closes with tomorrow's: a reason to come back, without a streak.
     game.spec.epochDay == state.today -> Outlook(stringResource(R.string.solved_daily_close))
+    // Finished a day late: today's page is already out.
+    (game.spec.epochDay ?: Long.MAX_VALUE) < state.today -> Outlook(stringResource(R.string.solved_daily_waiting))
     else -> null
 }
 
@@ -834,7 +836,15 @@ private fun handleKey(event: KeyEvent, state: PageUiState, onEvent: (PageEvent) 
             true
         }
         Key.H -> {
-            onEvent(if (state.coach == null) PageEvent.Coach else PageEvent.CoachDeeper)
+            // H does what the note's main button does, the answer's Place included.
+            val coach = state.coach
+            onEvent(
+                when {
+                    coach == null -> PageEvent.Coach
+                    coach.level < 3 -> PageEvent.CoachDeeper
+                    else -> PageEvent.CoachApply
+                },
+            )
             true
         }
         else -> {

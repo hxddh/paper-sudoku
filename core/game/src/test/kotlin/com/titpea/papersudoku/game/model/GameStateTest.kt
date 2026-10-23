@@ -61,6 +61,32 @@ class GameStateTest {
     }
 
     @Test
+    fun `a page only looked at is untouched, and undoing back to blank makes it so again`() {
+        val fresh = GameState.new(spec).select(empty).addElapsed(30_000)
+        assertTrue(fresh.untouched)
+        val written = fresh.input(answer, true)
+        assertFalse(written.untouched)
+        assertTrue(written.undo().untouched)
+        assertFalse(fresh.toggleNotesMode().input(1, true).untouched)
+        assertFalse(fresh.coachAsked().untouched)
+    }
+
+    @Test
+    fun `erasing a mistake gives back the pencil marks the wrong digit crossed out`() {
+        val wrong = (1..spec.size).first { it != answer }
+        val peer = spec.geometry.peers[empty].first { spec.givens[it] == 0 }
+        val noted = GameState.new(spec).select(peer).toggleNotesMode().input(wrong, true).toggleNotesMode()
+        val slip = noted.select(empty).input(wrong, true)
+        assertFalse(DigitMask.contains(slip.notes[peer], wrong))
+        val erased = slip.eraseMistake(empty)
+        assertEquals(0, erased.values[empty])
+        assertTrue(DigitMask.contains(erased.notes[peer], wrong))
+        // One undo takes the whole correction back.
+        assertEquals(slip.values, erased.undo().values)
+        assertEquals(slip.notes, erased.undo().notes)
+    }
+
+    @Test
     fun `undo walks back values notes and selection`() {
         val s0 = GameState.new(spec).select(empty)
         val s1 = s0.toggleNotesMode().input(1, true).input(2, true)

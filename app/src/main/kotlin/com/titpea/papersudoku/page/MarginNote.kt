@@ -184,7 +184,12 @@ private fun LevelSteps(coach: CoachUi) {
         stringResource(R.string.coach_step_why)
     }
     val labels = listOf(stringResource(R.string.coach_step_look), why, stringResource(R.string.coach_step_answer))
-    val progress = stringResource(R.string.coach_step_progress, labels[level - 1], level, labels.size)
+    // Said once, in words: "Why, step 2 of 3" (a written "2/3" is read as a fraction).
+    val progress = if (level == 2 && total > 1) {
+        stringResource(R.string.coach_step_why_spoken, coach.step + 1, total)
+    } else {
+        labels[level - 1]
+    }
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,

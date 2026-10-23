@@ -157,7 +157,7 @@
     <string name="cell_coach_answer">教练建议填 %1$d</string>
     <string name="cell_coach_removes">教练排除 %1$s</string>
     <string name="page_pane">页面</string>
-    <string name="coach_step_progress">%1$s（%2$d/%3$d）</string>
+    <string name="coach_step_why_spoken">原因，第 %1$d 步，共 %2$d 步</string>
     <string name="look_claiming">这条线上，某个数字只能落在一个宫里，看看那个宫。</string>
     <string name="status_hint">先点格子再点数字；按住滑动可放大选格。</string>
     <string name="list_separator">"，"</string>
@@ -176,6 +176,7 @@
     <string name="box_bottom_right">右下宫</string>
     <string name="widget_ready">随时开始</string>
     <string name="solved_level_up">下一页起是%1$s。</string>
+    <string name="solved_daily_waiting">今天的一页已经在等你了。</string>
     <string name="solved_daily_close">明天有新的一页。</string>
     <string name="page_answer_shown">看过答案</string>
     <string name="contents_title">目录</string>

@@ -49,6 +49,13 @@ data class GameState(
 
     fun isEditable(index: Int): Boolean = !solved && !isGiven(index)
 
+    /**
+     * Nothing done on the page yet: no digit or note written (or all undone) and the Coach never
+     * asked. Only looking at a page does not begin it.
+     */
+    val untouched: Boolean
+        get() = !solved && history.isEmpty() && coach.asks == 0 && values == spec.givens && notes.all { it == 0 }
+
     /** How many more times each digit 1..size can still be placed. Index 0 is unused. */
     val remaining: List<Int>
         get() {
@@ -98,6 +105,26 @@ data class GameState(
         if (!isEditable(index)) return this
         if (values[index] == 0 && notes[index] == 0) return this
         return remember().copy(values = values.replace(index, 0), notes = notes.replace(index, 0))
+    }
+
+    /**
+     * Takes back a wrong digit the Coach pointed out. Writing it had also crossed it out of the
+     * pencil marks of every empty cell it sees; those marks come back, so the cell's own answer is
+     * not left missing from its notes.
+     */
+    fun eraseMistake(index: Int): GameState {
+        if (!isEditable(index) || values[index] == 0) return this
+        val digit = values[index]
+        val before = history.lastOrNull { it.values[index] != digit }
+        val peers = spec.geometry.peers[index]
+        val restored = notes.mapIndexed { i, mask ->
+            if (before != null && i in peers && values[i] == 0 && DigitMask.contains(before.notes[i], digit)) {
+                mask or (1 shl digit)
+            } else {
+                mask
+            }
+        }
+        return remember().copy(values = values.replace(index, 0), notes = restored.replace(index, 0), selected = index)
     }
 
     fun undo(): GameState {

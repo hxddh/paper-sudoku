@@ -161,6 +161,17 @@ interface SavedGameDao {
 
     @Query("DELETE FROM saved_games WHERE kind = 'Classic' AND solved = 0 AND puzzleKey != :except")
     suspend fun discardUnsolvedPractice(except: String)
+
+    @Query("DELETE FROM saved_games WHERE puzzleKey = :puzzleKey")
+    suspend fun delete(puzzleKey: String)
+
+    /** Unsolved dailies with no digit written: the only rows that may hold a page never begun. */
+    @Query("SELECT puzzleKey FROM saved_games WHERE kind = 'Daily' AND solved = 0 AND grid = givens")
+    suspend fun unwrittenDailyKeys(): List<String>
+
+    /** Moves an unreadable row out of every query's way, under a key no page will ask for. */
+    @Query("UPDATE saved_games SET puzzleKey = :newKey, kind = 'Damaged' WHERE puzzleKey = :puzzleKey")
+    suspend fun setAside(puzzleKey: String, newKey: String)
 }
 
 private const val PAGE_COLUMNS = "puzzleKey, kind, difficulty, number, epochDay, solved, givens, grid"
