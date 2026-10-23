@@ -38,6 +38,16 @@ val FrauncesPen = FontFamily(fraunces(420, 36f, italic = true))
 /** Large dates and figures. */
 val FrauncesDisplay = FontFamily(fraunces(400, 96f), fraunces(600, 96f))
 
+/**
+ * The same cuts for code that draws with a Paint (widget, print), which would otherwise get the
+ * variable font's default instance: Fraunces 9pt Black.
+ */
+object FrauncesAxes {
+    const val PRINTED = "'wght' 560, 'opsz' 36"
+    const val PEN = "'wght' 420, 'opsz' 36"
+    const val DISPLAY = "'wght' 400, 'opsz' 96"
+}
+
 object PaperType {
     /** The date on a page corner, e.g. "21". */
     val pageNumeral = TextStyle(

@@ -41,12 +41,12 @@ upload key separate from the app-signing key.
 
 ## Tagged release (CI)
 
-**Sideload (no secrets needed):** `git tag v2.0.0-sideload && git push origin v2.0.0-sideload`
+**Sideload (no secrets needed):** `git tag v7.0.0-sideload && git push origin v7.0.0-sideload`
 publishes an APK signed with the CI runner's debug key. Each sideload build has a different key,
 so testers uninstall before updating. Not for Play.
 
 Without tag-push access, run the **Release** workflow from the Actions tab with the tag name
-(for example `v2.0.0-sideload`); it creates the tag on the commit it builds.
+(for example `v7.0.0-sideload`); it creates the tag on the commit it builds.
 
 **Signed (Play-ready):**
 
@@ -55,11 +55,14 @@ Store the upload key as repository secrets, then push a tag:
 ```bash
 base64 -w0 paper-sudoku-upload.jks   # → PAPER_SUDOKU_KEYSTORE_BASE64
 # also: PAPER_SUDOKU_STORE_PASSWORD, PAPER_SUDOKU_KEY_ALIAS, PAPER_SUDOKU_KEY_PASSWORD
-git tag v2.0.0 && git push origin v2.0.0
+git tag v7.0.0 && git push origin v7.0.0
 ```
 
-`.github/workflows/release.yml` runs the tests and lint, builds the signed APK and AAB, and
-attaches both to a GitHub release with `CHANGELOG.md` as notes. Without the secrets the workflow
+`.github/workflows/release.yml` runs the tests and lint, builds the signed AAB and attaches it
+alone to a GitHub release with `CHANGELOG.md` as notes. No APK is published for a plain tag:
+under Play App Signing, Play re-signs the app, so an upload-key APK could neither update from Play
+nor be updated by it. Either kind of tag first checks the release APK with `tools/ci/check-apk.sh`
+(permissions exactly as `tools/ci/permissions.allowed`, Baseline Profile packaged). Without the secrets the workflow
 stops with an error instead of publishing an unsigned or debug-signed build.
 
 Upgrading from the 1.0 sideload APK: that APK was signed with a local debug key. Android will not

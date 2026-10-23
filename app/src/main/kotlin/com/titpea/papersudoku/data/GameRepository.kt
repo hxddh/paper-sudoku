@@ -71,7 +71,6 @@ interface GameStore {
     suspend fun saveSolved(state: GameState, result: GameResult, now: Long): Boolean
 
     suspend fun nextClassicNumber(difficulty: Difficulty): Int
-    suspend fun pruneUnsolvedDailies(beforeEpochDay: Long)
 
     /** Drops unfinished practice pages other than [except]; numbering continues past them. */
     suspend fun discardUnsolvedPractice(except: String)
@@ -138,9 +137,6 @@ class RoomGameStore(
     // so a page that came out easier can never be dealt twice.
     override suspend fun nextClassicNumber(difficulty: Difficulty): Int =
         (savedGames.maxClassicNumber(Catalog.classicPrefix(difficulty)) ?: -1) + 1
-
-    override suspend fun pruneUnsolvedDailies(beforeEpochDay: Long) =
-        savedGames.pruneUnsolvedDailies(beforeEpochDay)
 
     override suspend fun discardUnsolvedPractice(except: String) =
         savedGames.discardUnsolvedPractice(except)

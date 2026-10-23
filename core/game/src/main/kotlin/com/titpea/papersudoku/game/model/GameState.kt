@@ -167,6 +167,9 @@ data class GameState(
 
         /** A readable but damaged save is refused rather than crashing later (remaining, undo). */
         private fun GameState.isConsistent(): Boolean {
+            // The puzzle itself first: a size the board can't have, givens that disagree with the
+            // solution or a solution out of range would throw as soon as the page is shown.
+            if (runCatching { spec.puzzle.geometry }.isFailure) return false
             val cells = spec.cellCount
             val digits = 0..spec.size
             val noteMask = (1 shl (spec.size + 1)) - 1
@@ -178,7 +181,9 @@ data class GameState(
                 values.indices.all { spec.givens[it] == 0 || values[it] == spec.givens[it] } &&
                 (lockedDigit == null || lockedDigit in 1..spec.size) &&
                 history.all { boardOk(it.values, it.notes, it.selected) } &&
-                coach.deepest in 0..3 && elapsedMillis >= 0
+                coach.deepest in 0..3 && elapsedMillis >= 0 &&
+                // "Solved" with a wrong board would lock it for good.
+                (!solved || values == spec.solution)
         }
     }
 }

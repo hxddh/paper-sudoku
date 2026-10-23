@@ -1,6 +1,6 @@
 # Paper Sudoku — Privacy Policy
 
-Last updated: 2026-10-22 (version 6.0)
+Last updated: 2026-10-23 (version 7.0)
 
 Paper Sudoku is an offline puzzle game. It does not require an account, does not contain ads or
 analytics, and does not request the `INTERNET` permission.
@@ -26,11 +26,18 @@ uses Android's print service and the printer or "Save as PDF" target you pick.
 
 ## Permissions and sharing
 
-The app does not request network, location, contacts, camera, microphone, or advertising
-permissions. The home-screen widget relies on Android's job scheduler, which brings two system
-permissions with it: keeping the device awake briefly while the widget redraws, and restoring
-scheduled redraws after a restart. Neither gives access to any data. The app does not share data
-with third parties.
+The app does not request network, location, contacts, camera, microphone, notification or
+advertising permissions. It asks Android for exactly three, all brought in by the job scheduler
+the home-screen widget uses to redraw at midnight:
+
+- `WAKE_LOCK` — keeps the device awake for the moment the widget redraws;
+- `RECEIVE_BOOT_COMPLETED` — restores the scheduled redraw after the phone restarts;
+- `com.titpea.papersudoku.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` — a permission the app
+  defines for itself (AndroidX adds it) so that only the app can message its own internal
+  receivers.
+
+None of them gives access to any data. The app does not run foreground services. A build check
+fails if the app ever asks for anything else. The app does not share data with third parties.
 
 ## Children
 

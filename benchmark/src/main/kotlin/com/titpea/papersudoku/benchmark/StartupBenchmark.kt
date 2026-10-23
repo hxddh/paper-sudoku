@@ -15,7 +15,7 @@ import org.junit.runner.RunWith
 
 /**
  * Cold start to today's page, with the shipped Baseline Profile applied (CompilationMode.Partial),
- * and the frame timing of writing on the board.
+ * and the frame timing of writing digits on the board.
  */
 @RunWith(AndroidJUnit4::class)
 class StartupBenchmark {
@@ -50,9 +50,15 @@ class StartupBenchmark {
         // The benchmark build is minified like a release: a missing board is a failure, not a skip.
         val board = checkNotNull(device.wait(Until.findObject(By.res("sudoku-board")), 5_000)) { "No board on today's page" }
         val b = board.visibleBounds
+        // Today's daily is a 6×6 page: one tap per row, down the diagonal.
         val cell = b.width() / 6
+        // Select a cell, then write in it from the keypad: the frames measured include a digit
+        // landing, its candidates being tidied, and the keypad's counts changing.
         for (i in 0 until 6) {
             device.click(b.left + cell / 2 + i * cell, b.top + cell / 2 + i * cell)
+            device.waitForIdle()
+            val key = checkNotNull(device.findObject(By.res("keypad-${i + 1}"))) { "No keypad on today's page" }
+            key.click()
             device.waitForIdle()
         }
     }

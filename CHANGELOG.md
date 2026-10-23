@@ -1,5 +1,47 @@
 # Changelog
 
+## 7.0.0
+
+What the app says, it does: the Coach's every word checked against the board, the notebook keeps
+everything, and the privacy policy lists exactly what the app asks Android for.
+
+**Fixed**
+- The Coach no longer says "only one option left" for a hidden single; it says where the digit has
+  only one place to go. Every crossing-out it shows is one its technique really allows, worked out
+  on your own board; a pair or an X-Wing no longer marks candidates it does not rule out.
+- The Coach's ink line points at the row, column or box it is talking about, not across every unit
+  it mentions; those units are outlined on the board.
+- A daily page is always the level the calendar promises (about one weekend page in a hundred was
+  easier or harder). Those days now have a new puzzle; pages you have started or finished are kept.
+- The handbook records every technique a solved page needed, not only the hardest.
+- The stamp lands once per page: turning the phone or coming back no longer replays it.
+- Taps and the keypad land in the right place in right-to-left languages.
+- A damaged save (an impossible puzzle size, or a page marked solved with the wrong digits) is
+  set aside instead of opened.
+- Pen and printed digits use the weights designed for them, on the board, the widget and in print.
+
+**Changed**
+- Unfinished daily pages are kept for good; nothing in the notebook is deleted any more.
+- The notebook has a contents page: the month as a grid of days, each marked clean, coached or
+  begun. Earlier pages are grouped under month headings that stay in view.
+- Boxes have names: "top right box", 右上宫, 中宫.
+- The Coach shows "Why 2/3" with its steps; once it has helped, its button reads "Back to the
+  page". A page whose answer was shown says so in its header.
+- The solved note says what comes next: the practice level you reached, how many clean pages to
+  the next, or that tomorrow brings a new page. The stamp lands with a tap of haptics.
+- Clearer colour on the board: a firmer selection, crossings-out in the Coach's red, darker box
+  lines at night, and a wider board on phones and in landscape.
+- In Chinese, "clean" pages are 干净完成.
+- The widget says "Ready when you are" before you start.
+
+**Under the hood**
+- The app asks for exactly three permissions (keeping the device awake for a moment, restoring
+  the widget's midnight redraw after a restart, and one AndroidX defines for its own receivers),
+  and a build check fails on anything else. The foreground service a library brought in is gone.
+- Plain release tags publish the Play AAB only.
+- UI tests run Compose's accessibility checks; the benchmark writes digits from the keypad.
+- Licences now credit Okio.
+
 ## 6.0.0
 
 Right, then refined: three real bugs fixed, a new icon, and every screen brought to one standard.

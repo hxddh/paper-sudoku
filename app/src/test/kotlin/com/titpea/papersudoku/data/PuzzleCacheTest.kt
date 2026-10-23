@@ -18,7 +18,7 @@ class PuzzleCacheTest {
     @get:Rule
     val folder = TemporaryFolder()
 
-    private val version = "-v${Catalog.GENERATOR_VERSION}.json"
+    private val version = "-v${Catalog.GENERATOR_VERSION}.${Catalog.REVISION}.json"
 
     @Test
     fun `pages are generated once, then read back`() = runBlocking {

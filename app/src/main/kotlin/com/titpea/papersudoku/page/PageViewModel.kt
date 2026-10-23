@@ -14,6 +14,7 @@ import com.titpea.papersudoku.data.GameStore
 import com.titpea.papersudoku.data.SettingsStore
 import com.titpea.papersudoku.data.UserSettings
 import com.titpea.papersudoku.engine.CoachHint
+import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.engine.Step
 import com.titpea.papersudoku.engine.SudokuEngine
 import com.titpea.papersudoku.game.model.Catalog
@@ -76,9 +77,17 @@ data class PageUiState(
     val today: Long = 0,
     /** True only right after the solving move, so the stamp lands once. */
     val justSolved: Boolean = false,
+    /** Where practice stands after the practice page on the desk was solved. */
+    val practiceAfter: PracticeOutcome? = null,
 ) {
     val boardLocked: Boolean get() = loading || game?.solved != false
 }
+
+/**
+ * Practice after a solve: the level the next page is dealt at, how many clean pages remain before
+ * the one after it (null at the top), and whether this solve moved the level up.
+ */
+data class PracticeOutcome(val level: Difficulty, val remaining: Int?, val leveledUp: Boolean)
 
 sealed interface PageEvent {
     data class Tap(val index: Int) : PageEvent
@@ -150,9 +159,6 @@ class PageViewModel(
     init {
         viewModelScope.launch {
             settingsStore.settings.collect { settings -> _state.update { it.copy(settings = settings) } }
-        }
-        viewModelScope.launch {
-            store.pruneUnsolvedDailies(today() - KEEP_UNFINISHED_DAILY_DAYS)
         }
         // After process death, reopen the page that was on the desk.
         val open = savedState.get<String>(OPEN_PAGE)
@@ -321,7 +327,8 @@ class PageViewModel(
 
     private fun onBackground() {
         foreground = false
-        _state.update { it.copy(game = foldClock(it), runningSince = null) }
+        // Leaving ends the landing: coming back shows the stamp already on the page.
+        _state.update { it.copy(game = foldClock(it), runningSince = null, justSolved = false) }
         saveNow(notifyWidget = true)
     }
 
@@ -345,6 +352,7 @@ class PageViewModel(
                 coach = null,
                 runningSince = if (foreground) ticker() else null,
                 justSolved = false,
+                practiceAfter = null,
             ).withDerived()
         }
         saveNow()
@@ -373,8 +381,12 @@ class PageViewModel(
         load { openablePractice() }
     }
 
-    private suspend fun openablePractice(): GameState =
-        store.latestUnsolvedPracticeKey()?.let { store.load(it) } ?: newPractice()
+    private suspend fun openablePractice(): GameState {
+        // A page still being dealt is the one to continue: wait for it, so the page it replaces
+        // (already set aside) is never offered again in the meantime.
+        practiceDeal?.takeIf { it.isActive }?.let { runCatching { it.await() } }
+        return store.latestUnsolvedPracticeKey()?.let { store.load(it) } ?: newPractice()
+    }
 
     /**
      * The page asked for is the one already in memory: if another page was being prepared, stop
@@ -446,6 +458,7 @@ class PageViewModel(
                 coach = null,
                 runningSince = if (foreground && !next.solved) ticker() else null,
                 justSolved = false,
+                practiceAfter = null,
             ).withDerived()
         }
         savedState[OPEN_PAGE] = next.spec.key
@@ -485,7 +498,14 @@ class PageViewModel(
                 clock.millis(),
             )
             notifyWidget(game)
-            updateSettings { it.copy(techniquesMet = it.techniquesMet + spec.hardest) }
+            if (spec.kind == PuzzleKind.Classic) {
+                val clean = store.cleanPractice.first()
+                val level = Practice.level(clean)
+                val outcome = PracticeOutcome(level, Practice.remainingToAdvance(clean), leveledUp = level > spec.difficulty)
+                _state.update { if (it.game?.spec?.key == spec.key) it.copy(practiceAfter = outcome) else it }
+            }
+            // Every technique the page needed, not only its hardest.
+            updateSettings { it.copy(techniquesMet = it.techniquesMet + spec.techniquesUsed) }
         }
     }
 
@@ -543,7 +563,6 @@ class PageViewModel(
 
     companion object {
         private const val SAVE_DEBOUNCE_MILLIS = 400L
-        private const val KEEP_UNFINISHED_DAILY_DAYS = 365L
         private const val OPEN_PAGE = "open_page"
         private const val CLASSIC_PREFIX = "classic-"
         private const val TAG = "PageViewModel"

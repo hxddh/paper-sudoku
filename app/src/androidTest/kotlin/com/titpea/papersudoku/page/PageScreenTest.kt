@@ -3,11 +3,13 @@ package com.titpea.papersudoku.page
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -15,14 +17,16 @@ import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.test.espresso.accessibility.AccessibilityChecks
 import com.titpea.papersudoku.designsystem.SudokuTheme
 import com.titpea.papersudoku.game.model.GameState
 import org.junit.Assert.assertEquals
@@ -38,9 +42,11 @@ class PageScreenTest {
 
     private val spec = Fixtures.daily
 
+    // Compose's own Accessibility Test Framework checks: they run on every perform* action
+    // (Espresso's checks never saw Compose content).
     @Before
     fun enableAccessibilityChecks() {
-        AccessibilityChecks.enable().setRunChecksFromRootView(true)
+        composeRule.enableAccessibilityChecks()
     }
 
     private fun show(
@@ -48,17 +54,20 @@ class PageScreenTest {
         events: MutableList<PageEvent> = mutableListOf(),
         onBack: (() -> Unit)? = {},
         wide: Boolean = false,
+        direction: LayoutDirection = LayoutDirection.Ltr,
     ) {
         composeRule.setContent {
             SudokuTheme(darkTheme = false) {
-                Box(if (wide) Modifier.requiredSize(1000.dp, 600.dp) else Modifier.fillMaxSize()) {
-                    PageScreen(
-                        state = state,
-                        onEvent = { events += it },
-                        onBack = onBack,
-                        onPrint = {},
-                        onShare = {},
-                    )
+                CompositionLocalProvider(LocalLayoutDirection provides direction) {
+                    Box(if (wide) Modifier.requiredSize(1000.dp, 600.dp) else Modifier.fillMaxSize()) {
+                        PageScreen(
+                            state = state,
+                            onEvent = { events += it },
+                            onBack = onBack,
+                            onPrint = {},
+                            onShare = {},
+                        )
+                    }
                 }
             }
         }
@@ -87,6 +96,23 @@ class PageScreenTest {
             listOf(PageEvent.Tap(Fixtures.firstEmpty), PageEvent.Digit(1), PageEvent.ToggleNotes, PageEvent.Coach),
             events,
         )
+    }
+
+    // A puzzle grid and a keypad read the same in every language: under a right-to-left locale a
+    // tap on the top-left cell must still select cell 0, and the keypad must still start at 1.
+    @Test
+    fun rightToLeftLayoutKeepsTheBoardAndKeypadInPlace() {
+        val events = mutableListOf<PageEvent>()
+        show(Fixtures.page(), events, direction = LayoutDirection.Rtl)
+        val board = composeRule.onNodeWithTag("sudoku-board")
+        val bounds = board.getUnclippedBoundsInRoot()
+        val cellPx = with(composeRule.density) { (bounds.right - bounds.left).toPx() } / 6f
+        board.performTouchInput { click(Offset(cellPx * 0.5f, cellPx * 0.5f)) }
+        board.performTouchInput { click(Offset(cellPx * 5.5f, cellPx * 0.5f)) }
+        val keypad = composeRule.onNodeWithTag("keypad").getUnclippedBoundsInRoot()
+        val one = composeRule.onNodeWithTag("keypad-1").getUnclippedBoundsInRoot()
+        assertTrue("keypad-1 sits at the left edge", one.left - keypad.left < keypad.right - one.right)
+        assertEquals(listOf<PageEvent>(PageEvent.Tap(0), PageEvent.Tap(5)), events)
     }
 
     @Test

@@ -52,6 +52,7 @@ import androidx.glance.unit.ColorProvider as GlanceColor
 import com.titpea.papersudoku.MainActivity
 import com.titpea.papersudoku.R
 import com.titpea.papersudoku.SudokuApplication
+import com.titpea.papersudoku.designsystem.FrauncesAxes
 import com.titpea.papersudoku.data.PageSummary
 import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.GameState
@@ -99,7 +100,7 @@ class TodayWidget : GlanceAppWidget() {
             val page = saved ?: blank
             val status = context.getString(
                 when {
-                    saved == null -> R.string.page_blank
+                    saved == null -> R.string.widget_ready
                     page.solved -> R.string.widget_stamped
                     else -> R.string.page_in_progress
                 },
@@ -148,7 +149,8 @@ class TodayWidget : GlanceAppWidget() {
         private val Wide = DpSize(220.dp, 110.dp)
 
         private val Paper = ColorProvider(day = Color(0xFFF4EFE5), night = Color(0xFF14130F))
-        private val Sheet = ColorProvider(day = Color(0xFFFFFDF8), night = Color(0xFF0F0E0A))
+        // A step lighter than the widget's paper at night too, as in the app.
+        private val Sheet = ColorProvider(day = Color(0xFFFFFDF8), night = Color(0xFF1C1A16))
         private val InkColor = ColorProvider(day = Color(0xFF1F1C18), night = Color(0xFFEDE6DA))
         private val Muted = ColorProvider(day = Color(0xFF5F574C), night = Color(0xFFCFC5B5))
         private val Accent = ColorProvider(day = Color(0xFFA8442F), night = Color(0xFFEFA489))
@@ -240,6 +242,7 @@ class PageLayers(val grid: Bitmap, val printed: Bitmap, val pen: Bitmap) {
                 paint.textAlign = Paint.Align.CENTER
                 paint.textSize = cell * 0.6f
                 paint.typeface = if (given) printedFace else penFace
+                paint.setFontVariationSettings(if (given) FrauncesAxes.PRINTED else FrauncesAxes.PEN)
                 for (index in 0 until size * size) {
                     val value = page.valueAt(index)
                     if (value == 0 || page.isGiven(index) != given) continue
@@ -295,6 +298,7 @@ class Numeral(val bitmap: Bitmap, val width: Dp, val height: Dp) {
             val density = context.resources.displayMetrics.density
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 typeface = ResourcesCompat.getFont(context, R.font.fraunces) ?: Typeface.SERIF
+                setFontVariationSettings(FrauncesAxes.DISPLAY)
                 textSize = SIZE_DP * density
                 fontFeatureSettings = "lnum"
             }

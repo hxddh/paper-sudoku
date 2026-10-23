@@ -1,0 +1,7 @@
+# Every permission the release APK may request, and why. PRIVACY.md lists the same.
+# WorkManager (under the Glance widget): hold the CPU while the widget redraws.
+android.permission.WAKE_LOCK
+# WorkManager: put scheduled widget redraws back after a restart.
+android.permission.RECEIVE_BOOT_COMPLETED
+# AndroidX core: a signature-level permission that keeps the app's own runtime receivers private.
+com.titpea.papersudoku.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION

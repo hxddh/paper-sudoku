@@ -45,18 +45,10 @@ jobs:
         run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease :benchmark:assembleBenchmark -PpaperSudoku.sideload=true
 
       # The hand-written Baseline Profile must survive R8 and land in the APK for profileinstaller.
-      - name: Baseline Profile is packaged
-        run: unzip -l app/build/outputs/apk/release/app-release.apk | grep -E "assets/dexopt/baseline\.prof$"
-
-      # The app promises no network: the merged manifest (libraries included) must agree.
-      - name: No network permissions
-        run: |
-          perms=$("$ANDROID_HOME/build-tools/37.0.0/aapt2" dump permissions app/build/outputs/apk/release/app-release.apk)
-          echo "$perms"
-          if echo "$perms" | grep -E "android.permission.(INTERNET|ACCESS_NETWORK_STATE)"; then
-            echo "::error::The release APK requests a network permission"
-            exit 1
-          fi
+      # The app promises no network and nothing in the background beyond the widget: the merged
+      # manifest (libraries included) must ask for exactly tools/ci/permissions.allowed.
+      - name: Permissions and Baseline Profile
+        run: sh tools/ci/check-apk.sh app/build/outputs/apk/release/app-release.apk
 
       - name: Run lint
         run: ./gradlew --no-daemon :app:lintDebug
@@ -167,7 +159,8 @@ jobs:
       - name: Failed device tests
         if: failure()
         run: |
-          for f in $(find app/build/outputs/androidTest-results benchmark/build/outputs/androidTest-results -name "*.xml" 2>/dev/null); do
+          # Result files are named after the device ("TEST-test(AVD) - 16-_app-.xml"): read whole lines.
+          find app/build/outputs/androidTest-results benchmark/build/outputs/androidTest-results -name "*.xml" 2>/dev/null | while IFS= read -r f; do
             python3 - "$f" <<'PY'
           import sys, xml.etree.ElementTree as ET
           for case in ET.parse(sys.argv[1]).iter("testcase"):

@@ -159,9 +159,6 @@ interface SavedGameDao {
     )
     suspend fun maxClassicNumber(prefix: String): Int?
 
-    @Query("DELETE FROM saved_games WHERE kind = 'Daily' AND solved = 0 AND epochDay < :beforeEpochDay")
-    suspend fun pruneUnsolvedDailies(beforeEpochDay: Long)
-
     @Query("DELETE FROM saved_games WHERE kind = 'Classic' AND solved = 0 AND puzzleKey != :except")
     suspend fun discardUnsolvedPractice(except: String)
 }

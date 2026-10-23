@@ -21,8 +21,9 @@ signing secrets exist (see [docs/release.md](docs/release.md)).
 ## What it is
 
 - **A notebook, not a menu.** Today's 6×6 page on top (gentle on weekdays, steady at the
-  weekend), the practice stack, the technique handbook, then every earlier day since you started. Stamped pages show their time; there is no
-  streak.
+  weekend), the practice stack, the month's contents at a glance, the technique handbook, then
+  every earlier day since you started, unfinished ones included. Stamped pages show their time;
+  there is no streak.
 - **Practice that follows you.** One never-ending stack of 9×9 pages whose difficulty rises after
   three pages solved without the Coach's answer — singles, then pointing and pairs, then hidden
   pairs and X-Wings.
@@ -70,9 +71,9 @@ review the images and commit them as the new goldens.
 :benchmark     Android test Macrobenchmark: cold start to today's page, writing frames
 ```
 
-- Home is a Navigation 3 back stack (Notebook, Settings). The notebook is a Material 3 adaptive
+- Home is a Navigation 3 back stack (Notebook, Settings, Licences). The notebook is a Material 3 adaptive
   `NavigableListDetailPaneScaffold`: pages list and open page, one pane or two.
-- `GameState` is immutable and saved as JSON in Room after every move, with the printed and
+- `GameState` is immutable and saved as JSON in Room within 0.4s of a move and on leaving, with the printed and
   current digits beside it for the notebook (schema 3); a solve is saved and recorded in one
   transaction, once per puzzle. Upcoming pages are generated ahead into a disk cache.
 - One custom-drawn surface (the board); everything else is Material 3 / Expressive.

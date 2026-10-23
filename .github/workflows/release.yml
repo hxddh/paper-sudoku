@@ -1,10 +1,14 @@
 name: Release
 
 # Push a tag to publish a GitHub release:
-# - v2.0.0           → signed with the private upload key (APK + AAB). Requires the secrets
-#                      PAPER_SUDOKU_KEYSTORE_BASE64, PAPER_SUDOKU_STORE_PASSWORD,
-#                      PAPER_SUDOKU_KEY_ALIAS, PAPER_SUDOKU_KEY_PASSWORD (see docs/release.md).
-# - v2.0.0-sideload  → APK signed with the runner's debug key, for sideload testing only.
+# - v7.0.0           → AAB signed with the private upload key, for Google Play only. No APK is
+#                      published: under Play App Signing, Play re-signs the app with its own key,
+#                      so an upload-key APK could never update from Play, nor Play update it.
+#                      Requires the secrets PAPER_SUDOKU_KEYSTORE_BASE64,
+#                      PAPER_SUDOKU_STORE_PASSWORD, PAPER_SUDOKU_KEY_ALIAS,
+#                      PAPER_SUDOKU_KEY_PASSWORD (see docs/release.md).
+# - v7.0.0-sideload  → APK signed with the runner's debug key, for sideload testing only.
+# Either way the APK built is checked (permissions, Baseline Profile) before anything is published.
 #
 # It can also be started from the Actions tab (or the API) with a tag name; the release then
 # creates that tag on the commit being built.
@@ -14,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag, e.g. v2.0.0-sideload"
+        description: "Release tag, e.g. v7.0.0-sideload"
         required: true
         type: string
 
@@ -73,23 +77,34 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
           echo "PAPER_SUDOKU_KEYSTORE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
 
-      - name: Build signed APK and AAB
+      - name: Build signed AAB
         if: ${{ !endsWith(env.TAG, '-sideload') }}
         env:
           PAPER_SUDOKU_STORE_PASSWORD: ${{ secrets.PAPER_SUDOKU_STORE_PASSWORD }}
           PAPER_SUDOKU_KEY_ALIAS: ${{ secrets.PAPER_SUDOKU_KEY_ALIAS }}
           PAPER_SUDOKU_KEY_PASSWORD: ${{ secrets.PAPER_SUDOKU_KEY_PASSWORD }}
         run: |
+          # The APK is built only to check it; it is not published.
           ./gradlew --no-daemon :app:assembleRelease :app:bundleRelease
           version="${TAG#v}"
-          cp app/build/outputs/apk/release/app-release.apk "paper-sudoku-$version.apk"
           cp app/build/outputs/bundle/release/app-release.aab "paper-sudoku-$version.aab"
           sh tools/ci/changelog-section.sh "$version" CHANGELOG.md > release-notes.md
+
+      - name: Check the build (permissions, Baseline Profile)
+        run: sh tools/ci/check-apk.sh app/build/outputs/apk/release/app-release.apk
 
       - name: Verify signature
         run: |
           version="${TAG#v}"
-          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "paper-sudoku-$version.apk"
+          if [ -f "paper-sudoku-$version.apk" ]; then
+            "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "paper-sudoku-$version.apk"
+          else
+            # jarsigner exits 0 even for an unsigned jar; require its "verified" verdict. (-strict
+            # would also fail on the self-signed upload certificate's chain warnings.)
+            out=$(jarsigner -verify "paper-sudoku-$version.aab")
+            echo "$out"
+            echo "$out" | grep -q "^jar verified" || { echo "::error::The AAB is not signed"; exit 1; }
+          fi
 
       - name: Create GitHub release
         env:

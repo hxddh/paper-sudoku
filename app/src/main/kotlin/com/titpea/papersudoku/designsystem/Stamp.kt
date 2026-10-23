@@ -12,6 +12,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -47,21 +52,25 @@ fun InkStamp(
     size: Dp = 168.dp,
     animate: Boolean = true,
     seed: Int = 0,
+    /** Called once when the stamp comes to rest (for the landing's haptic). */
+    onLanded: () -> Unit = {},
 ) {
     val hand = remember(seed) { java.util.Random(seed.toLong()) }
     val tilt = remember(seed) { -14f + 8f * hand.nextFloat() }
     val nudgeX = remember(seed) { (hand.nextFloat() - 0.5f) * 12f }
     val nudgeY = remember(seed) { (hand.nextFloat() - 0.5f) * 12f }
     val night = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val scale = remember { Animatable(if (animate) 1.6f else 1f) }
-    val alpha = remember { Animatable(if (animate) 0f else 1f) }
-    LaunchedEffect(animate) {
-        if (!animate) return@LaunchedEffect
-        alpha.animateTo(1f, spring(stiffness = Spring.StiffnessMedium))
-    }
-    LaunchedEffect(animate) {
-        if (!animate) return@LaunchedEffect
+    // Landed once, landed for good: the flag survives rotation, so a turned phone never stamps
+    // the page a second time.
+    var landed by rememberSaveable { mutableStateOf(!animate) }
+    val scale = remember { Animatable(if (landed) 1f else 1.6f) }
+    val alpha = remember { Animatable(if (landed) 1f else 0f) }
+    LaunchedEffect(Unit) {
+        if (landed) return@LaunchedEffect
+        launch { alpha.animateTo(1f, spring(stiffness = Spring.StiffnessMedium)) }
         scale.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow))
+        landed = true
+        onLanded()
     }
     Box(
         modifier = modifier

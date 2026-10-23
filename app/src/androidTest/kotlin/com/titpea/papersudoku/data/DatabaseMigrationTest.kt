@@ -118,14 +118,12 @@ class DatabaseMigrationTest {
             assertNull(store.load(practice.spec.key))
             assertEquals(2, store.nextClassicNumber(Difficulty.Gentle))
 
-            // Unfinished dailies before the cut-off are pruned; the day itself is kept.
+            // Unfinished dailies are kept, however old: the notebook never loses a started page.
             val old = GameState.new(Catalog.daily(100))
             val kept = GameState.new(Catalog.daily(101))
             store.save(old, now = 1)
             store.save(kept, now = 1)
-            store.pruneUnsolvedDailies(beforeEpochDay = 101)
-            assertNull(store.load(old.spec.key))
-            assertEquals(listOf(kept.spec.key), store.dailies(0).first().map { it.key })
+            assertEquals(listOf(kept.spec.key, old.spec.key), store.dailies(0).first().map { it.key })
 
             // A solve is saved and recorded together, once; answered solves are not clean.
             val result = GameResult(next.spec.key, PuzzleKind.Classic, Difficulty.Gentle, 300, 1, 3, 10, null)

@@ -29,7 +29,15 @@ data class PuzzleSpec(
     val epochDay: Long? = null,
     /** Sequence number of a Classic within its difficulty. */
     val number: Int? = null,
+    /**
+     * Every technique a logical solve of this page uses (the hardest is [hardest]). Empty in pages
+     * saved before 7.0; read [techniquesUsed] instead.
+     */
+    val techniques: Set<Technique> = emptySet(),
 ) {
+    /** The techniques this page needs, falling back to the hardest for older saves. */
+    val techniquesUsed: Set<Technique> get() = techniques.ifEmpty { setOf(hardest) }
+
     val puzzle: Puzzle get() = Puzzle(size, boxRows, boxCols, givens, solution)
     val geometry: Geometry get() = Geometry.of(size, boxRows, boxCols)
     val cellCount: Int get() = size * size
@@ -41,6 +49,15 @@ data class PuzzleSpec(
 object Catalog {
     /** Bump when the generator changes; part of every seed. */
     const val GENERATOR_VERSION: Long = 3
+
+    /**
+     * Bump when what the catalog deals for a seed changes without the seeds changing (7.0: a daily
+     * that misses its level is dealt again; specs carry their techniques). Part of the cache key.
+     */
+    const val REVISION: Int = 1
+
+    /** A weekend daily that comes out easier is dealt again from a derived seed, this many times. */
+    private const val DAILY_RETRIES = 8
 
     /** Weekdays are gentle; the weekend Mini needs one elimination idea. */
     fun dailyDifficulty(epochDay: Long): Difficulty {
@@ -60,7 +77,17 @@ object Catalog {
 
     fun daily(epochDay: Long): PuzzleSpec {
         val difficulty = dailyDifficulty(epochDay)
-        val generated = PuzzleGenerator(Geometry.Mini).generate(seed(1, epochDay), difficulty)
+        val generator = PuzzleGenerator(Geometry.Mini)
+        val base = seed(1, epochDay)
+        // The generator settles for its best try when it never reaches the level; a weekend page
+        // must need its elimination idea, so the day is dealt again (the first try is unchanged,
+        // so every day that already matched keeps its puzzle).
+        var generated = generator.generate(base, difficulty)
+        var attempt = 1L
+        while (generated.grade.difficulty != difficulty && attempt <= DAILY_RETRIES) {
+            generated = generator.generate(SplitMix64.mix(base xor attempt), difficulty)
+            attempt++
+        }
         return spec(dailyKey(epochDay), PuzzleKind.Daily, generated, epochDay = epochDay)
     }
 
@@ -98,6 +125,7 @@ object Catalog {
             solution = p.solution,
             epochDay = epochDay,
             number = number,
+            techniques = generated.grade.techniques,
         )
     }
 }
