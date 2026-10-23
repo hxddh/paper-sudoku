@@ -155,4 +155,19 @@ class GameStateTest {
         assertEquals("classic-steady-", Catalog.classicPrefix(Difficulty.Steady))
         assertTrue(Catalog.classicKey(Difficulty.Steady, 3).startsWith(Catalog.classicPrefix(Difficulty.Steady)))
     }
+
+    @Test
+    fun `saves with an impossible puzzle are refused`() {
+        val good = GameState.new(Catalog.daily(20_000))
+        val json = good.encode()
+        fun tampered(transform: (String) -> String) = GameState.decode(transform(json))
+        // No board at all.
+        assertNull(tampered { it.replace("\"size\":6", "\"size\":0").replace("\"boxRows\":2", "\"boxRows\":0").replace("\"boxCols\":3", "\"boxCols\":0") })
+        // A given that disagrees with the solution.
+        val given = good.spec.givens.indexOfFirst { it != 0 }
+        val wrong = good.spec.givens.toMutableList().also { it[given] = it[given] % 6 + 1 }
+        assertNull(GameState.decode(good.copy(spec = good.spec.copy(givens = wrong), values = wrong).encode()))
+        // Marked solved with a board that isn't.
+        assertNull(GameState.decode(good.copy(solved = true).encode()))
+    }
 }

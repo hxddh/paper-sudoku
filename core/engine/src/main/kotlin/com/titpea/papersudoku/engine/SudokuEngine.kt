@@ -68,7 +68,7 @@ class SudokuEngine(private val puzzle: Puzzle) {
         if (board.isSolved) return null
         val groundwork = mutableListOf<Elimination>()
         repeat(MAX_GROUNDWORK) {
-            solver.nextSingle(board)?.let { return CoachHint.Next(it, essential(groundwork, it)) }
+            solver.nextSingle(board)?.let { return CoachHint.Next(it, replayed(values, essential(groundwork, it))) }
             val elimination = solver.nextElimination(board) ?: return null
             groundwork += elimination
             board.eliminate(elimination.removals)
@@ -104,6 +104,51 @@ class SudokuEngine(private val puzzle: Puzzle) {
             }
         }
         return kept.toList()
+    }
+
+    /**
+     * The kept steps as the player sees them: replayed from [values], each crossing out everything
+     * its own pattern rules out there. (Found with the dropped steps applied, a step's removals
+     * could miss candidates those steps had already taken, so the note and the board disagreed.)
+     */
+    private fun replayed(values: IntArray, steps: List<Elimination>): List<Elimination> {
+        if (steps.isEmpty()) return steps
+        val board = Board.from(geometry, values)
+        return steps.map { step ->
+            val removals = removalsOf(step, board).ifEmpty { step.removals }
+            board.eliminate(removals)
+            step.copy(removals = removals)
+        }
+    }
+
+    /** Every candidate on [board] that [step]'s pattern rules out, by the technique's own rule. */
+    private fun removalsOf(step: Elimination, board: Board): List<Candidate> {
+        fun has(cell: Int, digit: Int) = board.values[cell] == 0 && (board.candidates[cell] shr digit) and 1 == 1
+        val units = step.units.map { geometry.cells(it).toList() }
+        return when (step.technique) {
+            // Units: the box, then the line the digit is confined to.
+            Technique.Pointing -> {
+                val d = step.digits[0]
+                units[1].filter { it !in units[0] && has(it, d) }.map { Candidate(it, d) }
+            }
+            // Units: the line, then the box the digit is confined to.
+            Technique.Claiming -> {
+                val d = step.digits[0]
+                units[1].filter { it !in units[0] && has(it, d) }.map { Candidate(it, d) }
+            }
+            Technique.NakedPair -> units[0]
+                .filter { it !in step.patternCells }
+                .flatMap { cell -> step.digits.filter { has(cell, it) }.map { Candidate(cell, it) } }
+            Technique.HiddenPair -> step.patternCells.flatMap { cell ->
+                (1..geometry.size).filter { it !in step.digits && has(cell, it) }.map { Candidate(cell, it) }
+            }
+            // Units: the two base lines, then the two cover lines.
+            Technique.XWing -> {
+                val d = step.digits[0]
+                (units[2] + units[3]).filter { it !in step.patternCells && has(it, d) }.map { Candidate(it, d) }
+            }
+            else -> step.removals
+        }
     }
 
     private companion object {

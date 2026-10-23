@@ -70,6 +70,6 @@ class CachedPuzzleSource(
 
     private companion object {
         val json = Json { ignoreUnknownKeys = true }
-        val SUFFIX = "-v${Catalog.GENERATOR_VERSION}.json"
+        val SUFFIX = "-v${Catalog.GENERATOR_VERSION}.${Catalog.REVISION}.json"
     }
 }
