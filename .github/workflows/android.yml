@@ -53,6 +53,18 @@ jobs:
       - name: Run lint
         run: ./gradlew --no-daemon :app:lintDebug
 
+      # Warnings (printed above) don't fail the build; the full report is kept either way.
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: paper-sudoku-lint
+          path: |
+            app/build/reports/lint-results-debug.html
+            app/build/reports/lint-results-debug.sarif
+            app/build/reports/lint-results-debug.txt
+          if-no-files-found: ignore
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
         with:

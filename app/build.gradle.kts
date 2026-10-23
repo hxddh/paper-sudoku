@@ -82,6 +82,11 @@ android {
 
     lint {
         abortOnError = true
+        // Warnings don't fail the build: print them all in the CI log, and keep a SARIF report
+        // (uploaded with the HTML one by android.yml).
+        textReport = true
+        textOutput = file("stdout")
+        sarifReport = true
     }
 }
 
