@@ -34,6 +34,13 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -116,6 +123,9 @@ fun Board(
     val selected = aimed ?: game.selected
     val highlightDigit = game.lockedDigit ?: selected?.let { game.values[it] }?.takeIf { it != 0 }
 
+    // A sudoku is never mirrored: row 1 column 1 is top left in every language. Hit-testing, the
+    // loupe and the cells all use the same left-to-right layout (RTL used to flip only the cells).
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
     BoxWithConstraints(
         modifier = modifier
             .testTag("sudoku-board")
@@ -236,6 +246,26 @@ fun Board(
                     )
                 }
             }
+            // The units the Coach is talking about, outlined in moss (shape, not a fill colour).
+            if (marks.focusUnits.isNotEmpty()) {
+                val outline = MaterialTheme.colorScheme.tertiary
+                Canvas(Modifier.fillMaxSize()) {
+                    val cell = this.size.width / size
+                    val inset = 2.dp.toPx()
+                    for (unit in marks.focusUnits) {
+                        val cells = geometry.cells(unit)
+                        val rows = cells.map { it / size }
+                        val cols = cells.map { it % size }
+                        drawRoundRect(
+                            color = outline,
+                            topLeft = Offset(cols.min() * cell + inset, rows.min() * cell + inset),
+                            size = Size((cols.max() - cols.min() + 1) * cell - 2 * inset, (rows.max() - rows.min() + 1) * cell - 2 * inset),
+                            cornerRadius = CornerRadius(4.dp.toPx()),
+                            style = Stroke(width = 2.dp.toPx()),
+                        )
+                    }
+                }
+            }
             // Read through lambdas, so following the finger re-lays out only the loupe.
             Loupe(
                 game = game,
@@ -244,6 +274,7 @@ fun Board(
                 boardPx = with(density) { side.toPx() },
             )
         }
+    }
     }
 }
 
@@ -330,16 +361,16 @@ private fun Cell(
     val ink = PaperTheme.ink
     val isTarget = marks.target == index
     val inPattern = index in marks.pattern
-    val inFocus = index in marks.focus
     val removed = marks.removals[index].orEmpty()
 
+    val night = colors.background.luminance() < 0.5f
     val background = when {
-        // Red is the Coach's; the player's own selection is in pen blue.
+        // Red is the Coach's; the player's own selection is in pen blue, stronger than its echoes.
+        // The Coach's focus unit is outlined on the board, not filled.
         isTarget -> colors.primary.copy(alpha = 0.20f)
-        isSelected -> colors.secondary.copy(alpha = 0.14f)
-        inPattern -> colors.primaryContainer.copy(alpha = 0.85f)
-        inFocus -> colors.tertiaryContainer.copy(alpha = 0.55f)
-        sameDigit -> colors.secondaryContainer.copy(alpha = 0.75f)
+        isSelected -> colors.secondary.copy(alpha = 0.20f)
+        inPattern -> if (night) colors.primary.copy(alpha = 0.22f) else colors.primaryContainer.copy(alpha = 0.85f)
+        sameDigit -> colors.secondary.copy(alpha = if (night) 0.12f else 0.08f)
         related -> colors.surfaceVariant.copy(alpha = 0.45f)
         else -> Color.Transparent
     }
@@ -413,7 +444,8 @@ private fun Cell(
                 style = TextStyle(
                     fontFamily = if (given) FrauncesPrinted else FrauncesPen,
                     fontSize = digitSize,
-                    fontWeight = if (given) FontWeight.SemiBold else FontWeight.Normal,
+                    // The printed cut's own weight, so nothing asks for a bolder one it would fake.
+                    fontWeight = if (given) FontWeight(560) else FontWeight(420),
                     fontFeatureSettings = "lnum, tnum",
                 ),
                 modifier = Modifier
@@ -484,7 +516,7 @@ private fun NoteGrid(
                             Text(
                                 text = digit.toString(),
                                 color = when {
-                                    struck -> colors.error
+                                    struck -> colors.primary
                                     emphasised -> colors.secondary
                                     else -> ink.pencil
                                 },

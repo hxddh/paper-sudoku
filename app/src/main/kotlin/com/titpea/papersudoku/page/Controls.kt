@@ -31,6 +31,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -111,6 +114,8 @@ fun Keypad(
     // Zero stands for the Erase key.
     val rows = if (game.size == 6) listOf((1..6) + 0) else listOf((1..5).toList(), (6..9) + 0)
     val remaining = game.remaining
+    // Digits run 1 → 9 left to right in every language, like the board.
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
     Column(
         modifier = modifier.fillMaxWidth().testTag("keypad"),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -122,7 +127,7 @@ fun Keypad(
                 // Every key always fits; an overflow button would add an unlabeled node.
                 overflowIndicator = {},
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 val groupScope = this
                 digits.forEachIndexed { i, digit ->
@@ -182,6 +187,7 @@ fun Keypad(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -227,7 +233,8 @@ private fun DigitKey(
     Box(
         modifier = modifier
             .height(KeyHeight)
-            // 44dp keeps all seven 6×6 keys on a 360dp phone (they are 56dp tall).
+            // Seven 6×6 keys share (width − 24dp margins − 18dp gaps): 45dp on a 360dp phone, 48dp
+            // from 378dp; they are 56dp tall.
             .widthIn(min = 44.dp)
             .clip(shape)
             .background(container)
@@ -283,7 +290,8 @@ private fun EraseKey(
             .height(KeyHeight)
             .widthIn(min = 44.dp)
             .clip(shape)
-            .background(colors.surfaceContainer)
+            // The same paper as the digit keys: one row of keys, not a disabled one at the end.
+            .background(colors.surfaceContainerHigh)
             .clickable(
                 interactionSource = interactionSource,
                 indication = ripple(),

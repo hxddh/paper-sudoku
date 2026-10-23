@@ -4,6 +4,6 @@
         <item quantity="other">已盖章 %1$d 页</item>
     </plurals>
     <plurals name="practice_to_next">
-        <item quantity="other">再独立完成 %1$d 页即可升级</item>
+        <item quantity="other">再干净完成 %1$d 页，进入下一级</item>
     </plurals>
 </resources>

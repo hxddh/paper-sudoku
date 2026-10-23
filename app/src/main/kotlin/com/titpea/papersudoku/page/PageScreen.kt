@@ -42,7 +42,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
@@ -56,6 +55,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -94,6 +94,7 @@ import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
@@ -127,7 +128,7 @@ private val NoteHeight: Dp = 176.dp
 /** The quiet line between the tools and the keys; a 48dp target when it is a button. */
 private val StatusHeight: Dp = 48.dp
 
-/** How long the stamp takes to land before it stops replaying on rotation or reopening. */
+/** How long the stamp takes to land; then the page stops asking for it to land again. */
 private const val STAMP_LANDING_MILLIS = 1_200L
 
 /**
@@ -255,7 +256,7 @@ fun PageScreen(
                     .fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
                 // 9×9 cells need the width; the board itself keeps its edges from the back gesture.
-                val boardPadding = if (game?.size == 9) 4.dp else 12.dp
+                val boardPadding = if (game?.size == 9) 8.dp else 12.dp
                 Column(content, horizontalAlignment = Alignment.CenterHorizontally) {
                     BoardArea(
                         state, onEvent,
@@ -269,7 +270,7 @@ fun PageScreen(
                         state, onEvent, onBack, onPrint, onShare, coachBack,
                         Modifier
                             .widthIn(max = 640.dp)
-                            .padding(horizontal = 16.dp)
+                            .padding(horizontal = 12.dp)
                             .padding(bottom = 12.dp)
                             .onGloballyPositioned { noteBounds = it.boundsInRoot() },
                     )
@@ -280,7 +281,8 @@ fun PageScreen(
             if (game != null && coach != null) {
                 val marks = remember(game.values, coach) { coachMarks(game.spec.geometry, game.values, coach) }
                 InkConnector(
-                    focus = marks.focus + marks.pattern + listOfNotNull(marks.target),
+                    // Only what the note names: the bracket reads as "this box", not every cell lit.
+                    focus = marks.anchor,
                     size = game.size,
                     board = boardBounds?.translate(-origin),
                     note = noteBounds?.translate(-origin),
@@ -359,14 +361,19 @@ private fun BoardArea(
                             onEvent(PageEvent.StampLanded)
                         }
                     }
-                    InkStamp(
-                        title = stringResource(R.string.stamp_title),
-                        caption = formatElapsed(game.elapsedMillis / 1_000),
-                        animate = state.justSolved,
-                        size = (side * 0.5f).coerceAtMost(220.dp),
-                        seed = game.spec.key.hashCode(),
-                        modifier = Modifier.testTag("solved-stamp"),
-                    )
+                    // One stamp per page: its landed state belongs to this page, not to the slot.
+                    key(game.spec.key) {
+                        InkStamp(
+                            title = stringResource(R.string.stamp_title),
+                            caption = formatElapsed(game.elapsedMillis / 1_000),
+                            animate = state.justSolved,
+                            size = (side * 0.5f).coerceAtMost(220.dp),
+                            seed = game.spec.key.hashCode(),
+                            // The hand feels the stamp land, not only the last digit.
+                            onLanded = { haptics.performHapticFeedback(HapticFeedbackType.Confirm) },
+                            modifier = Modifier.testTag("solved-stamp"),
+                        )
+                    }
                 }
             }
             if (state.loading) LoadingIndicator(Modifier.testTag("loading"))
@@ -447,6 +454,7 @@ private fun WorkArea(
             } ?: Spacer(Modifier)
             WorkMode.Solved -> SolvedNote(
                 game = game,
+                outlook = solvedOutlook(game, state),
                 onShare = { onShare(game) },
                 onPrint = { onPrint(game) },
                 onNext = {
@@ -511,6 +519,7 @@ private fun StatusLine(game: GameState, onEvent: (PageEvent) -> Unit, showHint: 
 @Composable
 private fun SolvedNote(
     game: GameState,
+    outlook: Outlook?,
     onShare: () -> Unit,
     onPrint: () -> Unit,
     onNext: () -> Unit,
@@ -542,18 +551,47 @@ private fun SolvedNote(
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (outlook != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                outlook.text,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (outlook.news) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("solved-outlook"),
+            )
+        }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            FilledTonalIconButton(onClick = onShare) {
-                Icon(painterResource(R.drawable.ic_share), contentDescription = stringResource(R.string.action_share))
+            // Quiet tools: blue is the player's pen, not a button colour.
+            val tools = MaterialTheme.colorScheme.onSurfaceVariant
+            IconButton(onClick = onShare) {
+                Icon(painterResource(R.drawable.ic_share), contentDescription = stringResource(R.string.action_share), tint = tools)
             }
-            FilledTonalIconButton(onClick = onPrint) {
-                Icon(painterResource(R.drawable.ic_print), contentDescription = stringResource(R.string.action_print))
+            IconButton(onClick = onPrint) {
+                Icon(painterResource(R.drawable.ic_print), contentDescription = stringResource(R.string.action_print), tint = tools)
             }
             Spacer(Modifier.weight(1f))
             Button(onClick = onNext, modifier = Modifier.heightIn(min = 48.dp).testTag("solved-next")) { Text(nextLabel) }
         }
     }
+}
+
+/** One line after a solve about what comes next; [news] when the level just moved up. */
+private data class Outlook(val text: String, val news: Boolean = false)
+
+@Composable
+private fun solvedOutlook(game: GameState, state: PageUiState): Outlook? = when {
+    game.spec.kind == PuzzleKind.Classic -> state.practiceAfter?.let { after ->
+        val remaining = after.remaining
+        when {
+            after.leveledUp -> Outlook(stringResource(R.string.solved_level_up, difficultyName(after.level)), news = true)
+            remaining != null -> Outlook(pluralStringResource(R.plurals.practice_to_next, remaining, remaining))
+            else -> Outlook(stringResource(R.string.practice_top_level))
+        }
+    }
+    // Today's page closes with tomorrow's: a reason to come back, without a streak.
+    game.spec.epochDay == state.today -> Outlook(stringResource(R.string.solved_daily_close))
+    else -> null
 }
 
 @Composable
@@ -593,11 +631,14 @@ private fun PageHeader(
                 val day = spec.epochDay
                 Column {
                     Text(
-                        text = if (spec.kind == PuzzleKind.Daily && day != null) {
-                            weekday(LocalDate.ofEpochDay(day), locale) + DOT + difficultyName(spec.difficulty)
-                        } else {
-                            stringResource(R.string.practice) + DOT + difficultyName(spec.difficulty)
-                        },
+                        text = (
+                            if (spec.kind == PuzzleKind.Daily && day != null) {
+                                weekday(LocalDate.ofEpochDay(day), locale) + DOT + difficultyName(spec.difficulty)
+                            } else {
+                                stringResource(R.string.practice) + DOT + difficultyName(spec.difficulty)
+                            }
+                            // Once the answer is shown, the page says so while you play, not only at the end.
+                            ) + if (game.coach.deepest >= 3) DOT + stringResource(R.string.page_answer_shown) else "",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

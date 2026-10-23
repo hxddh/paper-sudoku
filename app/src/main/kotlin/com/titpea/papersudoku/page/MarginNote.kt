@@ -84,7 +84,7 @@ fun MarginNote(
                     Text(text.tag, style = MaterialTheme.typography.labelLarge, color = ink.margin)
                     if (coach.hint != null) {
                         Spacer(Modifier.height(4.dp))
-                        LevelSteps(coach.level)
+                        LevelSteps(coach)
                     }
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -94,7 +94,7 @@ fun MarginNote(
                             color = ink.margin,
                             modifier = Modifier.weight(1f),
                         )
-                        if (coach.hint != null) LevelSteps(coach.level)
+                        if (coach.hint != null) LevelSteps(coach)
                     }
                 }
                 Spacer(Modifier.height(4.dp))
@@ -123,15 +123,15 @@ fun MarginNote(
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
-            Row(
-                Modifier.fillMaxWidth().padding(top = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            // Once the Coach has said something, closing the note is going back to the page.
+            val dismissLabel = stringResource(if (hint == null) R.string.coach_not_now else R.string.coach_back)
+            val dismiss = @Composable { modifier: Modifier ->
                 TextButton(
                     onClick = { onEvent(PageEvent.DismissCoach) },
-                    modifier = Modifier.heightIn(min = 48.dp),
-                ) { Text(stringResource(R.string.coach_not_now)) }
+                    modifier = modifier.heightIn(min = 48.dp),
+                ) { Text(dismissLabel) }
+            }
+            val next = @Composable { modifier: Modifier ->
                 if (hint != null) {
                     val label = when {
                         coach.level == 1 -> stringResource(R.string.coach_show_why)
@@ -141,7 +141,7 @@ fun MarginNote(
                         else -> stringResource(R.string.coach_erase)
                     }
                     val onClick = { onEvent(if (coach.level < 3) PageEvent.CoachDeeper else PageEvent.CoachApply) }
-                    val buttonModifier = Modifier.heightIn(min = 48.dp).testTag("coach-next")
+                    val buttonModifier = modifier.heightIn(min = 48.dp).testTag("coach-next")
                     if (answerNext) {
                         OutlinedButton(onClick = onClick, modifier = buttonModifier) { Text(label) }
                     } else {
@@ -149,17 +149,44 @@ fun MarginNote(
                     }
                 }
             }
+            if (LocalDensity.current.fontScale > 1.3f) {
+                // Very large text: one action per line, full width, the step forward first.
+                Column(Modifier.fillMaxWidth().padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    next(Modifier.fillMaxWidth())
+                    dismiss(Modifier.fillMaxWidth())
+                }
+            } else {
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    dismiss(Modifier)
+                    next(Modifier)
+                }
+            }
         }
     }
 }
 
+/**
+ * Look, Why, Answer as pips. When Why walks through several steps, its label counts them
+ * ("Why 2/3"), so there is one progress marker, not two.
+ */
 @Composable
-private fun LevelSteps(level: Int) {
+private fun LevelSteps(coach: CoachUi) {
     val colors = MaterialTheme.colorScheme
-    val labels = listOf(R.string.coach_step_look, R.string.coach_step_why, R.string.coach_step_answer)
-    val progress = stringResource(R.string.coach_step_progress, level, labels.size, stringResource(labels[level - 1]))
+    val level = coach.level
+    val total = coach.steps.size
+    val why = if (total > 1) {
+        stringResource(R.string.coach_step_why_count, coach.step + 1, total)
+    } else {
+        stringResource(R.string.coach_step_why)
+    }
+    val labels = listOf(stringResource(R.string.coach_step_look), why, stringResource(R.string.coach_step_answer))
+    val progress = stringResource(R.string.coach_step_progress, labels[level - 1], level, labels.size)
     Row(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.clearAndSetSemantics { contentDescription = progress },
     ) {
@@ -178,9 +205,9 @@ private fun LevelSteps(level: Int) {
                             },
                         ),
                 )
-                Spacer(Modifier.width(3.dp))
+                Spacer(Modifier.width(6.dp))
                 Text(
-                    stringResource(label),
+                    label,
                     style = MaterialTheme.typography.labelSmall,
                     color = if (reached) colors.onSurface else colors.onSurfaceVariant,
                 )
@@ -206,7 +233,7 @@ private fun coachText(coach: CoachUi, geometry: Geometry): CoachText {
                 tag = stringResource(R.string.coach),
                 title = stringResource(R.string.coach_mistake_title),
                 body = when (coach.level) {
-                    1 -> stringResource(R.string.coach_mistake_look, unitLabel(UnitRef(UnitKind.Row, row - 1)))
+                    1 -> stringResource(R.string.coach_mistake_look, unitLabel(geometry, UnitRef(UnitKind.Row, row - 1)))
                     2 -> stringResource(R.string.coach_mistake_why, row, column, hint.digit)
                     else -> stringResource(R.string.coach_mistake_answer, row, column, hint.digit)
                 },
@@ -215,19 +242,14 @@ private fun coachText(coach: CoachUi, geometry: Geometry): CoachText {
         is CoachHint.Next -> {
             val lesson = checkNotNull(coach.lesson)
             val placement = hint.placement
-            // The technique of the step on the page, with where it falls when there are several.
-            val total = coach.steps.size
-            val tag = if (total > 1) {
-                stringResource(R.string.coach_tag_step, techniqueName(lesson.technique), coach.step + 1, total)
-            } else {
-                techniqueName(lesson.technique)
-            }
+            // The technique of the step on the page; the Why pip counts the steps.
+            val tag = techniqueName(lesson.technique)
             val cell = cellLabel(geometry, placement.index)
             // The step's anchor stays the same from Look to Why; the tag already names the technique.
             val lookTitle = if (lesson is Placement && lesson.technique == Technique.NakedSingle) {
                 stringResource(R.string.coach_look_title, cell)
             } else {
-                stringResource(R.string.coach_look_title, unitLabel(focusUnit(geometry, lesson)))
+                stringResource(R.string.coach_look_title, unitLabel(geometry, focusUnit(geometry, lesson)))
             }
             when (coach.level) {
                 1 -> CoachText(tag = tag, title = lookTitle, body = lookTip(lesson.technique))
@@ -236,9 +258,10 @@ private fun coachText(coach: CoachUi, geometry: Geometry): CoachText {
                     title = lookTitle,
                     body = whyText(geometry, lesson) + when {
                         lesson !is Elimination -> ""
-                        // Only after the last elimination does the cell have a single answer.
-                        coach.lastStep -> " " + stringResource(R.string.coach_then, cell)
-                        else -> " " + stringResource(R.string.coach_more)
+                        // After the last elimination, say what became single, the way it is single:
+                        // the cell's last candidate, or the digit's last place in its unit.
+                        coach.lastStep -> stringResource(R.string.sentence_space) + thenText(geometry, placement, cell)
+                        else -> stringResource(R.string.sentence_space) + stringResource(R.string.coach_more)
                     },
                 )
                 else -> CoachText(
@@ -251,17 +274,49 @@ private fun coachText(coach: CoachUi, geometry: Geometry): CoachText {
     }
 }
 
+@Composable
+private fun thenText(geometry: Geometry, placement: Placement, cell: String): String {
+    val unit = placement.unit
+    return if (placement.technique == Technique.HiddenSingle && unit != null) {
+        stringResource(R.string.coach_then_hidden, placement.digit, unitLabel(geometry, unit))
+    } else {
+        stringResource(R.string.coach_then, cell)
+    }
+}
+
 private fun focusUnit(geometry: Geometry, lesson: Step): UnitRef = when (lesson) {
     is Elimination -> lesson.units.first()
     is Placement -> lessonUnit(geometry, lesson)
 }
 
+/**
+ * Rows and columns by number; boxes by where they sit ("the top-right box", 右上宫), since the
+ * board never shows box numbers.
+ */
 @Composable
-fun unitLabel(unit: UnitRef): String = when (unit.kind) {
+fun unitLabel(geometry: Geometry, unit: UnitRef): String = when (unit.kind) {
     UnitKind.Row -> stringResource(R.string.unit_row, unit.index + 1)
     UnitKind.Column -> stringResource(R.string.unit_column, unit.index + 1)
-    UnitKind.Box -> stringResource(R.string.unit_box, unit.index + 1)
+    UnitKind.Box -> stringResource(boxName(geometry, unit.index))
 }
+
+/** The name of box [index] by its place: 3 × 3 boxes on 9×9, 3 rows × 2 columns on 6×6. */
+private fun boxName(geometry: Geometry, index: Int): Int {
+    val across = geometry.size / geometry.boxCols
+    val down = geometry.size / geometry.boxRows
+    val vertical = position(index / across, down)
+    val horizontal = position(index % across, across)
+    return BOX_NAMES[vertical][horizontal]
+}
+
+/** 0 top/left, 1 middle, 2 bottom/right; two boxes have no middle. */
+private fun position(i: Int, count: Int): Int = if (count == 2) i * 2 else i
+
+private val BOX_NAMES = listOf(
+    listOf(R.string.box_top_left, R.string.box_top_middle, R.string.box_top_right),
+    listOf(R.string.box_middle_left, R.string.box_centre, R.string.box_middle_right),
+    listOf(R.string.box_bottom_left, R.string.box_bottom_middle, R.string.box_bottom_right),
+)
 
 @Composable
 private fun cellLabel(geometry: Geometry, index: Int): String =
@@ -311,7 +366,7 @@ private fun whyText(geometry: Geometry, lesson: Step): String = when (lesson) {
     is Placement -> {
         val unit = lesson.unit
         if (lesson.technique == Technique.HiddenSingle && unit != null) {
-            stringResource(R.string.why_hidden_single, unitLabel(unit), lesson.digit)
+            stringResource(R.string.why_hidden_single, unitLabel(geometry, unit), lesson.digit)
         } else {
             stringResource(R.string.why_naked_single, cellLabel(geometry, lesson.index), lesson.digit)
         }
@@ -320,16 +375,16 @@ private fun whyText(geometry: Geometry, lesson: Step): String = when (lesson) {
         val d = lesson.digits
         val u = lesson.units
         when (lesson.technique) {
-            Technique.Pointing -> stringResource(R.string.why_pointing, unitLabel(u[0]), d[0], unitLabel(u[1]))
-            Technique.Claiming -> stringResource(R.string.why_claiming, unitLabel(u[0]), d[0], unitLabel(u[1]))
-            Technique.NakedPair -> stringResource(R.string.why_naked_pair, unitLabel(u[0]), d[0], d[1])
-            Technique.HiddenPair -> stringResource(R.string.why_hidden_pair, unitLabel(u[0]), d[0], d[1])
+            Technique.Pointing -> stringResource(R.string.why_pointing, unitLabel(geometry, u[0]), d[0], unitLabel(geometry, u[1]))
+            Technique.Claiming -> stringResource(R.string.why_claiming, unitLabel(geometry, u[0]), d[0], unitLabel(geometry, u[1]))
+            Technique.NakedPair -> stringResource(R.string.why_naked_pair, unitLabel(geometry, u[0]), d[0], d[1])
+            Technique.HiddenPair -> stringResource(R.string.why_hidden_pair, unitLabel(geometry, u[0]), d[0], d[1])
             Technique.XWing -> stringResource(
                 R.string.why_x_wing,
-                unitLabel(u[0]),
-                unitLabel(u[1]),
-                unitLabel(u[2]),
-                unitLabel(u[3]),
+                unitLabel(geometry, u[0]),
+                unitLabel(geometry, u[1]),
+                unitLabel(geometry, u[2]),
+                unitLabel(geometry, u[3]),
                 d[0],
             )
             else -> techniqueSummary(lesson.technique)

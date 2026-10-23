@@ -540,6 +540,38 @@ class PageViewModelTest {
     }
 
     @Test
+    fun `a solved practice page says where practice stands and records every technique`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.OpenPractice)
+        advanceUntilIdle()
+        val spec = vm.game().spec
+        store.clean.value = mapOf(Difficulty.Gentle to 1)
+        vm.solveFully()
+        advanceUntilIdle()
+        val outcome = checkNotNull(vm.state.value.practiceAfter)
+        assertEquals(Difficulty.Gentle, outcome.level)
+        assertEquals(2, outcome.remaining)
+        assertFalse(outcome.leveledUp)
+        assertTrue(settings.flow.value.techniquesMet.containsAll(spec.techniquesUsed))
+        // Opening another page forgets it.
+        vm.onEvent(PageEvent.OpenDaily(today.toEpochDay()))
+        advanceUntilIdle()
+        assertNull(vm.state.value.practiceAfter)
+    }
+
+    @Test
+    fun `leaving a just-solved page ends the stamp's landing`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.solveFully()
+        assertTrue(vm.state.value.justSolved)
+        vm.onEvent(PageEvent.Background)
+        advanceUntilIdle()
+        assertFalse(vm.state.value.justSolved)
+    }
+
+    @Test
     fun `the how-to line goes once a first digit is written`() = test {
         val vm = viewModel()
         advanceUntilIdle()

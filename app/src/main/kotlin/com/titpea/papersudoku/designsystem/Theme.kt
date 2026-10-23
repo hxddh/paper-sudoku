@@ -130,7 +130,7 @@ private fun inkFor(scheme: ColorScheme, dark: Boolean) = PaperInk(
     pencil = scheme.onSurfaceVariant,
     // Cell lines hold 3:1 against the sheet (WCAG 1.4.11); box lines are a clear step darker.
     gridLine = if (dark) Color(0xFF6E675B) else Color(0xFF9C9081),
-    boxLine = if (dark) Color(0xFFA39A8A) else Color(0xFF6B6256),
+    boxLine = if (dark) Color(0xFF8C8475) else Color(0xFF6B6256),
     // The page is a sheet on the desk: a step lighter than the background in both themes.
     sheet = if (dark) Color(0xFF1C1A16) else scheme.surfaceContainerLowest,
     grain = if (dark) Color.White else Color(0xFF3B2A14),

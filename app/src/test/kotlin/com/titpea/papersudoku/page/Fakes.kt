@@ -41,12 +41,6 @@ class FakeGameStore : GameStore {
         return (saved.keys.filter { it.startsWith(prefix) }.mapNotNull { it.removePrefix(prefix).toIntOrNull() }.maxOrNull() ?: -1) + 1
     }
 
-    override suspend fun pruneUnsolvedDailies(beforeEpochDay: Long) {
-        savedFlow.update { map ->
-            map.filterValues { (g, _) -> !(g.spec.kind == PuzzleKind.Daily && !g.solved && (g.spec.epochDay ?: 0) < beforeEpochDay) }
-        }
-    }
-
     override suspend fun discardUnsolvedPractice(except: String) {
         savedFlow.update { map ->
             map.filter { (key, value) -> key == except || !(value.first.spec.kind == PuzzleKind.Classic && !value.first.solved) }

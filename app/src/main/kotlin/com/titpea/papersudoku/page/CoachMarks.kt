@@ -18,6 +18,10 @@ import com.titpea.papersudoku.engine.UnitRef
 @Immutable
 data class CoachMarks(
     val focus: Set<Int> = emptySet(),
+    /** The units the step is about, outlined on the board (an outline, not a fill: colour-blind safe). */
+    val focusUnits: List<UnitRef> = emptyList(),
+    /** What the note names: its cells are where the Coach's ink line points. */
+    val anchor: Set<Int> = emptySet(),
     val pattern: Set<Int> = emptySet(),
     val removals: Map<Int, Set<Int>> = emptyMap(),
     val target: Int? = null,
@@ -34,18 +38,30 @@ fun coachMarks(geometry: Geometry, values: List<Int>, coach: CoachUi?): CoachMar
     return when (hint) {
         is CoachHint.Mistake -> CoachMarks(
             focus = geometry.rows[geometry.row(hint.index)].toSet(),
+            focusUnits = listOf(UnitRef(UnitKind.Row, geometry.row(hint.index))),
+            anchor = geometry.rows[geometry.row(hint.index)].toSet(),
             target = hint.index.takeIf { level >= 2 },
         )
         is CoachHint.Next -> {
             val lesson = coach.lesson ?: return CoachMarks.None
             val placement = hint.placement
-            val focus = when (lesson) {
-                is Elimination -> lesson.units.flatMap { geometry.cells(it).toList() }.toSet()
-                is Placement -> lessonUnit(geometry, lesson).let { geometry.cells(it).toSet() }
+            val units = when (lesson) {
+                is Elimination -> lesson.units
+                is Placement -> listOf(lessonUnit(geometry, lesson))
             }
+            val focus = units.flatMap { geometry.cells(it).toList() }.toSet()
             // A naked single's note names its cell from the first step.
             val namesCell = lesson is Placement && lesson.technique == Technique.NakedSingle
-            if (level == 1) return CoachMarks(focus = focus, target = placement.index.takeIf { namesCell })
+            // The note's title names one place: the first unit, or the cell for a naked single.
+            val anchor = if (namesCell) setOf(placement.index) else geometry.cells(units.first()).toSet()
+            if (level == 1) {
+                return CoachMarks(
+                    focus = focus,
+                    focusUnits = units,
+                    anchor = anchor,
+                    target = placement.index.takeIf { namesCell },
+                )
+            }
             val pattern = when (lesson) {
                 is Elimination -> lesson.patternCells.toSet()
                 is Placement -> blockers(geometry, values, lesson)
@@ -58,6 +74,8 @@ fun coachMarks(geometry: Geometry, values: List<Int>, coach: CoachUi?): CoachMar
                 .mapValues { it.value.toSet() }
             CoachMarks(
                 focus = focus,
+                focusUnits = units,
+                anchor = anchor,
                 pattern = pattern,
                 removals = removals,
                 // Once the note reaches the cell to fill, it is marked too.

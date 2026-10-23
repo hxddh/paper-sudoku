@@ -76,7 +76,7 @@ class NotebookViewModel(
 
     val state: StateFlow<NotebookUiState> = today.flatMapLatest { day ->
         combine(
-            // Unfinished dailies are pruned after a day, so every saved daily is few enough to read.
+            // One row per day ever opened (projected columns only), so the whole notebook is one read.
             store.dailies(0),
             store.days,
             store.unfinishedPractice,
@@ -85,7 +85,8 @@ class NotebookViewModel(
         ) { dailies, days, practice, clean, (settings, stampedCount) ->
             val saved = dailies.associateBy { it.epochDay }
             val results = days.associateBy { it.epochDay }
-            fun entry(d: Long) = PageEntry(d, Catalog.dailyDifficulty(d), saved[d], results[d])
+            // A saved page says what it was dealt at; the calendar rule is for days not yet opened.
+            fun entry(d: Long) = PageEntry(d, saved[d]?.difficulty ?: Catalog.dailyDifficulty(d), saved[d], results[d])
             // Pages restored from a backup may predate the install; they open the notebook instead.
             val start = minOf(
                 firstDay,

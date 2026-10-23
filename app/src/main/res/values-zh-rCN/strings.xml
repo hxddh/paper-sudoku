@@ -26,7 +26,6 @@
     <string name="cell_conflict">与其他数字冲突</string>
     <string name="unit_row">第 %1$d 行</string>
     <string name="unit_column">第 %1$d 列</string>
-    <string name="unit_box">第 %1$d 宫</string>
     <string name="coach_step_look">提示</string>
     <string name="coach_step_why">原因</string>
     <string name="coach_step_answer">答案</string>
@@ -39,8 +38,7 @@
     <string name="coach_answer">在%2$s填入 %1$d。</string>
     <string name="coach_then">排除之后，%1$s只剩一个可能。</string>
     <string name="coach_next_step">下一步</string>
-    <string name="coach_tag_step">%1$s · 第 %2$d/%3$d 步</string>
-    <string name="coach_answer_cost">看答案后，这一页就不算独立完成。</string>
+    <string name="coach_answer_cost">看了答案，这一页就不算干净完成。</string>
     <string name="coach_more">单靠这一步还定不出数字。</string>
     <string name="coach_none_title">现在没有简单的下一步。</string>
     <string name="coach_none_body">走一步之后再来看看。</string>
@@ -77,9 +75,9 @@
     <string name="technique_desc_x_wing">某个数字在两条线上构成矩形，可清除交叉线上的同一数字。</string>
     <string name="technique_seen">遇到过</string>
     <string name="stamp_title">完成</string>
-    <string name="coach_usage_none">独立完成，没用教练。</string>
-    <string name="coach_usage_look">独立完成。教练指了方向。</string>
-    <string name="coach_usage_why">独立完成。教练讲解了一步。</string>
+    <string name="coach_usage_none">干净完成，没用教练。</string>
+    <string name="coach_usage_look">干净完成，教练指了个方向。</string>
+    <string name="coach_usage_why">干净完成，教练讲了一步。</string>
     <string name="coach_usage_answer">看过教练的答案后完成。</string>
     <string name="restart_title">重新开始这一页？</string>
     <string name="restart_body">这一页上的数字、铅笔记号和用时都会清空，教练的帮助仍会记录。</string>
@@ -112,7 +110,7 @@
     <string name="share_heading_daily">纸上数独 · 每日一页 · %1$s</string>
     <string name="share_heading_classic">纸上数独 · 练习第 %1$d 页</string>
     <string name="share_body">%1$s\n%2$s · %3$s · %4$s</string>
-    <string name="share_clean">独立完成</string>
+    <string name="share_clean">干净完成</string>
     <string name="share_coached">看过教练答案</string>
     <string name="print_title_daily">纸上数独 · %1$s · %2$s</string>
     <string name="print_title_classic">纸上数独 · 练习 · %2$s · 第 %1$d 页</string>
@@ -123,7 +121,7 @@
     <string name="shortcut_undo">撤销</string>
     <string name="shortcut_notes">切换铅笔</string>
     <string name="shortcut_coach">请教练 / 下一步</string>
-    <string name="keypad_held">%1$d，已拿起，点格子填入</string>
+    <string name="keypad_held">%1$d，已拿起，点格子填入。</string>
     <string name="loupe_label">%1$d 行 %2$d 列</string>
     <string name="menu_next_practice">换一页练习</string>
     <string name="next_practice_title">放下这一页？</string>
@@ -159,8 +157,25 @@
     <string name="cell_coach_answer">教练建议填 %1$d</string>
     <string name="cell_coach_removes">教练排除 %1$s</string>
     <string name="page_pane">页面</string>
-    <string name="coach_step_progress">%3$s，第 %1$d/%2$d 部分</string>
+    <string name="coach_step_progress">%1$s（%2$d/%3$d）</string>
     <string name="look_claiming">这条线上，某个数字只能落在一个宫里，看看那个宫。</string>
-    <string name="status_hint">先点格子再点数字，或按住滑动选格。</string>
+    <string name="status_hint">先点格子再点数字；按住滑动可放大选格。</string>
     <string name="list_separator">"，"</string>
+    <string name="coach_back">回到盘面</string>
+    <string name="coach_step_why_count">原因 %1$d/%2$d</string>
+    <string name="coach_then_hidden">排除之后，%1$d 在%2$s里只剩一个位置。</string>
+    <string name="sentence_space"></string>
+    <string name="box_top_left">左上宫</string>
+    <string name="box_top_middle">上中宫</string>
+    <string name="box_top_right">右上宫</string>
+    <string name="box_middle_left">左中宫</string>
+    <string name="box_centre">中宫</string>
+    <string name="box_middle_right">右中宫</string>
+    <string name="box_bottom_left">左下宫</string>
+    <string name="box_bottom_middle">下中宫</string>
+    <string name="box_bottom_right">右下宫</string>
+    <string name="widget_ready">随时开始</string>
+    <string name="solved_level_up">下一页起是%1$s。</string>
+    <string name="solved_daily_close">明天有新的一页。</string>
+    <string name="page_answer_shown">看过答案</string>
 </resources>

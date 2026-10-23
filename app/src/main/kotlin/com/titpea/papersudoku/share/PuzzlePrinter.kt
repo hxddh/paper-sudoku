@@ -15,6 +15,7 @@ import android.print.PrintManager
 import android.print.pdf.PrintedPdfDocument
 import androidx.core.content.res.ResourcesCompat
 import com.titpea.papersudoku.R
+import com.titpea.papersudoku.designsystem.FrauncesAxes
 import com.titpea.papersudoku.page.difficultyRes
 import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.PuzzleKind
@@ -134,6 +135,8 @@ private class PuzzlePrintAdapter(
         }
         val digitPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = printed
+            // The printed cut, as on screen (the font file's default instance is its Black).
+            setFontVariationSettings(FrauncesAxes.PRINTED)
             textSize = cell * 0.55f
             color = INK
             textAlign = Paint.Align.CENTER
