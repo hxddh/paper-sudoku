@@ -53,6 +53,18 @@ jobs:
       - name: Run lint
         run: ./gradlew --no-daemon :app:lintDebug
 
+      # Warnings (printed above) don't fail the build; the full report is kept either way.
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: paper-sudoku-lint
+          path: |
+            app/build/reports/lint-results-debug.html
+            app/build/reports/lint-results-debug.sarif
+            app/build/reports/lint-results-debug.txt
+          if-no-files-found: ignore
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
         with:
@@ -152,6 +164,11 @@ jobs:
             adb shell settings put system user_rotation 0; sleep 2
             ./gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true || touch app/build/ui-tests-failed
             adb pull /sdcard/Android/data/com.titpea.papersudoku/files/screenshots app/build/outputs/screenshots || true
+            # The UI tests run without animations; the benchmark (and the minified SmokeTest) must
+            # measure the ink and stamp animations users see, so turn them back on.
+            adb shell settings put global window_animation_scale 1
+            adb shell settings put global transition_animation_scale 1
+            adb shell settings put global animator_duration_scale 1
             ./gradlew --no-daemon :benchmark:connectedBenchmarkAndroidTest || touch app/build/benchmark-failed
             test ! -e app/build/ui-tests-failed && test ! -e app/build/benchmark-failed
 
@@ -219,6 +236,7 @@ jobs:
       - name: Benchmark results
         if: always()
         run: |
+          python3 tools/ci/benchmark-summary.py benchmark/build/outputs || true
           find benchmark/build/outputs -name "*benchmarkData.json" -exec cat {} \; || true
           find benchmark/build/outputs/androidTest-results -name "*.xml" -exec cat {} \; || true
 

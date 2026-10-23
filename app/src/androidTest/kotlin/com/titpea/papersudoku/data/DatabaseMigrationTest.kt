@@ -100,6 +100,69 @@ class DatabaseMigrationTest {
     }
 
     @Test
+    fun migratesV3PagesWithJsonLastAndIndices() = runBlocking {
+        val daily = GameState.new(Catalog.daily(20_000)).let { it.select(it.spec.givens.indexOfFirst { v -> v == 0 }).input(4, true) }
+        val practice = GameState.new(Catalog.classic(Difficulty.Gentle, 0))
+        raw(version = 3) {
+            execSQL(
+                "CREATE TABLE IF NOT EXISTS `game_results` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`mode` TEXT NOT NULL, `durationSeconds` INTEGER NOT NULL, `hints` INTEGER NOT NULL, " +
+                    "`completedAt` INTEGER NOT NULL, `puzzleKey` TEXT NOT NULL DEFAULT '', " +
+                    "`difficulty` TEXT NOT NULL DEFAULT '', `coachLevel` INTEGER NOT NULL DEFAULT 0, `epochDay` INTEGER)",
+            )
+            execSQL("CREATE INDEX IF NOT EXISTS `index_game_results_puzzleKey` ON `game_results` (`puzzleKey`)")
+            execSQL(
+                "CREATE TABLE IF NOT EXISTS `saved_games` (`puzzleKey` TEXT NOT NULL, `kind` TEXT NOT NULL, " +
+                    "`difficulty` TEXT NOT NULL, `number` INTEGER, `epochDay` INTEGER, `solved` INTEGER NOT NULL, " +
+                    "`json` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, `givens` TEXT NOT NULL DEFAULT '', " +
+                    "`grid` TEXT NOT NULL DEFAULT '', PRIMARY KEY(`puzzleKey`))",
+            )
+            execSQL(
+                "INSERT INTO game_results (mode, durationSeconds, hints, completedAt, puzzleKey, difficulty, coachLevel, epochDay) " +
+                    "VALUES ('classic', 300, 0, 9, 'done', 'Gentle', 0, 19999)",
+            )
+            for ((game, updatedAt) in listOf(daily to 7L, practice to 8L)) {
+                execSQL(
+                    "INSERT INTO saved_games VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?)",
+                    arrayOf(
+                        game.spec.key, game.spec.kind.name, game.spec.difficulty.name, game.spec.number,
+                        game.spec.epochDay, game.encode(), updatedAt, game.spec.givens.digits(), game.values.digits(),
+                    ),
+                )
+            }
+        }
+        val database = SudokuDatabase.create(context, name)
+        try {
+            val store = RoomGameStore(database)
+            assertEquals(1, database.resultDao().count())
+            assertEquals(daily, store.load(daily.spec.key))
+            assertEquals(practice, store.load(practice.spec.key))
+            assertEquals(listOf(PageSummary.of(daily)), store.dailies(0).first())
+            assertEquals(PageSummary.of(practice), store.unfinishedPractice.first())
+            assertEquals(practice.spec.key, store.latestUnsolvedPracticeKey())
+
+            val sqlite = database.openHelper.readableDatabase
+            val columns = buildList {
+                sqlite.query("PRAGMA table_info(`saved_games`)").use { c ->
+                    val nameIndex = c.getColumnIndexOrThrow("name")
+                    while (c.moveToNext()) add(c.getString(nameIndex))
+                }
+            }
+            assertEquals("json", columns.last())
+            assertEquals(10, columns.size)
+            val indices = buildSet {
+                sqlite.query("PRAGMA index_list(`saved_games`)").use { c ->
+                    val nameIndex = c.getColumnIndexOrThrow("name")
+                    while (c.moveToNext()) add(c.getString(nameIndex))
+                }
+            }
+            assertTrue(indices.containsAll(setOf("index_saved_games_kind_epochDay", "index_saved_games_kind_solved_updatedAt")))
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
     fun storeQueries() = runBlocking {
         val database = SudokuDatabase.create(context, name)
         try {

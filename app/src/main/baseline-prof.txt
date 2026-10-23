@@ -6,6 +6,12 @@ HSPLcom/titpea/papersudoku/engine/**;->**(**)**
 Lcom/titpea/papersudoku/engine/**;
 HSPLcom/titpea/papersudoku/game/model/**;->**(**)**
 Lcom/titpea/papersudoku/game/model/**;
-# Saved pages are JSON: the decoder is on the path to the first page.
-HSPLkotlinx/serialization/json/**;->**(**)**
-Lkotlinx/serialization/json/**;
+# Saved pages are JSON: the decoder, and the serialization core it drives (descriptors,
+# encoders, generated serializers' supertypes), are on the path to the first page.
+HSPLkotlinx/serialization/**;->**(**)**
+Lkotlinx/serialization/**;
+# Every screen's state is a StateFlow collected on the main dispatcher; saves run on IO.
+HSPLkotlinx/coroutines/**;->**(**)**
+Lkotlinx/coroutines/**;
+# Compose (and other AndroidX libraries) ship their own profiles, merged at build time.
+# benchmark/.../BaselineProfileGenerator.kt records the journey, to compare or regenerate this file.
