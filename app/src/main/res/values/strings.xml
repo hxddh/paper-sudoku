@@ -104,8 +104,8 @@
     <string name="licences_software">Icons and libraries</string>
     <string name="licences_symbols">Material Symbols</string>
     <string name="licences_symbols_body">Google · Apache License 2.0</string>
-    <string name="licences_libraries">AndroidX, Jetpack Compose, Kotlin and kotlinx</string>
-    <string name="licences_libraries_body">Google and JetBrains · Apache License 2.0</string>
+    <string name="licences_libraries">AndroidX, Jetpack Compose, Kotlin, kotlinx and Okio</string>
+    <string name="licences_libraries_body">Google, JetBrains and Square · Apache License 2.0</string>
     <string name="share_chooser">Share your page</string>
     <string name="share_heading_daily">Paper Sudoku · Daily page · %1$s</string>
     <string name="share_heading_classic">Paper Sudoku · Practice page %1$d</string>
@@ -179,4 +179,10 @@
     <string name="solved_level_up">Next pages are %1$s.</string>
     <string name="solved_daily_close">A new page tomorrow.</string>
     <string name="page_answer_shown">answer shown</string>
+    <string name="contents_title">Contents</string>
+    <string name="contents_previous">Previous month</string>
+    <string name="contents_next">Next month</string>
+    <string name="contents_clean">stamped clean</string>
+    <string name="contents_coached">stamped with the answer</string>
+    <string name="today_support">%1$s\u00A0· %2$s</string>
 </resources>

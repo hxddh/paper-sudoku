@@ -234,9 +234,11 @@ fun PageScreen(
                             .windowInsetsPadding(WindowInsets.statusBars)
                             .padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
                         boardModifier.then(focusRing).onGloballyPositioned { boardBounds = it.boundsInRoot() },
-                        alignment = Alignment.Center,
+                        // Against the panel, so board and tools read as one spread.
+                        alignment = Alignment.CenterEnd,
                     )
-                    Column(Modifier.width(panel).fillMaxHeight().padding(end = 8.dp)) {
+                    // The keys keep clear of the screen edge and its back gesture.
+                    Column(Modifier.width(panel).fillMaxHeight().padding(end = 24.dp)) {
                         header()
                         Column(
                             Modifier.weight(1f).verticalScroll(rememberScrollState()),

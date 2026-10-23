@@ -8,6 +8,12 @@
         android:name="android.permission.ACCESS_NETWORK_STATE"
         tools:node="remove" />
 
+    <!-- WorkManager's foreground-work support: the app never runs foreground work, so neither
+         the permission nor the service is kept (tools/ci/permissions.allowed lists what is). -->
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE"
+        tools:node="remove" />
+
     <application
         android:name=".SudokuApplication"
         android:allowBackup="true"
@@ -49,6 +55,9 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/today_widget_info" />
         </receiver>
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            tools:node="remove" />
     </application>
 
 </manifest>

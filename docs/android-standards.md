@@ -1,4 +1,4 @@
-# Android 开发规范 / Checklist — v6.0
+# Android 开发规范 / Checklist — v7.0
 
 > 基线：`targetSdk 36`、`compileSdk 37`、`minSdk 26`，Jetpack Compose + Material 3 Expressive
 > （`material3 1.5.0-beta01`）、Material 3 Adaptive 1.1、Navigation 3、Room 2.8、DataStore、Glance。
@@ -14,26 +14,27 @@
 - [x] 不锁方向、不禁止 resize；布局按窗口尺寸而非设备类型决定
 - [x] SplashScreen API（`core-splashscreen`），启动画面停留到主题设置读出，深色用户无纸色闪烁（启动画面自身跟随系统主题：`setApplicationNightMode` 没有“跟随系统”的取值，故不使用）
 - [x] R8 + 资源压缩的 release 构建；kotlinx.serialization 自带 R8 规则
-- [x] 无 `INTERNET` 与 `ACCESS_NETWORK_STATE`（合并清单中移除 WorkManager 声明），CI 对 release APK 检查；Android 备份包含 Room 与 DataStore
+- [x] 合并清单只申请 `WAKE_LOCK`、`RECEIVE_BOOT_COMPLETED` 与 AndroidX 自定义的签名级权限（移除网络状态与前台服务声明及其服务）；CI 与发布流程用 `tools/ci/check-apk.sh` 对照 `tools/ci/permissions.allowed` 逐项检查 release APK；Android 备份包含 Room 与 DataStore
 - [ ] Play Data Safety、内容分级、隐私政策托管（文案已更新，提交待 owner）
 
 ## 1. 触控与视觉
 
 | 项 | 规则 | 当前 |
 |---|---|---|
-| 最小触控目标 | 48 × 48dp | 浮动工具栏 64dp 高；数字键 56dp 高、≥ 44dp 宽（6×6 七键在 360dp 手机上的取舍，≥ 380dp 时 ≥ 48dp）；状态行按钮 48dp；6×6 单元格 ≈ 61dp |
+| 最小触控目标 | 48 × 48dp | 浮动工具栏 64dp 高；数字键 56dp 高、≥ 44dp 宽（6×6 七键：360dp 手机上 45dp，378dp 起 48dp）；状态行按钮 48dp；6×6 单元格 ≈ 61dp |
 | 9×9 单元格 | 48dp | 手机竖屏 ≈ 42dp；按住滑动瞄准 + 放大镜让落点与手指大小无关；另有拿起数字、键盘、宽屏布局 |
 | 颜色角色 | 无基线紫色回退 | Paper / Night 定义全部 M3 角色（含 `surfaceContainer*`） |
-| 对比度 | 正文 4.5:1、图形 3:1 | 所有文字角色 ≥ 4.5:1；格线 3.07:1（Paper）/ 3.45:1（Night），宫线 5.9:1 / 6.9:1 |
-| 不只用颜色表意 | 冲突、错误、Coach | 冲突为点状下划线 + 语义（与红色标记形状不同）；Coach 步骤用实心/空心圆点并朗读 |
+| 对比度 | 正文 4.5:1、图形 3:1 | 所有文字角色 ≥ 4.5:1；格线 3.07:1（Paper）/ 3.11:1（Night），宫线 5.9:1 / 4.7:1（对纸面 sheet 计） |
+| 不只用颜色表意 | 冲突、错误、Coach | 冲突为点状下划线 + 语义（与红色标记形状不同）；Coach 关注的单元用描边框出；步骤用实心/空心圆点并朗读；本月目录的完成状态用实心点/空心圈/灰点区分 |
 | 字体 | sp；200% 不截断 | UI 文本 sp；顶栏、状态行、工作区随字号增高；卡片缩略图在大字号下缩小；分隔点前不换行；教练步骤在大字号下单独一行；棋盘、数字键与印章的数字按图形大小缩放 |
-| 动效 | 不承载关键信息 | 落笔、印章、面板过渡均为装饰性 |
+| 动效 | 不承载关键信息 | 落笔、印章、面板过渡均为装饰性；印章每页只落一次（旋转屏幕、返回后不重放） |
 
 ## 2. 原生组件映射
 
 | UI | 使用 |
 |---|---|
 | 导航 | Navigation 3 `NavDisplay`（本子 / 设置 / 开源许可），自定义 transition / pop / predictive pop |
+| RTL | 棋盘与数字键固定从左到右（数独格局不随语言镜像），点按命中按 LTR 计算；有仪器测试 |
 | 本子与页面 | `NavigableListDetailPaneScaffold` + `AnimatedPane` + `sharedBounds` |
 | 本子 | `LargeTopAppBar`（折叠）、`Surface` 卡片、`ListItem` |
 | 页面顶栏 | 透明小 `TopAppBar` |
@@ -80,15 +81,15 @@
 
 ## 6. 测试与 CI
 
-- [x] 引擎：几何、求解唯一性、生成确定性与评级、每一步逻辑推导与答案一致、X-Wing 定式；一年每日题与每级 60 页练习无重复；跟随教练解题时每一步的排除都生效且最终确为唯一解
-- [x] `GameState`：输入、笔记整理、撤销、锁定、完成冻结、JSON 往返与篡改拒绝
+- [x] 引擎：几何、求解唯一性、生成确定性与评级、每一步逻辑推导与答案一致、X-Wing 定式；两年每日题难度都与日历一致、一年每日题与每级 60 页练习无重复；跟随教练（及随机顺序）解题时每一步讲解的排除都按其技巧成立、落子在所述单元内唯一
+- [x] `GameState`：输入、笔记整理、撤销、锁定、完成冻结、JSON 往返与篡改拒绝（含尺寸为 0 等不可能的题面）
 - [x] ViewModel：自动保存恢复、计时、只记一次、Coach 三级与多步讲解、错误提示、经典续玩、换页时切回或打开别页、启动落到今天
-- [x] Compose UI：棋盘语义、事件、Coach、完成页、宽布局；`AccessibilityChecks`
+- [x] Compose UI：棋盘语义、事件、Coach、完成页、宽布局、RTL 点按；Compose 无障碍检查（`enableAccessibilityChecks()`，每次 perform* 时运行）
 - [x] Room 迁移仪器测试
 - [x] CI：JVM 测试、debug/release 构建、lint、schema 已提交检查、API 36 模拟器仪器测试
 - [x] 截图矩阵（Paper/Night × 页面状态 × 宽屏 × 200% 字号）与已提交的基准图逐张比对
 - [x] 每日题与练习页固定样例、3.0 存档格式样例
-- [x] Macrobenchmark：冷启动到今日页、书写帧时间（CI 模拟器上跑，数据仅看趋势）
+- [x] Macrobenchmark：冷启动到今日页、书写帧时间（选格后用数字键真实落笔；CI 模拟器上跑，数据仅看趋势）
 - [x] Baseline Profile（手写规则 + profileinstaller），CI 检查已打进 release APK；`ReportDrawnWhen` 标记完全绘制
 - [ ] 真机冷启动 < 400ms 验证（模拟器数据不代表真机）
 

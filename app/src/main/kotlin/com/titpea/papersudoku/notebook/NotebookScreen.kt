@@ -1,5 +1,6 @@
 package com.titpea.papersudoku.notebook
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -53,6 +54,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -70,6 +72,8 @@ import com.titpea.papersudoku.page.techniqueName
 import com.titpea.papersudoku.page.techniqueSummary
 import com.titpea.papersudoku.page.weekday
 import java.time.LocalDate
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
 
 /**
  * The notebook: today's page on top, the practice stack, the technique handbook, then every
@@ -81,7 +85,7 @@ import java.time.LocalDate
  * [boardTransition] attaches the shared-element transition between a page's thumbnail here and
  * its board on the page.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun NotebookScreen(
     state: NotebookUiState,
@@ -160,23 +164,54 @@ fun NotebookScreen(
                     modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(horizontal = TextInset, vertical = 8.dp),
                 )
             }
+            // The contents: a month at a time, the quick way back to any day.
+            item(key = "contents-title") { SectionTitle(stringResource(R.string.contents_title)) }
+            item(key = "contents") {
+                MonthContents(
+                    pages = state.pages,
+                    today = state.today,
+                    first = state.pastDays.lastOrNull() ?: state.today,
+                    onOpenDay = onOpenDay,
+                )
+            }
             // The handbook sits above the days, so it never drifts to the end of a long notebook.
             item(key = "techniques") { SectionTitle(stringResource(R.string.notebook_techniques)) }
             item(key = "handbook") { Handbook(state.techniquesMet) }
             if (state.pastDays.isNotEmpty()) {
                 item(key = "earlier") { SectionTitle(stringResource(R.string.notebook_earlier)) }
             }
-            items(state.pastDays, key = { it }) { day ->
-                val page = state.pages[day] ?: return@items
-                PageRow(
-                    page = page,
-                    selected = selectedKey == "daily-$day",
-                    onClick = { onOpenDay(day) },
-                    thumbnailModifier = boardTransition("daily-$day"),
-                )
+            // Grouped by month, each under a header that stays while its days scroll past.
+            state.pastDays.groupBy { YearMonth.from(LocalDate.ofEpochDay(it)) }.forEach { (month, days) ->
+                stickyHeader(key = "month-$month") { MonthHeader(month) }
+                items(days, key = { it }) { day ->
+                    val page = state.pages[day] ?: return@items
+                    PageRow(
+                        page = page,
+                        selected = selectedKey == "daily-$day",
+                        onClick = { onOpenDay(day) },
+                        thumbnailModifier = boardTransition("daily-$day"),
+                    )
+                }
             }
         }
     }
+}
+
+/** A month in the earlier pages: opaque, so the rows scrolling under it never show through. */
+@Composable
+private fun MonthHeader(month: YearMonth) {
+    val locale = LocalConfiguration.current.locales[0]
+    Text(
+        month.format(DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(locale, "LLLLyyyy"), locale)),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .widthIn(max = 640.dp)
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(start = TextInset, top = 12.dp, bottom = 4.dp)
+            .semantics { heading() },
+    )
 }
 
 /** How far text sits in from a card's edge; titles and rows outside cards line up with it. */
@@ -252,7 +287,8 @@ private fun TodayCard(
                 CardLabel(stringResource(R.string.today))
                 // The numeral is the date; the line under it says the rest once.
                 Text(date.dayOfMonth.toString(), style = PaperType.pageNumeral, color = MaterialTheme.colorScheme.onSurface)
-                CardSupport(weekday(date, locale) + DOT + month(date, locale))
+                // Each language's own order: "Wednesday · October", 「十月 星期三」.
+                CardSupport(stringResource(R.string.today_support, weekday(date, locale), month(date, locale)))
                 Spacer(Modifier.height(8.dp))
                 CardAction(difficultyName(page.difficulty) + DOT + status)
             }
@@ -390,8 +426,8 @@ private fun StampMark(clean: Boolean, modifier: Modifier, size: androidx.compose
 }
 
 /**
- * The seven techniques on one card, in learning order. A ring fills once a page has needed the
- * technique; only those say "Seen", so the rest stay quiet.
+ * The seven techniques on one card, in learning order. A technique is checked once a stamped
+ * page needed it or the Coach explained it; only those say "Seen", so the rest stay quiet.
  */
 @Composable
 private fun Handbook(met: Set<Technique>) {
@@ -422,17 +458,13 @@ private fun TechniqueRow(technique: Technique, met: Boolean) {
             .testTag("technique-${technique.name}"),
         verticalAlignment = Alignment.Top,
     ) {
-        Box(
-            Modifier
-                .padding(top = 2.dp)
-                .size(20.dp)
-                .then(
-                    if (met) Modifier.background(colors.tertiaryContainer, CircleShape)
-                    else Modifier.border(1.dp, colors.outlineVariant, CircleShape),
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (met) Icon(painterResource(R.drawable.ic_check), contentDescription = null, tint = colors.onTertiaryContainer, modifier = Modifier.size(14.dp))
+        // Met: a moss check. Not yet: nothing (an empty ring read as a to-do to tick).
+        Box(Modifier.padding(top = 2.dp).size(20.dp), contentAlignment = Alignment.Center) {
+            if (met) {
+                Box(Modifier.size(20.dp).background(colors.tertiaryContainer, CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(painterResource(R.drawable.ic_check), contentDescription = null, tint = colors.onTertiaryContainer, modifier = Modifier.size(14.dp))
+                }
+            }
         }
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {

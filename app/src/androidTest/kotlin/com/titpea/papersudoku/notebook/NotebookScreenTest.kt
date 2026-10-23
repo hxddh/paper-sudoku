@@ -1,6 +1,7 @@
 package com.titpea.papersudoku.notebook
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -9,7 +10,6 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.hasTestTag
-import androidx.test.espresso.accessibility.AccessibilityChecks
 import com.titpea.papersudoku.data.DayResult
 import com.titpea.papersudoku.data.PageSummary
 import com.titpea.papersudoku.designsystem.SudokuTheme
@@ -27,9 +27,11 @@ class NotebookScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    // Compose's own Accessibility Test Framework checks: they run on every perform* action
+    // (Espresso's checks never saw Compose content).
     @Before
     fun enableAccessibilityChecks() {
-        AccessibilityChecks.enable().setRunChecksFromRootView(true)
+        composeRule.enableAccessibilityChecks()
     }
 
     private val today = Fixtures.DAY

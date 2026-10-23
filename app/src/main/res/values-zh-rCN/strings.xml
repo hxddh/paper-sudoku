@@ -104,8 +104,8 @@
     <string name="licences_software">图标与开源库</string>
     <string name="licences_symbols">Material Symbols</string>
     <string name="licences_symbols_body">Google · Apache 许可证 2.0</string>
-    <string name="licences_libraries">AndroidX、Jetpack Compose、Kotlin 与 kotlinx</string>
-    <string name="licences_libraries_body">Google 与 JetBrains · Apache 许可证 2.0</string>
+    <string name="licences_libraries">AndroidX、Jetpack Compose、Kotlin、kotlinx 与 Okio</string>
+    <string name="licences_libraries_body">Google、JetBrains 与 Square · Apache 许可证 2.0</string>
     <string name="share_chooser">分享这一页</string>
     <string name="share_heading_daily">纸上数独 · 每日一页 · %1$s</string>
     <string name="share_heading_classic">纸上数独 · 练习第 %1$d 页</string>
@@ -178,4 +178,10 @@
     <string name="solved_level_up">下一页起是%1$s。</string>
     <string name="solved_daily_close">明天有新的一页。</string>
     <string name="page_answer_shown">看过答案</string>
+    <string name="contents_title">目录</string>
+    <string name="contents_previous">上个月</string>
+    <string name="contents_next">下个月</string>
+    <string name="contents_clean">干净完成</string>
+    <string name="contents_coached">看过答案</string>
+    <string name="today_support">%2$s %1$s</string>
 </resources>

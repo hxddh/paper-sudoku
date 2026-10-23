@@ -23,11 +23,11 @@ day is there. Finish a page and it is stamped. When you are stuck, the Coach wri
 |---|---|
 | App | Navigation 3 back stack: Notebook → Settings → Licences; every page is an opaque sheet of paper |
 | Notebook + page | `NavigableListDetailPaneScaffold` (one pane on phones, two on wide windows); predictive back |
-| Notebook | `LargeTopAppBar` (collapsing), today and practice cards (one build, 112dp thumbnails, 88dp at large text), summary, handbook card, `ListItem` rows; one text edge 20dp in from the cards |
+| Notebook | `LargeTopAppBar` (collapsing), today and practice cards (one build, 112dp thumbnails, 88dp at large text), the month's contents (a day grid: filled dot clean, ring coached, grey dot begun; today circled), handbook card, earlier pages under sticky month headers; one text edge 20dp in from the cards. Every unfinished page is kept. |
 | Page header | small transparent `TopAppBar`: back (one-pane only), weekday · level, date, overflow |
 | Tools | `HorizontalFloatingToolbar`: Undo, Pencil (`FilledIconToggleButton`, secondary container when on), Coach (`FilledTonalIconButton`, primary container) |
 | Keypad | `ButtonGroup` with connected keys (outer corners round, inner tight, press rounds fully); Erase is the last key: 5 + 5 on 9×9, seven keys on 6×6 |
-| Coach | margin note: 2dp ink rule, tag (+ step n of m) and steps, note in upright `onSurfaceVariant`, two actions; the answer is an outlined button with its cost said above it |
+| Coach | margin note: 2dp ink rule, the technique as tag, "Why n/m" with step pips, note in upright `onSurfaceVariant`, two actions ("Back to the page" once it has helped); the answer is an outlined button with its cost said above it; boxes are named by position (top right box / 右上宫) |
 | Transitions | taps: shared axis X (10%) on the motion scheme; back gesture: the leaving page scales to 90%, rounds 28dp and lifts, linear with the finger, fading as it commits; thumbnail ↔ board as shared bounds (cross-fade); ink connector drawn by pen to a bracket on the board's edge |
 | Icons | Material Symbols Rounded, weight 400, unfilled, as vector drawables |
 | Widget | Glance: date, status, page miniature drawn as tinted layers (follows day/night); opens today |
@@ -43,13 +43,16 @@ day is there. Finish a page and it is stamped. When you are stuck, the Coach wri
   writes it; tap it again or the status line to put it down. It is put down by itself when its
   last copy is placed. A digit typed on a keyboard always writes.
 - **Notes:** the toggle switches the pen to pencil; keys and status line show it.
-- **Coach:** Look tints the unit; Why adds the pattern and crossed-out candidates. When the
+- **Coach:** Look outlines the unit; Why adds the pattern and crossed-out candidates. When the
   placement needs eliminations first, Why walks through each (only those the placement depends
   on), keeping earlier crossings-out, and names the cell only at the last. Answer shows the digit
   faintly and offers Place. A wrong digit is pointed out first.
 - **Leaving** a page (back, notebook, background) stops the hidden clock.
 - **First page:** until the first digit is ever written, the status line reads "Tap a cell, then a
-  digit, or press and slide to aim." (one line on a phone). It is the app's only how-to.
+  digit. Or hold and slide to zoom in." It is the app's only how-to.
+- **Solved:** the note says what comes next — the practice level reached or how many clean pages
+  to the next, or that a new daily page comes tomorrow. A page whose answer was shown says so in
+  its header.
 - **Clean:** a page is clean unless the Coach gave its answer; pointing at a wrong digit does not
   count. The same rule drives stamps, practice levels and share text.
 
@@ -59,6 +62,7 @@ day is there. Finish a page and it is stamped. When you are stuck, the Coach wri
 |---|---|---|
 | Printed givens | Fraunces 560, opsz 36 | `onSurface` |
 | Pen | Fraunces Italic 420, SOFT 100 | `secondary` |
+| Struck candidates (Coach) | strike line | `primary` (terracotta) |
 | Pencil | platform sans, regular, tabular | `onSurfaceVariant` |
 | Margin (Coach) | platform sans, upright (no synthetic CJK italic) | `primary` rule and tag, `onSurfaceVariant` note |
 | Clash | + dotted 2dp underline (shape, not only colour) | `error` |
@@ -76,15 +80,15 @@ is no dynamic-color variant. Key: paper `#F4EFE5`, terracotta `#A8442F`, ink `#2
 `#5E6B3A`; night `#14130F` with `#EFA489`, `#A9C8E8`, `#C3CF9B`. The page sheet is a step
 lighter than the desk in both themes (night sheet `#1C1A16`); night cards carry a 1dp
 `outlineVariant` edge. Terracotta marks the Coach (target, pattern, rule), the stamp and the
-held digit; the selection is `secondary` at 14%.
+held digit; the selection is `secondary` at 20%, same digits 8% (12% at night), the Coach's unit a 2dp `tertiary` outline.
 
 ## Layout
 
-- Phone portrait: header, board (4dp margins for 9×9, 12dp for 6×6) sitting just above the work
+- Phone portrait: header, board (8dp margins for 9×9, 12dp for 6×6) sitting just above the work
   area of height `max(176dp, toolbar + status + keypad)`; most of the spare height goes above the
   board (vertical bias 0.4), so it sits near the hand.
-- Window wider than tall and ≥ 560dp: board left at full height, header and work area right
-  (40%, 320–440dp).
+- Window wider than tall and ≥ 560dp: board at full height, pushed toward the centre, header and
+  work area right (40%, 320–440dp, 24dp from the edge).
 - Wide windows with the notebook expanded: list-detail two panes; the page hides its back button.
   Short windows (a phone on its side, height below 480dp) show one pane at a time.
 
@@ -96,13 +100,14 @@ precise input independent of finger size. Every other target is ≥ 48dp.
 `MotionScheme.expressive()`; custom motion takes its specs (keys, work area, page transitions,
 connector). Ink settles on write (scale 1.25 → 1, spring 0.55); the stamp lands with overshoot,
 multiplies into the paper (screens at night) and is tilted −14°…−6° and nudged ±6dp by the page,
-so each page's stamp is its own and stays the same.
+so each page's stamp is its own and stays the same. It lands once per page, with a confirm
+haptic as it touches; turning the phone or coming back shows it already landed.
 Haptics follow the system's touch-feedback setting: keyboard tap on write, reject on a clash,
 confirm on solve, segment tick on toggles and while aiming.
 
 ## Keys
 
 Paper keys (`surfaceContainerHigh`) with printed ink; pencil mode greys them; the held digit is
-the one terracotta key. Finished digits shrink to a check icon. Keys are at least 44dp wide (all
-seven 6×6 keys fit a 360dp phone) and 56dp tall; their glyphs are sized by the key, not the font
+the one terracotta key. Finished digits shrink to a check icon. Keys are at least 44dp wide (the
+seven 6×6 keys are 45dp on a 360dp phone, 48dp from 378dp) and 56dp tall; their glyphs are sized by the key, not the font
 scale, so they never clip at 200% text.
