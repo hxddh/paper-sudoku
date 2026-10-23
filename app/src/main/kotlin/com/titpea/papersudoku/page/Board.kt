@@ -110,12 +110,14 @@ fun Board(
     modifier: Modifier = Modifier,
     onAimMove: () -> Unit = {},
     showContent: Boolean = true,
+    /** False for a drawing to look at (the handbook's examples): no taps, aiming or actions. */
+    interactive: Boolean = true,
 ) {
     val ink = PaperTheme.ink
     val size = game.size
     val geometry = game.spec.geometry
     val boardDescription = stringResource(R.string.board_description, size)
-    val enabled = !game.solved && showContent
+    val enabled = interactive && !game.solved && showContent
     var aimed by remember { mutableStateOf<Int?>(null) }
     var loupeAt by remember { mutableStateOf<Offset?>(null) }
     val currentOnTap by rememberUpdatedState(onTap)
@@ -247,22 +249,28 @@ fun Board(
                     )
                 }
             }
-            // The units the Coach is talking about, outlined in moss (shape, not a fill colour).
+            // The units the Coach is talking about, in the Coach's ink: a light wash, and an
+            // outline set inside the cells so it never sits on the box lines (shape as well as
+            // colour, for colour-blind eyes).
             if (marks.focusUnits.isNotEmpty()) {
-                val outline = MaterialTheme.colorScheme.tertiary
+                val ink = MaterialTheme.colorScheme.primary
+                val wash = ink.copy(alpha = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) 0.14f else 0.08f)
                 Canvas(Modifier.fillMaxSize()) {
                     val cell = this.size.width / size
-                    val inset = 2.dp.toPx()
+                    val inset = 3.dp.toPx()
                     for (unit in marks.focusUnits) {
                         val cells = geometry.cells(unit)
                         val rows = cells.map { it / size }
                         val cols = cells.map { it % size }
+                        val topLeft = Offset(cols.min() * cell + inset, rows.min() * cell + inset)
+                        val area = Size((cols.max() - cols.min() + 1) * cell - 2 * inset, (rows.max() - rows.min() + 1) * cell - 2 * inset)
+                        drawRoundRect(color = wash, topLeft = topLeft, size = area, cornerRadius = CornerRadius(4.dp.toPx()))
                         drawRoundRect(
-                            color = outline,
-                            topLeft = Offset(cols.min() * cell + inset, rows.min() * cell + inset),
-                            size = Size((cols.max() - cols.min() + 1) * cell - 2 * inset, (rows.max() - rows.min() + 1) * cell - 2 * inset),
+                            color = ink.copy(alpha = 0.75f),
+                            topLeft = topLeft,
+                            size = area,
                             cornerRadius = CornerRadius(4.dp.toPx()),
-                            style = Stroke(width = 2.dp.toPx()),
+                            style = Stroke(width = 1.5.dp.toPx()),
                         )
                     }
                 }

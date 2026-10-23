@@ -36,7 +36,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -108,6 +108,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
+import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.designsystem.FrauncesPrinted
 import com.titpea.papersudoku.designsystem.InkStamp
 import com.titpea.papersudoku.designsystem.PaperTheme
@@ -573,7 +574,8 @@ private fun SolvedNote(
                 Icon(painterResource(R.drawable.ic_print), contentDescription = stringResource(R.string.action_print), tint = tools)
             }
             Spacer(Modifier.weight(1f))
-            Button(onClick = onNext, modifier = Modifier.heightIn(min = 48.dp).testTag("solved-next")) { Text(nextLabel) }
+            // Ink, not the stamp's red: going back is a way on, not a reward.
+            FilledTonalButton(onClick = onNext, modifier = Modifier.heightIn(min = 48.dp).testTag("solved-next")) { Text(nextLabel) }
         }
     }
 }
@@ -587,12 +589,17 @@ private fun solvedOutlook(game: GameState, state: PageUiState): Outlook? = when 
         val remaining = after.remaining
         when {
             after.leveledUp -> Outlook(stringResource(R.string.solved_level_up, difficultyName(after.level)), news = true)
-            remaining != null -> Outlook(pluralStringResource(R.plurals.practice_to_next, remaining, remaining))
+            remaining != null -> {
+                val nextLevel = Difficulty.entries.getOrElse(after.level.ordinal + 1) { after.level }
+                Outlook(pluralStringResource(R.plurals.practice_to_next, remaining, remaining, difficultyName(nextLevel)))
+            }
             else -> Outlook(stringResource(R.string.practice_top_level))
         }
     }
     // Today's page closes with tomorrow's: a reason to come back, without a streak.
     game.spec.epochDay == state.today -> Outlook(stringResource(R.string.solved_daily_close))
+    // Finished a day late: today's page is already out.
+    (game.spec.epochDay ?: Long.MAX_VALUE) < state.today -> Outlook(stringResource(R.string.solved_daily_waiting))
     else -> null
 }
 
@@ -643,7 +650,8 @@ private fun PageHeader(
                             ) + if (game.coach.deepest >= 3) DOT + stringResource(R.string.page_answer_shown) else "",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
+                        // At large text "answer shown" wraps rather than being cut off.
+                        maxLines = if (LocalDensity.current.fontScale > 1.3f) 2 else 1,
                     )
                     Text(
                         text = if (spec.kind == PuzzleKind.Daily && day != null) {
@@ -708,8 +716,12 @@ private fun PageHeader(
             containerColor = Color.Transparent,
             scrolledContainerColor = Color.Transparent,
         ),
-        // Two lines of title: at large font scales the bar grows instead of clipping them.
-        expandedHeight = maxOf(TopAppBarDefaults.TopAppBarExpandedHeight, (48 * LocalDensity.current.fontScale + 12).dp),
+        // Two lines of title (three when the subtitle wraps at large text): the bar grows
+        // instead of clipping them.
+        expandedHeight = LocalDensity.current.fontScale.let { scale ->
+            val lines = if (scale > 1.3f && (game?.coach?.deepest ?: 0) >= 3) 3 else 2
+            maxOf(TopAppBarDefaults.TopAppBarExpandedHeight, (24 * lines * scale + 12).dp)
+        },
     )
 }
 
@@ -740,29 +752,41 @@ private fun InkConnector(
     Canvas(modifier.fillMaxSize().testTag("ink-connector")) {
         val cell = board.width / size
         val rows = focus.map { it / size }
-        val cols = focus.map { it % size }
         val gap = 4.dp.toPx()
         val path = Path()
+        val cols = focus.map { it % size }
         val bracketFrom: Offset
         val bracketTo: Offset
-        if (wide) {
-            // The note sits beside the board: a bracket down the board's near edge, by the rows.
-            val x = if (rtl) board.left - gap else board.right + gap
-            bracketFrom = Offset(x, board.top + rows.min() * cell + cell * 0.2f)
-            bracketTo = Offset(x, board.top + (rows.max() + 1) * cell - cell * 0.2f)
-            val start = Offset(if (rtl) note.right else note.left, note.top + 24.dp.toPx())
-            val end = Offset(x, (bracketFrom.y + bracketTo.y) / 2f)
-            path.moveTo(start.x, start.y)
-            path.cubicTo((start.x + end.x) / 2f, start.y, (start.x + end.x) / 2f, end.y, end.x, end.y)
-        } else {
-            // The note sits under the board: a bracket along the bottom edge, under the columns.
+        // A column runs the board's whole height: its bracket goes along the bottom edge, under
+        // it. Anything else gets a bracket down the board's side, beside its rows: on the side the
+        // note faces when it sits beside the board, on the side of its margin rule when it sits
+        // underneath. (Along the bottom edge, a box's columns would read as the bottom box.)
+        val column = !wide && rows.distinct().size == size
+        val nearSide = if (wide) !rtl else rtl
+        if (column) {
             val y = board.bottom + gap
             bracketFrom = Offset(board.left + cols.min() * cell + cell * 0.2f, y)
             bracketTo = Offset(board.left + (cols.max() + 1) * cell - cell * 0.2f, y)
+        } else {
+            val x = if (nearSide) board.right + gap else board.left - gap
+            bracketFrom = Offset(x, board.top + rows.min() * cell + cell * 0.2f)
+            bracketTo = Offset(x, board.top + (rows.max() + 1) * cell - cell * 0.2f)
+        }
+        val end = Offset((bracketFrom.x + bracketTo.x) / 2f, (bracketFrom.y + bracketTo.y) / 2f)
+        if (wide) {
+            val start = Offset(if (rtl) note.right else note.left, note.top + 24.dp.toPx())
+            path.moveTo(start.x, start.y)
+            path.cubicTo((start.x + end.x) / 2f, start.y, (start.x + end.x) / 2f, end.y, end.x, end.y)
+        } else if (column) {
             val start = Offset(if (rtl) note.right - 1.dp.toPx() else note.left + 1.dp.toPx(), note.top)
-            val end = Offset((bracketFrom.x + bracketTo.x) / 2f, y)
             path.moveTo(start.x, start.y)
             path.cubicTo(start.x, (start.y + end.y) / 2f, end.x, (start.y + end.y) / 2f, end.x, end.y)
+        } else {
+            // From the top of the note's margin rule, up the margin, into the bracket's middle.
+            val start = Offset(if (rtl) note.right - 1.dp.toPx() else note.left + 1.dp.toPx(), note.top)
+            val reach = if (nearSide) 12.dp.toPx() else -12.dp.toPx()
+            path.moveTo(start.x, start.y)
+            path.cubicTo(start.x, (start.y + end.y) / 2f, end.x + reach, end.y, end.x, end.y)
         }
         val measure = PathMeasure().apply { setPath(path, false) }
         val partial = Path()
@@ -834,7 +858,15 @@ private fun handleKey(event: KeyEvent, state: PageUiState, onEvent: (PageEvent) 
             true
         }
         Key.H -> {
-            onEvent(if (state.coach == null) PageEvent.Coach else PageEvent.CoachDeeper)
+            // H does what the note's main button does, the answer's Place included.
+            val coach = state.coach
+            onEvent(
+                when {
+                    coach == null -> PageEvent.Coach
+                    coach.level < 3 -> PageEvent.CoachDeeper
+                    else -> PageEvent.CoachApply
+                },
+            )
             true
         }
         else -> {

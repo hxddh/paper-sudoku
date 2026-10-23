@@ -43,33 +43,44 @@ class NotebookViewModelTest {
 
     private suspend fun NotebookViewModel.loaded(): NotebookUiState = state.first { it.loaded }
 
+    private fun begun(day: Long): GameState = GameState.new(Catalog.daily(day)).let { g ->
+        val empty = g.spec.givens.indexOfFirst { it == 0 }
+        g.select(empty).input(g.spec.solution[empty], true)
+    }
+
     @Test
     fun `a new notebook has no wall of blank days`() = runTest(dispatcher) {
         val state = viewModel(firstDay = today).loaded()
-        assertTrue(state.pastDays.isEmpty())
+        assertTrue(state.unfinished.isEmpty() && state.stampedDays.isEmpty())
         assertEquals(today, state.todayPage?.epochDay)
+        assertEquals(today, state.firstDay)
     }
 
     @Test
-    fun `the notebook begins on the install day`() = runTest(dispatcher) {
-        val state = viewModel(firstDay = today - 3).loaded()
-        assertEquals(listOf(today - 1, today - 2, today - 3), state.pastDays)
+    fun `only pages written on are listed, and the contents reach back to the install day`() = runTest(dispatcher) {
+        store.save(begun(today - 2), now = 1)
+        val state = viewModel(firstDay = today - 30).loaded()
+        assertEquals(listOf(today - 2), state.unfinished)
+        assertTrue(state.stampedDays.isEmpty())
+        assertEquals(today - 30, state.firstDay)
+        assertFalse(today - 5 in state.pages)
     }
 
     @Test
-    fun `a notebook older than a year still reaches its first day and pages`() = runTest(dispatcher) {
-        store.save(GameState.new(Catalog.daily(today - 500)), now = 1)
-        val state = viewModel(firstDay = today - 400).loaded()
-        assertEquals(500, state.pastDays.size)
-        assertEquals(today - 500, state.pastDays.last())
-        assertFalse(state.pages.getValue(today - 500).saved == null)
+    fun `stamped days are listed apart from unfinished ones`() = runTest(dispatcher) {
+        val solved = Catalog.daily(today - 1).let { spec -> GameState.new(spec).copy(values = spec.solution).settle(5) }
+        store.saveSolved(solved, GameResult(solved.spec.key, PuzzleKind.Daily, solved.spec.difficulty, 60, 0, 0, 1, today - 1), now = 1)
+        store.save(begun(today - 3), now = 1)
+        val state = viewModel(firstDay = today - 10).loaded()
+        assertEquals(listOf(today - 1), state.stampedDays)
+        assertEquals(listOf(today - 3), state.unfinished)
     }
 
     @Test
     fun `pages from before the install (a restored backup) open the notebook`() = runTest(dispatcher) {
-        store.save(GameState.new(Catalog.daily(today - 10)), now = 1)
+        store.save(begun(today - 10), now = 1)
         val state = viewModel(firstDay = today).loaded()
-        assertEquals(today - 10, state.pastDays.last())
+        assertEquals(today - 10, state.firstDay)
         assertFalse(state.pages.getValue(today - 10).saved == null)
     }
 
@@ -78,6 +89,8 @@ class NotebookViewModelTest {
         val practice = GameState.new(Catalog.classic(Difficulty.Gentle, 0))
         store.saveSolved(practice, GameResult(practice.spec.key, PuzzleKind.Classic, Difficulty.Gentle, 60, 0, 0, 1, null), now = 1)
         val vm = viewModel(firstDay = today)
-        assertEquals(1, vm.state.first { it.loaded && it.stamped == 1 }.stamped)
+        val state = vm.state.first { it.loaded && it.stamped == 1 }
+        assertEquals(1, state.stamped)
+        assertEquals(1, state.practiceByMonth.values.sum())
     }
 }

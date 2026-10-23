@@ -14,21 +14,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
-import com.titpea.papersudoku.data.DayResult
-import com.titpea.papersudoku.data.PageSummary
 import com.titpea.papersudoku.designsystem.PaperTheme
 import com.titpea.papersudoku.designsystem.SudokuTheme
-import com.titpea.papersudoku.engine.Difficulty
-import com.titpea.papersudoku.game.model.Catalog
+import com.titpea.papersudoku.engine.Technique
+import com.titpea.papersudoku.notebook.HandbookScreen
 import com.titpea.papersudoku.notebook.NotebookScreen
-import com.titpea.papersudoku.notebook.NotebookUiState
-import com.titpea.papersudoku.notebook.PageEntry
-import com.titpea.papersudoku.notebook.PracticeEntry
 import com.titpea.papersudoku.page.Fixtures
 import com.titpea.papersudoku.page.PageScreen
 import com.titpea.papersudoku.page.PageUiState
@@ -55,40 +50,10 @@ class ScreenshotMatrixTest {
         PageScreen(state = state, onEvent = {}, onBack = {}, onPrint = {}, onShare = {})
     }
 
-    private val notebook: @Composable () -> Unit = {
-        val today = Fixtures.DAY
-        val past = (1..20L).map { today - it }
-        val pages = (past + today).associateWith { day ->
-            val game = when (day) {
-                today -> Fixtures.fresh
-                today - 2 -> Fixtures.solved(com.titpea.papersudoku.game.model.GameState.new(Catalog.daily(day)))
-                else -> null
-            }
-            PageEntry(
-                epochDay = day,
-                difficulty = Catalog.dailyDifficulty(day),
-                saved = game?.let(PageSummary::of),
-                result = when (day) {
-                    today - 1 -> DayResult(day, 3, 301)
-                    today - 2 -> DayResult(day, 0, 125)
-                    today - 4 -> DayResult(day, 0, 98)
-                    else -> null
-                },
-            )
-        }
-        NotebookScreen(
-            state = NotebookUiState(
-                today = today,
-                todayPage = pages.getValue(today),
-                practice = PracticeEntry(Difficulty.Steady, 2, PageSummary.of(Fixtures.practice())),
-                pastDays = past,
-                pages = pages,
-                stamped = 3,
-            ),
-            onOpenDay = {},
-            onOpenPractice = {},
-            onOpenSettings = {},
-        )
+    private val notebook: @Composable () -> Unit = { NotebookScreen(state = notebookState(), onOpenDay = {}, onOpenPractice = {}, onOpenSettings = {}) }
+
+    private val handbook: @Composable () -> Unit = {
+        HandbookScreen(start = 7, techniquesMet = setOf(Technique.HiddenSingle, Technique.XWing), onBack = {})
     }
 
     private val shots: List<Shot> = buildList {
@@ -101,6 +66,7 @@ class ScreenshotMatrixTest {
             add(Shot("$t-practice", dark, Frame.Phone, page(Fixtures.page(game = Fixtures.practice()))))
             add(Shot("$t-notebook", dark, Frame.Phone, notebook))
             add(Shot("$t-wide-practice", dark, Frame.Wide, page(Fixtures.page(game = Fixtures.practice()))))
+            add(Shot("$t-handbook", dark, Frame.Phone, handbook))
         }
         add(Shot("paper-large-text-page", false, Frame.LargeText, page(Fixtures.page(coach = Fixtures.coach(2)))))
         add(Shot("paper-large-text-notebook", false, Frame.LargeText, notebook))

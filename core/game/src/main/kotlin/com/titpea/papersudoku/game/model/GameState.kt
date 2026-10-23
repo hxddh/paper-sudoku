@@ -1,6 +1,7 @@
 package com.titpea.papersudoku.game.model
 
 import com.titpea.papersudoku.engine.DigitMask
+import com.titpea.papersudoku.engine.SudokuEngine
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -48,6 +49,13 @@ data class GameState(
     fun isGiven(index: Int): Boolean = spec.givens[index] != 0
 
     fun isEditable(index: Int): Boolean = !solved && !isGiven(index)
+
+    /**
+     * Nothing done on the page yet: no digit or note written (or all undone) and the Coach never
+     * asked. Only looking at a page does not begin it.
+     */
+    val untouched: Boolean
+        get() = !solved && history.isEmpty() && coach.asks == 0 && values == spec.givens && notes.all { it == 0 }
 
     /** How many more times each digit 1..size can still be placed. Index 0 is unused. */
     val remaining: List<Int>
@@ -98,6 +106,44 @@ data class GameState(
         if (!isEditable(index)) return this
         if (values[index] == 0 && notes[index] == 0) return this
         return remember().copy(values = values.replace(index, 0), notes = notes.replace(index, 0))
+    }
+
+    /**
+     * Takes back a wrong digit the Coach pointed out. Writing it had also crossed it out of the
+     * pencil marks of every empty cell it sees; those marks come back, so the cell's own answer is
+     * not left missing from its notes.
+     */
+    fun eraseMistake(index: Int): GameState {
+        if (!isEditable(index) || values[index] == 0) return this
+        val digit = values[index]
+        val before = history.lastOrNull { it.values[index] != digit }
+        val geometry = spec.geometry
+        val peers = geometry.peers[index]
+        // Only where the digit is still possible: a later placement may have ruled it out again.
+        fun stillPossible(i: Int) = geometry.peers[i].none { it != index && values[it] == digit }
+        val restored = notes.mapIndexed { i, mask ->
+            if (before != null && i in peers && values[i] == 0 && DigitMask.contains(before.notes[i], digit) && stillPossible(i)) {
+                mask or (1 shl digit)
+            } else {
+                mask
+            }
+        }
+        return remember().copy(values = values.replace(index, 0), notes = restored.replace(index, 0), selected = index)
+    }
+
+    /**
+     * Pencils in every candidate (each digit not yet in the cell's row, column or box) in the
+     * empty cells that have no marks yet. Cells already marked keep the player's own marks. Only
+     * notes: the Coach's help and the clean stamp are untouched. One undo takes it all back.
+     */
+    fun pencilInCandidates(): GameState {
+        if (solved) return this
+        val engine = SudokuEngine(spec.puzzle)
+        val board = values.toIntArray()
+        val filled = notes.mapIndexed { i, mask ->
+            if (values[i] == 0 && mask == 0) DigitMask.of(engine.candidates(board, i)) else mask
+        }
+        return if (filled == notes) this else remember().copy(notes = filled)
     }
 
     fun undo(): GameState {

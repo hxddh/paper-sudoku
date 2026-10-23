@@ -2,7 +2,7 @@ package com.titpea.papersudoku.notebook
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.assert
@@ -37,8 +37,7 @@ class NotebookScreenTest {
     private val today = Fixtures.DAY
 
     private fun state(): NotebookUiState {
-        val past = (1..30L).map { today - it }
-        val pages = (past + today).associateWith { day ->
+        val pages = listOf(today, today - 1).associateWith { day ->
             PageEntry(
                 epochDay = day,
                 difficulty = Catalog.dailyDifficulty(day),
@@ -50,7 +49,8 @@ class NotebookScreenTest {
             today = today,
             todayPage = pages.getValue(today),
             practice = PracticeEntry(Difficulty.Steady, 2, null),
-            pastDays = past,
+            firstDay = today - 30,
+            stampedDays = listOf(today - 1),
             pages = pages,
             stamped = 1,
         )
@@ -74,7 +74,7 @@ class NotebookScreenTest {
         composeRule.onNodeWithTag("notebook-today").assertIsDisplayed().performClick()
         composeRule.onNodeWithTag("notebook-practice").performClick()
         composeRule.onNodeWithTag("notebook-practice")
-            .assert(hasContentDescription("2 more clean pages to reach the next level", substring = true))
+            .assert(hasContentDescription("2 more clean pages to Tricky", substring = true))
         composeRule.onNodeWithTag("open-settings").performClick()
         assertEquals(listOf(today), opened)
         assertTrue(practice)
@@ -92,5 +92,32 @@ class NotebookScreenTest {
         composeRule.onNodeWithTag("notebook-list").performScrollToNode(hasTestTag("page-row-${today - 1}"))
         composeRule.onNodeWithTag("page-row-${today - 1}").assertExists()
         composeRule.onNodeWithText("Stamped · 2:14", substring = true).assertExists()
+    }
+
+    @Test
+    fun blankDaysAreReachedThroughTheContentsAndHandbookRowsOpenTheirTopic() {
+        val opened = mutableListOf<Long>()
+        val topics = mutableListOf<Int>()
+        composeRule.setContent {
+            SudokuTheme(darkTheme = false) {
+                NotebookScreen(
+                    state = state(),
+                    onOpenDay = { opened += it },
+                    onOpenPractice = {},
+                    onOpenSettings = {},
+                    onOpenHandbook = { topics += it },
+                )
+            }
+        }
+        // A blank day has no row of its own, but its square in the contents opens it.
+        composeRule.onNodeWithTag("page-row-${today - 5}").assertDoesNotExist()
+        composeRule.onNodeWithTag("notebook-list").performScrollToNode(hasTestTag("contents-day-${today - 5}"))
+        composeRule.onNodeWithTag("contents-day-${today - 5}").performClick()
+        composeRule.onNodeWithTag("notebook-list").performScrollToNode(hasTestTag("technique-XWing"))
+        composeRule.onNodeWithTag("technique-XWing").performClick()
+        composeRule.onNodeWithTag("notebook-list").performScrollToNode(hasTestTag("technique-pen"))
+        composeRule.onNodeWithTag("technique-pen").performClick()
+        assertEquals(listOf(today - 5), opened)
+        assertEquals(listOf(7, 0), topics)
     }
 }

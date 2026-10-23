@@ -61,8 +61,15 @@ data class PageSummary(
 
 /** Saved pages and finished results. An interface so ViewModel tests can use a fake. */
 interface GameStore {
+    /** The saved page, or null. An unreadable save is set aside (kept, out of the way), not lost. */
     suspend fun load(puzzleKey: String): GameState?
     suspend fun save(state: GameState, now: Long)
+
+    /** Drops a saved page: a daily only looked at is not kept as begun. */
+    suspend fun forget(puzzleKey: String)
+
+    /** Drops saved dailies that were opened but never begun (saved that way before 8.0). */
+    suspend fun forgetUntouchedDailies()
 
     /**
      * Saves the solved page and records its first completion together, so a page is never left
@@ -94,6 +101,9 @@ interface GameStore {
 
     /** Every stamped page, dailies and practice. */
     val stampedCount: Flow<Int>
+
+    /** When each practice page was finished (epoch millis). */
+    val practiceCompletions: Flow<List<Long>>
 }
 
 class RoomGameStore(
@@ -104,8 +114,20 @@ class RoomGameStore(
 
     override suspend fun load(puzzleKey: String): GameState? {
         val json = savedGames.get(puzzleKey)?.json ?: return null
-        return withContext(Dispatchers.Default) { GameState.decode(json) }
-            ?: null.also { Log.w(TAG, "Unreadable saved page $puzzleKey; starting it afresh") }
+        return withContext(Dispatchers.Default) { GameState.decode(json) } ?: null.also {
+            Log.w(TAG, "Unreadable saved page $puzzleKey; set aside, starting it afresh")
+            savedGames.setAside(puzzleKey, "damaged-$puzzleKey-${System.currentTimeMillis()}")
+        }
+    }
+
+    override suspend fun forget(puzzleKey: String) = savedGames.delete(puzzleKey)
+
+    override suspend fun forgetUntouchedDailies() {
+        for (key in savedGames.unwrittenDailyKeys()) {
+            val json = savedGames.get(key)?.json ?: continue
+            val game = withContext(Dispatchers.Default) { GameState.decode(json) } ?: continue
+            if (game.untouched) savedGames.delete(key)
+        }
     }
 
     override suspend fun save(state: GameState, now: Long) {
@@ -163,6 +185,7 @@ class RoomGameStore(
 
     override val days: Flow<List<DayResult>> = results.observeDays()
     override val stampedCount: Flow<Int> = results.observeCount()
+    override val practiceCompletions: Flow<List<Long>> = results.observePracticeCompletions()
 
     private suspend fun entity(state: GameState, now: Long): SavedGameEntity {
         val spec = state.spec

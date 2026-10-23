@@ -89,14 +89,24 @@ class PageViewModelTest {
     }
 
     @Test
-    fun `opens today's page and saves it`() = test {
+    fun `opens today's page and keeps it only once it is begun`() = test {
         val vm = viewModel()
         advanceUntilIdle()
         val game = vm.game()
         assertEquals(Catalog.dailyKey(today.toEpochDay()), game.spec.key)
         assertEquals(Difficulty.Gentle, game.spec.difficulty)
         assertFalse(vm.state.value.loading)
+        // Only looked at: the notebook and the widget still offer it as a fresh page.
+        assertFalse(store.saved.containsKey(game.spec.key))
+        val empty = game.spec.givens.indexOfFirst { it == 0 }
+        vm.onEvent(PageEvent.Tap(empty))
+        vm.onEvent(PageEvent.Digit(game.spec.solution[empty]))
+        advanceUntilIdle()
         assertTrue(store.saved.containsKey(game.spec.key))
+        // Undone back to blank, it is fresh again.
+        vm.onEvent(PageEvent.Undo)
+        advanceUntilIdle()
+        assertFalse(store.saved.containsKey(game.spec.key))
         // The widget is redrawn when the page is put away or solved, not on every save.
         assertEquals(0, dailySaves)
         vm.onEvent(PageEvent.Background)
@@ -250,6 +260,10 @@ class PageViewModelTest {
         val vm = viewModel(generator)
         advanceUntilIdle()
         val daily = vm.game().spec.key
+        // Begun, so it is kept with its time.
+        val empty = vm.game().spec.givens.indexOfFirst { it == 0 }
+        vm.onEvent(PageEvent.Tap(empty))
+        vm.onEvent(PageEvent.Digit(vm.game().spec.solution[empty]))
         vm.onEvent(PageEvent.Foreground)
         now = 3_000
         vm.onEvent(PageEvent.OpenPractice)
@@ -598,5 +612,32 @@ class PageViewModelTest {
         vm.onEvent(PageEvent.Foreground)
         advanceUntilIdle()
         assertEquals(Catalog.dailyKey(today.toEpochDay() + 2), vm.game().spec.key)
+    }
+
+    @Test
+    fun `a daily finished a day late says today's page is waiting`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.Background)
+        instant = Instant.parse("2026-10-22T09:00:00Z")
+        vm.onEvent(PageEvent.Foreground)
+        vm.solveFully()
+        advanceUntilIdle()
+        assertEquals(today.toEpochDay() + 1, vm.state.value.today)
+        assertTrue(vm.game().spec.epochDay!! < vm.state.value.today)
+    }
+
+    @Test
+    fun `pages saved only for being opened are forgotten`() = test {
+        store.save(GameState.new(Catalog.daily(today.toEpochDay() - 3)), 0)
+        val begun = GameState.new(Catalog.daily(today.toEpochDay() - 2)).let { g ->
+            val empty = g.spec.givens.indexOfFirst { it == 0 }
+            g.select(empty).input(g.spec.solution[empty], true)
+        }
+        store.save(begun, 0)
+        viewModel()
+        advanceUntilIdle()
+        assertFalse(store.saved.containsKey(Catalog.dailyKey(today.toEpochDay() - 3)))
+        assertTrue(store.saved.containsKey(begun.spec.key))
     }
 }

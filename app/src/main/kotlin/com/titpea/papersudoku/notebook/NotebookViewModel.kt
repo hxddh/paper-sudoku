@@ -22,7 +22,9 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 
 /** One page of the notebook: a day, what is written on it, and how it ended. */
 data class PageEntry(
@@ -48,9 +50,16 @@ data class NotebookUiState(
     val today: Long = 0,
     val todayPage: PageEntry? = null,
     val practice: PracticeEntry = PracticeEntry(Difficulty.Gentle, Practice.CLEAN_SOLVES_TO_ADVANCE, null),
-    /** Past days, newest first. */
-    val pastDays: List<Long> = emptyList(),
+    /** The notebook's first day: the install day, or an earlier page restored from a backup. */
+    val firstDay: Long = 0,
+    /** Earlier days begun and not finished, newest first. */
+    val unfinished: List<Long> = emptyList(),
+    /** Earlier days stamped, newest first. */
+    val stampedDays: List<Long> = emptyList(),
+    /** Every day with something on it (today included); days absent were never begun. */
     val pages: Map<Long, PageEntry> = emptyMap(),
+    /** Practice pages finished, per month. */
+    val practiceByMonth: Map<YearMonth, Int> = emptyMap(),
     val stamped: Int = 0,
     val techniquesMet: Set<Technique> = emptySet(),
     /** False until the store has answered; the list stays empty so it opens at today, not below it. */
@@ -59,9 +68,10 @@ data class NotebookUiState(
 
 /**
  * The notebook is the app's home and its journal at once: today on top, the practice stack, the
- * technique handbook, then the earlier days. It starts on the day the app arrived (or the earliest
- * page it already holds), so a new notebook has no wall of blank days. There is no streak — only
- * stamped pages.
+ * month's contents, the technique handbook, then the pages written on. The contents reach every
+ * day since the notebook began (the install day, or the earliest page it already holds); the list
+ * below holds only pages with something on them, so it never fills with blank days. There is no
+ * streak — only stamped pages.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class NotebookViewModel(
@@ -76,24 +86,19 @@ class NotebookViewModel(
 
     val state: StateFlow<NotebookUiState> = today.flatMapLatest { day ->
         combine(
-            // One row per day ever opened (projected columns only), so the whole notebook is one read.
+            // One row per day ever begun (projected columns only), so the whole notebook is one read.
             store.dailies(0),
             store.days,
             store.unfinishedPractice,
             store.cleanPractice,
-            combine(settingsStore.settings, store.stampedCount, ::Pair),
-        ) { dailies, days, practice, clean, (settings, stampedCount) ->
+            combine(settingsStore.settings, store.stampedCount, store.practiceCompletions, ::Triple),
+        ) { dailies, days, practice, clean, (settings, stampedCount, completions) ->
             val saved = dailies.associateBy { it.epochDay }
             val results = days.associateBy { it.epochDay }
             // A saved page says what it was dealt at; the calendar rule is for days not yet opened.
             fun entry(d: Long) = PageEntry(d, saved[d]?.difficulty ?: Catalog.dailyDifficulty(d), saved[d], results[d])
-            // Pages restored from a backup may predate the install; they open the notebook instead.
-            val start = minOf(
-                firstDay,
-                dailies.minOfOrNull { it.epochDay ?: day } ?: day,
-                days.minOfOrNull { it.epochDay } ?: day,
-            )
-            val pastDays = (day - 1 downTo start).toList()
+            val written = (saved.keys.filterNotNull() + results.keys).filter { it < day }.distinct().sortedDescending()
+            val pages = (written + day).associateWith(::entry)
             NotebookUiState(
                 today = day,
                 todayPage = entry(day),
@@ -103,8 +108,14 @@ class NotebookViewModel(
                     toNextLevel = Practice.remainingToAdvance(clean),
                     saved = practice,
                 ),
-                pastDays = pastDays,
-                pages = (pastDays + day).associateWith(::entry),
+                // Pages restored from a backup may predate the install; they open the notebook instead.
+                firstDay = minOf(firstDay, written.lastOrNull() ?: day),
+                unfinished = written.filter { pages.getValue(it).let { p -> !p.stamped && p.saved != null } },
+                stampedDays = written.filter { pages.getValue(it).stamped },
+                pages = pages,
+                practiceByMonth = completions
+                    .groupingBy { YearMonth.from(Instant.ofEpochMilli(it).atZone(clock.zone)) }
+                    .eachCount(),
                 stamped = stampedCount,
                 techniquesMet = settings.techniquesMet,
                 loaded = true,

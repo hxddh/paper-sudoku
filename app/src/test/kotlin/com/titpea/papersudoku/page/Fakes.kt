@@ -28,11 +28,20 @@ class FakeGameStore : GameStore {
         savedFlow.update { it + (state.spec.key to (state to now)) }
     }
 
+    override suspend fun forget(puzzleKey: String) {
+        savedFlow.update { it - puzzleKey }
+    }
+
+    override suspend fun forgetUntouchedDailies() {
+        savedFlow.update { map -> map.filterValues { (g, _) -> !(g.spec.kind == PuzzleKind.Daily && g.untouched) } }
+    }
+
     override suspend fun saveSolved(state: GameState, result: GameResult, now: Long): Boolean {
         save(state, now)
         if (results.any { it.puzzleKey == result.puzzleKey }) return false
         results += result
         stampedFlow.value = results.size
+        result.epochDay?.let { day -> daysFlow.update { it + DayResult(day, result.coachLevel, result.durationSeconds) } }
         return true
     }
 
@@ -68,6 +77,9 @@ class FakeGameStore : GameStore {
     override val days: Flow<List<DayResult>> = daysFlow
     private val stampedFlow = MutableStateFlow(0)
     override val stampedCount: Flow<Int> = stampedFlow
+    override val practiceCompletions: Flow<List<Long>> = savedFlow.map {
+        results.filter { it.kind == PuzzleKind.Classic }.map { it.completedAt }
+    }
 }
 
 class FakeSettings(initial: UserSettings = UserSettings()) : SettingsStore {

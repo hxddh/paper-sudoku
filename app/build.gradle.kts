@@ -17,8 +17,8 @@ android {
         applicationId = "com.titpea.papersudoku"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "7.0.0"
+        versionCode = 8
+        versionName = "8.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -82,6 +82,11 @@ android {
 
     lint {
         abortOnError = true
+        // Warnings don't fail the build: print them all in the CI log, and keep a SARIF report
+        // (uploaded with the HTML one by android.yml).
+        textReport = true
+        textOutput = file("stdout")
+        sarifReport = true
     }
 }
 

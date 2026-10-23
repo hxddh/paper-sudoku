@@ -1,4 +1,4 @@
-# Design · Paper Sudoku 6.0
+# Design · Paper Sudoku 8.0
 
 **A notebook of pages.** Open it and today's page is in front of you. Turn back and every earlier
 day is there. Finish a page and it is stamped. When you are stuck, the Coach writes in the margin.
@@ -23,9 +23,10 @@ day is there. Finish a page and it is stamped. When you are stuck, the Coach wri
 |---|---|
 | App | Navigation 3 back stack: Notebook → Settings → Licences; every page is an opaque sheet of paper |
 | Notebook + page | `NavigableListDetailPaneScaffold` (one pane on phones, two on wide windows); predictive back |
-| Notebook | `LargeTopAppBar` (collapsing), today and practice cards (one build, 112dp thumbnails, 88dp at large text), the month's contents (a day grid: filled dot clean, ring coached, grey dot begun; today circled), handbook card, earlier pages under sticky month headers; one text edge 20dp in from the cards. Every unfinished page is kept. |
+| Notebook | `LargeTopAppBar` (collapsing), today and practice cards (one build, 112dp thumbnails, 88dp at large text), the month's contents (a day grid: filled dot clean, ring with the answer, grey dot begun; today circled; a key under it; the month's stamped and practice pages counted — never days in a row), the handbook card (using the pen, then the techniques; every row opens its page), unfinished pages, then stamped pages under sticky month headers; one text edge 20dp in from the cards. Only pages written on are listed: blank days are reached through the contents, and a page only looked at is not kept as begun. Unfinished dailies are kept for good; an unfinished practice page set aside is dropped. |
+| Handbook | a page per topic: using the pen (tap, aim, hold a digit, pencil, pencil-in-candidates, keyboard), then each technique with a worked example from a real practice page, drawn and explained as the Coach does it |
 | Page header | small transparent `TopAppBar`: back (one-pane only), weekday · level, date, overflow |
-| Tools | `HorizontalFloatingToolbar`: Undo, Pencil (`FilledIconToggleButton`, secondary container when on), Coach (`FilledTonalIconButton`, primary container) |
+| Tools | `HorizontalFloatingToolbar`: Undo, Pencil (an icon toggle, secondary container when on; a long press on 9×9 pencils in every candidate), Coach — all three equally quiet |
 | Keypad | `ButtonGroup` with connected keys (outer corners round, inner tight, press rounds fully); Erase is the last key: 5 + 5 on 9×9, seven keys on 6×6 |
 | Coach | margin note: 2dp ink rule, the technique as tag, "Why n/m" with step pips, note in upright `onSurfaceVariant`, two actions ("Back to the page" once it has helped); the answer is an outlined button with its cost said above it; boxes are named by position (top right box / 右上宫) |
 | Transitions | taps: shared axis X (10%) on the motion scheme; back gesture: the leaving page scales to 90%, rounds 28dp and lifts, linear with the finger, fading as it commits; thumbnail ↔ board as shared bounds (cross-fade); ink connector drawn by pen to a bracket on the board's edge |
@@ -39,11 +40,15 @@ day is there. Finish a page and it is stamped. When you are stuck, the Coach wri
   finger and ticks a haptic per cell; lifting commits. A plain tap is a tap; a touch the system
   takes over commits nothing.
 - **Write:** with an editable cell selected, a digit writes (again = clear). With nothing to write
-  into, a digit is *picked up* (the one red key, status line "Holding 4 · Put down"); every tap
+  into, a digit is *picked up* (the one red key, status line "4 in hand · Tap to put down"); every tap
   writes it; tap it again or the status line to put it down. It is put down by itself when its
   last copy is placed. A digit typed on a keyboard always writes.
-- **Notes:** the toggle switches the pen to pencil; keys and status line show it.
-- **Coach:** Look outlines the unit; Why adds the pattern and crossed-out candidates. When the
+- **Notes:** the toggle switches the pen to pencil; keys (smaller digits in pencil blue) and the
+  status line show it. Holding the pencil on a 9×9 page pencils in every candidate in the cells
+  with no marks yet (one undo takes it back; notes only, so the page stays clean).
+- **Mistakes:** erasing a wrong digit the Coach found also gives back the pencil marks it had
+  crossed out.
+- **Coach:** Look washes the unit in the Coach's terracotta and outlines it inside its cells, and the ink line brackets the board's side beside it (a column gets a bracket under it); Why adds the pattern and crossed-out candidates. When the
   placement needs eliminations first, Why walks through each (only those the placement depends
   on), keeping earlier crossings-out, and names the cell only at the last. Answer shows the digit
   faintly and offers Place. A wrong digit is pointed out first.
@@ -80,7 +85,7 @@ is no dynamic-color variant. Key: paper `#F4EFE5`, terracotta `#A8442F`, ink `#2
 `#5E6B3A`; night `#14130F` with `#EFA489`, `#A9C8E8`, `#C3CF9B`. The page sheet is a step
 lighter than the desk in both themes (night sheet `#1C1A16`); night cards carry a 1dp
 `outlineVariant` edge. Terracotta marks the Coach (target, pattern, rule), the stamp and the
-held digit; the selection is `secondary` at 20%, same digits 8% (12% at night), the Coach's unit a 2dp `tertiary` outline.
+held digit; the selection is `secondary` at 20%, same digits 8% (12% at night), the Coach's unit a terracotta wash (8%, 14% at night) with a 1.5dp outline inset 3dp. The Coach button is a plain tool; red is for what the Coach marks, the stamp and the held digit, and navigation (Back to the notebook) is tonal ink.
 
 ## Layout
 

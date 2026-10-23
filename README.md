@@ -21,18 +21,20 @@ signing secrets exist (see [docs/release.md](docs/release.md)).
 ## What it is
 
 - **A notebook, not a menu.** Today's 6×6 page on top (gentle on weekdays, steady at the
-  weekend), the practice stack, the month's contents at a glance, the technique handbook, then
-  every earlier day since you started, unfinished ones included. Stamped pages show their time;
-  there is no streak.
+  weekend), the practice stack, the month's contents (every day since you started, one tap away),
+  the handbook, then the pages you have written on: unfinished ones, then stamped ones with their
+  time. There is no streak.
 - **Practice that follows you.** One never-ending stack of 9×9 pages whose difficulty rises after
   three pages solved without the Coach's answer — singles, then pointing and pairs, then hidden
   pairs and X-Wings.
 - **A Coach in the margin.** Look → Why → Answer, with an ink line to the part of the board it is
   talking about; when a placement needs several eliminations, Why walks through each one. It fills
   exactly the space of the tools, so the page never moves.
-- **Pen and paper.** Printed digits, your ink, pencil notes. Press and slide to aim at a cell
-  (a loupe shows where you are); lift to write. Tap a digit with nothing selected to pick it up and
-  write it across the page.
+- **Pen and paper.** Printed digits, your ink, pencil notes (hold the pencil on a 9×9 page to
+  pencil in every candidate). Press and slide to aim at a cell (a loupe shows where you are);
+  lift to write. Tap a digit with nothing selected to pick it up and write it across the page.
+- **A handbook that teaches.** Using the pen, then every technique with a worked example from a
+  real page, drawn the way the Coach draws it.
 - **Quiet.** The clock is hidden while you play and pauses itself when you leave. No ads,
   accounts, analytics or network.
 
@@ -68,13 +70,14 @@ review the images and commit them as the new goldens.
 :core:engine   pure Kotlin  techniques, logical and backtracking solvers, generator, grader, Coach hints
 :core:game     pure Kotlin  Catalog (dailies, practice), Practice progression, GameState (serializable, undo)
 :app           Android      Room + DataStore, PageViewModel, NotebookViewModel, Compose UI, Glance widget
-:benchmark     Android test Macrobenchmark: cold start to today's page, writing frames
+:benchmark     Android test Macrobenchmark: cold start (with and without the Baseline Profile),
+               writing frames; a smoke test of the minified build; a Baseline Profile generator
 ```
 
 - Home is a Navigation 3 back stack (Notebook, Settings, Licences). The notebook is a Material 3 adaptive
   `NavigableListDetailPaneScaffold`: pages list and open page, one pane or two.
 - `GameState` is immutable and saved as JSON in Room within 0.4s of a move and on leaving, with the printed and
-  current digits beside it for the notebook (schema 3); a solve is saved and recorded in one
+  current digits beside it for the notebook (schema 4: the JSON last, indexed by kind and day); a solve is saved and recorded in one
   transaction, once per puzzle. Upcoming pages are generated ahead into a disk cache.
 - One custom-drawn surface (the board); everything else is Material 3 / Expressive.
 

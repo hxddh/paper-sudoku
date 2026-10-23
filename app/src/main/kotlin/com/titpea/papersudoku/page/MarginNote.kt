@@ -150,10 +150,16 @@ fun MarginNote(
                 }
             }
             if (LocalDensity.current.fontScale > 1.3f) {
-                // Very large text: one action per line, full width, the step forward first.
+                // Very large text: one action per line, full width, the step forward first, except
+                // when it is the answer: what costs the clean stamp never takes the top spot.
                 Column(Modifier.fillMaxWidth().padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    next(Modifier.fillMaxWidth())
-                    dismiss(Modifier.fillMaxWidth())
+                    if (answerNext) {
+                        dismiss(Modifier.fillMaxWidth())
+                        next(Modifier.fillMaxWidth())
+                    } else {
+                        next(Modifier.fillMaxWidth())
+                        dismiss(Modifier.fillMaxWidth())
+                    }
                 }
             } else {
                 Row(
@@ -184,7 +190,12 @@ private fun LevelSteps(coach: CoachUi) {
         stringResource(R.string.coach_step_why)
     }
     val labels = listOf(stringResource(R.string.coach_step_look), why, stringResource(R.string.coach_step_answer))
-    val progress = stringResource(R.string.coach_step_progress, labels[level - 1], level, labels.size)
+    // Said once, in words: "Why, step 2 of 3" (a written "2/3" is read as a fraction).
+    val progress = if (level == 2 && total > 1) {
+        stringResource(R.string.coach_step_why_spoken, coach.step + 1, total)
+    } else {
+        labels[level - 1]
+    }
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -272,6 +283,23 @@ private fun coachText(coach: CoachUi, geometry: Geometry): CoachText {
             }
         }
     }
+}
+
+/**
+ * The Coach's whole explanation of [hint] at once, for the handbook's worked examples: what to
+ * look for, why, and what it leaves.
+ */
+@Composable
+internal fun workedExample(geometry: Geometry, hint: CoachHint.Next): List<String> {
+    val lesson = hint.lesson
+    val placement = hint.placement
+    val why = whyText(geometry, lesson)
+    val then = if (lesson is Elimination) {
+        stringResource(R.string.sentence_space) + thenText(geometry, placement, cellLabel(geometry, placement.index))
+    } else {
+        ""
+    }
+    return listOf(lookTip(lesson.technique), why + then)
 }
 
 @Composable

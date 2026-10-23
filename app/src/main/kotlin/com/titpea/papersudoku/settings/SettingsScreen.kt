@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -182,10 +184,11 @@ private fun LicenceText(text: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsScaffold(
+internal fun SettingsScaffold(
     title: String,
     onBack: () -> Unit,
     tag: String,
+    listState: LazyListState = rememberLazyListState(),
     content: LazyListScope.() -> Unit,
 ) {
     // The bar takes a surface once the list scrolls under it, so rows never run under the title.
@@ -204,7 +207,9 @@ private fun SettingsScaffold(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
+                    // Also when the list opens partway down (the handbook at a topic), where no
+                    // scroll has happened for the bar to notice.
+                    containerColor = if (listState.canScrollBackward) MaterialTheme.colorScheme.surfaceContainer else Color.Transparent,
                     scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ),
                 scrollBehavior = scrollBehavior,
@@ -214,6 +219,7 @@ private fun SettingsScaffold(
         val direction = LocalLayoutDirection.current
         LazyColumn(
             modifier = Modifier.fillMaxSize().testTag(tag),
+            state = listState,
             contentPadding = PaddingValues(
                 start = padding.calculateStartPadding(direction),
                 end = padding.calculateEndPadding(direction),

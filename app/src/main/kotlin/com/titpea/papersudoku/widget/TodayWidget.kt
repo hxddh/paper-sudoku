@@ -10,6 +10,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.Build
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -65,6 +66,8 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.TextStyle as JavaTextStyle
+import java.util.Locale
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Today's page on the home screen: the date, how far it has got, and a miniature of the page as
@@ -98,6 +101,7 @@ class TodayWidget : GlanceAppWidget() {
             // Read inside the composition, so an update to a running session shows the latest page.
             val saved by remember { pages }.collectAsState(initial = initial)
             val page = saved ?: blank
+            SideEffect { shown.set(Shown(key, saved, context.resources.configuration.locales[0])) }
             val status = context.getString(
                 when {
                     saved == null -> R.string.widget_ready
@@ -160,14 +164,33 @@ class TodayWidget : GlanceAppWidget() {
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         private val pending = MutableStateFlow(false)
 
-        /** Redraws placed widgets; overlapping requests collapse into one. Cheap when none are placed. */
+        /** What a widget last composed: today's key, its saved page (null: not started) and the locale. */
+        private data class Shown(val key: String, val page: PageSummary?, val locale: Locale)
+
+        private val shown = AtomicReference<Shown?>(null)
+
+        /**
+         * Redraws placed widgets if today's page differs from what they last showed; overlapping
+         * requests collapse into one. Cheap when none are placed, and when nothing changed (the
+         * app asks on every put-away). The midnight and clock changes go through [updateNow].
+         */
         fun requestUpdate(context: Context) {
             if (!pending.compareAndSet(expect = false, update = true)) return
             val app = context.applicationContext
             scope.launch {
                 pending.value = false
-                runCatching { TodayWidget().updateAll(app) }
+                runCatching {
+                    if (!showsCurrent(app)) TodayWidget().updateAll(app)
+                }
             }
+        }
+
+        private suspend fun showsCurrent(app: Context): Boolean {
+            val last = shown.get() ?: return false
+            val container = (app as? SudokuApplication)?.container ?: return false
+            val key = Catalog.dailyKey(LocalDate.now(container.clock).toEpochDay())
+            val now = Shown(key, container.gameStore.page(key).first(), app.resources.configuration.locales[0])
+            return now == last
         }
 
         /** Redraws placed widgets now, then calls [done] whether or not that succeeded. */
