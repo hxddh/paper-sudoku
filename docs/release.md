@@ -4,7 +4,7 @@
 
 - App name: **Paper Sudoku** / **纸上数独**
 - `applicationId`: `com.titpea.papersudoku`
-- Version: `6.0.0` (`versionCode 6`)
+- Version: `8.0.0` (`versionCode 8`)
 - Minimum SDK: 26
 - Target SDK: 36
 - Compile SDK: 37 (required by Material 3 Expressive `1.5.0-beta01`)
@@ -65,9 +65,13 @@ nor be updated by it. Either kind of tag first checks the release APK with `tool
 (permissions exactly as `tools/ci/permissions.allowed`, Baseline Profile packaged). Without the secrets the workflow
 stops with an error instead of publishing an unsigned or debug-signed build.
 
-Upgrading from the 1.0 sideload APK: that APK was signed with a local debug key. Android will not
-update it with a release-signed 2.0 build; users must uninstall 1.0 first (its local stats are
-lost unless restored from an Android backup).
+Before it builds anything, `tools/ci/release-preflight.sh` checks that the tag is `v<versionName>`
+(or `-sideload`), that `CHANGELOG.md` has a non-empty section for that version, that the commit
+is on `main`, and that Android CI passed on that exact commit (wait for it after merging).
+
+Sideload builds are signed with each CI runner's own debug key, so every sideload update has to be
+installed after uninstalling the previous one (the notebook is lost unless Android backup restores
+it). A fixed sideload key, kept as repository secrets, would remove that step; it is not set up.
 
 ## Preflight
 
@@ -96,7 +100,10 @@ substitute for a signed release check.
 4. Complete content rating and target audience for a puzzle game.
 5. Set pricing/monetization. The v1 recommendation is a one-time paid app; there is no billing
    code and no IAP.
-6. Add phone and tablet screenshots, feature graphic, short/full description, and support contact.
+6. Add phone and tablet screenshots (`StoreScreenshotsTest`: 1080×1920 phone, 1600×1000 tablet;
+   CI publishes them under `store/` on the captures branch), the feature graphic
+   (`docs/assets/feature-graphic.png`, drawn by `tools/store/feature_graphic.py`), short/full
+   description, and support contact.
 7. Run the Play pre-launch report on at least one phone and one tablet.
 8. Roll out to internal testing, then staged production.
 

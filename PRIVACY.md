@@ -1,6 +1,6 @@
 # Paper Sudoku — Privacy Policy
 
-Last updated: 2026-10-23 (version 7.0)
+Last updated: 2026-10-24 (version 8.0)
 
 Paper Sudoku is an offline puzzle game. It does not require an account, does not contain ads or
 analytics, and does not request the `INTERNET` permission.
@@ -12,7 +12,8 @@ The app stores only the data needed to run the game locally:
 - your games (board, notes, undo history, time, how much the Coach helped) in a local Room
   database;
 - finished-puzzle results (mode, difficulty, time, Coach use, date) for the notebook;
-- settings (theme, note tidying, techniques you have met) in Android DataStore.
+- settings (theme, note tidying, techniques you have met, whether you have written your first
+  digit) in Android DataStore.
 
 The home-screen widget reads today's page from the same local database.
 
@@ -27,14 +28,17 @@ uses Android's print service and the printer or "Save as PDF" target you pick.
 ## Permissions and sharing
 
 The app does not request network, location, contacts, camera, microphone, notification or
-advertising permissions. It asks Android for exactly three, all brought in by the job scheduler
-the home-screen widget uses to redraw at midnight:
+advertising permissions. It asks Android for exactly three, all added by the AndroidX libraries
+the home-screen widget is built with:
 
-- `WAKE_LOCK` — keeps the device awake for the moment the widget redraws;
-- `RECEIVE_BOOT_COMPLETED` — restores the scheduled redraw after the phone restarts;
+- `WAKE_LOCK` and `RECEIVE_BOOT_COMPLETED` — WorkManager (used by the widget library to draw the
+  widget) keeps the device awake for the moment a redraw runs, and restores its pending work after
+  the phone restarts;
 - `com.titpea.papersudoku.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` — a permission the app
-  defines for itself (AndroidX adds it) so that only the app can message its own internal
+  defines for itself (androidx.core adds it) so that only the app can message its own internal
   receivers.
+
+The widget's redraw just after midnight is an ordinary alarm and needs no permission.
 
 None of them gives access to any data. The app does not run foreground services. A build check
 fails if the app ever asks for anything else. The app does not share data with third parties.

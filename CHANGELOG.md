@@ -1,5 +1,47 @@
 # Changelog
 
+## 8.0.0
+
+Quiet, and it keeps what matters: a page you only looked at stays fresh, the notebook lists only
+what you wrote, and the handbook teaches with real examples.
+
+**Changed**
+- The notebook's contents are its archive: every day since you started is one tap away there,
+  with a key to its marks and the month's stamped and practice pages counted. Below them, only
+  pages you have written on: unfinished ones first, then stamped pages by month.
+- The handbook opens: "Using the pen" (tap, aim, hold a digit, pencil, keyboard), then each
+  technique with a worked example from a real practice page, drawn and explained the way the
+  Coach does it.
+- On a 9×9 page, hold the pencil to pencil in every candidate in the cells you have not marked.
+  It is only notes: the page stays clean, and one undo takes it back.
+- The Coach button is as quiet as Undo and Pencil. What the Coach points at is washed in its
+  terracotta and outlined, and its ink line brackets the board's side beside it.
+- At large text, "Back to the page" comes before "Show the answer", and "answer shown" wraps
+  instead of being cut off. "Back to the notebook" is ink, not the stamp's red. Pencil keys are
+  pencil blue instead of greyed out.
+- Words: the Coach puts the digit first ("A 3 fits only one cell in row 2"), names the next level
+  ("2 more clean pages to Tricky", "Up a level"), and in Chinese says 干净完成，全靠自己, 回到这一页
+  and 铅笔记号.
+
+**Fixed**
+- Opening a page no longer marks it "In progress": the widget, the Today card and the contents
+  only count a page once something is written on it. Pages saved that way before are tidied up.
+- Erasing a wrong digit the Coach found gives back the pencil marks it had crossed out, so a
+  cell's own answer is never missing from its notes.
+- A daily finished a day late says today's page is waiting, not "a new page tomorrow".
+- An unreadable save is set aside instead of being overwritten.
+- H at the Coach's answer places it; TalkBack says "Why, step 2 of 3" once.
+
+**Under the hood**
+- Database schema 4: saved pages keep their JSON last and are indexed, so the notebook reads
+  less as it grows.
+- The widget no longer wakes the device every hour and skips redraws that change nothing.
+- A release only builds from a commit on main that passed CI, with a matching version and
+  release notes. Lint warnings are printed in CI; Gradle caches builds.
+- Benchmarks: a fresh page per run, animations on, a cold start without the Baseline Profile to
+  compare, a smoke test of the minified build, and a Baseline Profile generator.
+- Play listing artwork: screenshots at Play's sizes and a feature graphic.
+
 ## 7.0.0
 
 What the app says, it does: the Coach's every word checked against the board, the notebook keeps

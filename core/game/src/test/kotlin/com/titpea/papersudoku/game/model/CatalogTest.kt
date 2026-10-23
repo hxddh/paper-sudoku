@@ -18,8 +18,9 @@ class CatalogTest {
 
     @Test
     fun `every daily is dealt at its level`() {
-        // 2027–2028 include days whose first try came out easier (2027-04-04, 2028-07-09, 2028-10-07).
-        val start = LocalDate.of(2027, 1, 1).toEpochDay()
+        // From the start of 2026 (the year the app shipped) through 2028, which includes days whose
+        // first try came out easier (2027-04-04, 2028-07-09, 2028-10-07).
+        val start = LocalDate.of(2026, 1, 1).toEpochDay()
         val end = LocalDate.of(2028, 12, 31).toEpochDay()
         val missed = (start..end).filter { Catalog.daily(it).difficulty != Catalog.dailyDifficulty(it) }
         assertEquals("days dealt below their level", emptyList<Long>(), missed)

@@ -31,7 +31,7 @@ Stuck? The Coach writes in the margin: where to look, then why, and the answer o
 ## Category and tags
 
 - Category: Games / Puzzle
-- Tags: sudoku, logic puzzle, daily puzzle, minimal, offline
+- Tags (chosen from Play's own list in the console): Sudoku, Logic, Offline
 
 ## Monetization
 
@@ -41,14 +41,19 @@ privacy/data-safety updates must be designed before release.
 
 ## Screenshot plan
 
-From the CI screenshot matrix (`paper-sudoku-screenshots` artifact) or a device:
+`StoreScreenshotsTest` draws them at Play's sizes (phone 1080×1920, 9:16; tablet 1600×1000,
+16:10); CI publishes them under `store/` on the PR's captures branch. The matrix captures are
+not used: at 540×1200 they are taller than Play's 2:1 limit.
 
-1. Today's page, fresh (Paper)
-2. The Coach at "Why", with the ink line to the board
+1. A practice page with pencil marks (Paper)
+2. The Coach at "Why", the unit washed and bracketed
 3. A stamped page
-4. The notebook with stamped days
-5. A practice page on a tablet, notebook beside it
+4. The notebook: today, practice, the month's contents
+5. The handbook's X-Wing example
 6. Night
+7. Tablet: the page beside its tools
+
+Feature graphic: `docs/assets/feature-graphic.png` (1024×500, `tools/store/feature_graphic.py`).
 
 ## Support / privacy
 
