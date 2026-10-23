@@ -29,7 +29,7 @@ fun notebookState(): NotebookUiState {
         today - 2 to PageSummary.of(Fixtures.solved(GameState.new(Catalog.daily(today - 2)))),
         today - 6 to begun(today - 6),
     )
-    val days = (saved.keys + results.keys).toSortedSet().reversed()
+    val days = (saved.keys + results.keys).distinct().sortedDescending()
     val pages = days.associateWith { day -> PageEntry(day, Catalog.dailyDifficulty(day), saved[day], results[day]) }
     return NotebookUiState(
         today = today,

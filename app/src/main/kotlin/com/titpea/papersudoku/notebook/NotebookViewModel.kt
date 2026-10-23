@@ -97,7 +97,7 @@ class NotebookViewModel(
             val results = days.associateBy { it.epochDay }
             // A saved page says what it was dealt at; the calendar rule is for days not yet opened.
             fun entry(d: Long) = PageEntry(d, saved[d]?.difficulty ?: Catalog.dailyDifficulty(d), saved[d], results[d])
-            val written = (saved.keys.filterNotNull() + results.keys).filter { it < day }.toSortedSet().reversed()
+            val written = (saved.keys.filterNotNull() + results.keys).filter { it < day }.distinct().sortedDescending()
             val pages = (written + day).associateWith(::entry)
             NotebookUiState(
                 today = day,
