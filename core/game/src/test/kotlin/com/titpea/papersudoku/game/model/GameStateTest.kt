@@ -87,6 +87,24 @@ class GameStateTest {
     }
 
     @Test
+    fun `pencilling in candidates fills only unmarked empty cells, and undoes in one step`() {
+        val classic = Catalog.classic(Difficulty.Steady, 0)
+        val cell = classic.givens.indexOfFirst { it == 0 }
+        val marked = GameState.new(classic).select(cell).toggleNotesMode().input(classic.solution[cell], true).toggleNotesMode()
+        val filled = marked.pencilInCandidates()
+        assertEquals(marked.notes[cell], filled.notes[cell])
+        for (i in classic.givens.indices) {
+            if (i == cell || classic.givens[i] != 0) continue
+            assertTrue(DigitMask.contains(filled.notes[i], classic.solution[i]))
+            val seen = classic.geometry.peers[i].map { classic.givens[it] }.toSet()
+            assertTrue(DigitMask.digits(filled.notes[i]).none { it in seen })
+        }
+        assertEquals(marked.notes, filled.undo().notes)
+        assertEquals(marked.coach, filled.coach)
+        assertEquals(filled, filled.pencilInCandidates())
+    }
+
+    @Test
     fun `undo walks back values notes and selection`() {
         val s0 = GameState.new(spec).select(empty)
         val s1 = s0.toggleNotesMode().input(1, true).input(2, true)

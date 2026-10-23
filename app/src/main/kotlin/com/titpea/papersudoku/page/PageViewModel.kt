@@ -101,6 +101,7 @@ sealed interface PageEvent {
     data object Erase : PageEvent
     data object Undo : PageEvent
     data object ToggleNotes : PageEvent
+    data object FillCandidates : PageEvent
     data object Coach : PageEvent
     data object CoachDeeper : PageEvent
     data object CoachApply : PageEvent
@@ -195,6 +196,7 @@ class PageViewModel(
             PageEvent.Erase -> mutate { it.erase() }
             PageEvent.Undo -> mutate { it.undo() }
             PageEvent.ToggleNotes -> mutate(PageEffect.Toggled) { it.toggleNotesMode() }
+            PageEvent.FillCandidates -> mutate { if (it.size == 9) it.pencilInCandidates() else it }
             PageEvent.Coach -> openCoach()
             PageEvent.CoachDeeper -> deepenCoach()
             PageEvent.CoachApply -> applyCoach()

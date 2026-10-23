@@ -16,6 +16,7 @@
     <string name="coach">教练</string>
     <string name="keypad_digit">%1$d，还剩 %2$d 个</string>
     <string name="keypad_done">%1$d，已全部填入</string>
+    <string name="keypad_pencil">%1$d，铅笔记号</string>
     <string name="board_description">数独盘面，%1$d × %1$d</string>
     <string name="cell_description">第 %1$d 行，第 %2$d 列，%3$s</string>
     <string name="cell_label">第 %1$d 行第 %2$d 列</string>

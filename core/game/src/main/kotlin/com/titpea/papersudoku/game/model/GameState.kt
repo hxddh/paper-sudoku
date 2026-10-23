@@ -1,6 +1,7 @@
 package com.titpea.papersudoku.game.model
 
 import com.titpea.papersudoku.engine.DigitMask
+import com.titpea.papersudoku.engine.SudokuEngine
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -125,6 +126,21 @@ data class GameState(
             }
         }
         return remember().copy(values = values.replace(index, 0), notes = restored.replace(index, 0), selected = index)
+    }
+
+    /**
+     * Pencils in every candidate (each digit not yet in the cell's row, column or box) in the
+     * empty cells that have no marks yet. Cells already marked keep the player's own marks. Only
+     * notes: the Coach's help and the clean stamp are untouched. One undo takes it all back.
+     */
+    fun pencilInCandidates(): GameState {
+        if (solved) return this
+        val engine = SudokuEngine(spec.puzzle)
+        val board = values.toIntArray()
+        val filled = notes.mapIndexed { i, mask ->
+            if (values[i] == 0 && mask == 0) DigitMask.of(engine.candidates(board, i)) else mask
+        }
+        return if (filled == notes) this else remember().copy(notes = filled)
     }
 
     fun undo(): GameState {

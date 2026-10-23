@@ -1,5 +1,15 @@
 package com.titpea.papersudoku.page
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -17,12 +27,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
@@ -59,7 +66,8 @@ fun keypadHeight(size: Int): Dp = if (size == 6) KeyHeight else KeyHeight * 2 + 
 
 /**
  * The three tools in a Material 3 Expressive floating toolbar: undo, the pencil (a toggle, in ink
- * blue when on) and the Coach (tonal). Red stays for the Coach's own marks and the held digit.
+ * blue when on; held on a 9×9 page, it pencils in every candidate) and the Coach. All three are
+ * equally quiet: the page leads, and red stays for the Coach's own marks and the held digit.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -77,26 +85,65 @@ fun PageToolbar(
             enabled = game.history.isNotEmpty(),
             modifier = Modifier.testTag("tool-undo"),
         ) { Icon(painterResource(R.drawable.ic_undo), contentDescription = stringResource(R.string.undo)) }
-        val colors = MaterialTheme.colorScheme
-        FilledIconToggleButton(
-            checked = game.notesMode,
-            onCheckedChange = { onEvent(PageEvent.ToggleNotes) },
-            colors = IconButtonDefaults.filledIconToggleButtonColors(
-                containerColor = Color.Transparent,
-                contentColor = colors.onSurfaceVariant,
-                checkedContainerColor = colors.secondaryContainer,
-                checkedContentColor = colors.onSecondaryContainer,
-            ),
-            modifier = Modifier.testTag("tool-notes"),
-        ) { Icon(painterResource(R.drawable.ic_pencil), contentDescription = stringResource(R.string.notes)) }
-        FilledTonalIconButton(
+        PencilButton(
+            on = game.notesMode,
+            // Pencilling in every candidate is for 9×9 pages; a 6×6 page is quick to mark by hand.
+            canFill = game.size == 9 && !game.solved,
+            onToggle = { onEvent(PageEvent.ToggleNotes) },
+            onFill = { onEvent(PageEvent.FillCandidates) },
+        )
+        IconButton(
             onClick = { onEvent(PageEvent.Coach) },
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = colors.primaryContainer,
-                contentColor = colors.onPrimaryContainer,
-            ),
             modifier = Modifier.testTag("coach-action"),
         ) { Icon(painterResource(R.drawable.ic_coach), contentDescription = stringResource(R.string.coach)) }
+    }
+}
+
+/**
+ * The pencil: a tap switches it, a long press (or TalkBack's action) pencils in every candidate.
+ * Drawn like an icon toggle button: ink-blue container when on.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun PencilButton(on: Boolean, canFill: Boolean, onToggle: () -> Unit, onFill: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val haptics = LocalHapticFeedback.current
+    val fillLabel = stringResource(R.string.fill_candidates)
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        Modifier
+            .size(48.dp)
+            .padding(4.dp)
+            .clip(CircleShape)
+            .background(if (on) colors.secondaryContainer else Color.Transparent)
+            .combinedClickable(
+                interactionSource = interaction,
+                indication = ripple(),
+                role = Role.Switch,
+                onClickLabel = null,
+                onLongClickLabel = if (canFill) fillLabel else null,
+                onLongClick = if (canFill) {
+                    {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onFill()
+                    }
+                } else {
+                    null
+                },
+                onClick = onToggle,
+            )
+            .semantics {
+                toggleableState = ToggleableState(on)
+                if (canFill) customActions = listOf(CustomAccessibilityAction(fillLabel) { onFill(); true })
+            }
+            .testTag("tool-notes"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painterResource(R.drawable.ic_pencil),
+            contentDescription = stringResource(R.string.notes),
+            tint = if (on) colors.onSecondaryContainer else colors.onSurfaceVariant,
+        )
     }
 }
 
@@ -214,7 +261,8 @@ private fun DigitKey(
         bottomEnd = if (last) outer else inner,
     )
     val done = left <= 0
-    // Paper keys with printed ink; the held digit is the one red key. Pencil mode greys the ink.
+    // Paper keys with printed ink; the held digit is the one red key. In pencil mode the digits
+    // are smaller and in the pencil's ink blue, so the mode reads as a mode, not as disabled keys.
     val container = when {
         held -> colors.primary
         pencil -> colors.surfaceContainer
@@ -222,12 +270,13 @@ private fun DigitKey(
     }
     val content = when {
         held -> colors.onPrimary
-        pencil -> colors.onSurfaceVariant
+        pencil -> colors.secondary
         else -> colors.onSurface
     }
     val description = when {
         held -> stringResource(R.string.keypad_held, digit)
         done -> stringResource(R.string.keypad_done, digit)
+        pencil -> stringResource(R.string.keypad_pencil, digit)
         else -> stringResource(R.string.keypad_digit, digit, left)
     }
     Box(

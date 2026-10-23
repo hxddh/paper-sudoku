@@ -150,10 +150,16 @@ fun MarginNote(
                 }
             }
             if (LocalDensity.current.fontScale > 1.3f) {
-                // Very large text: one action per line, full width, the step forward first.
+                // Very large text: one action per line, full width, the step forward first, except
+                // when it is the answer: what costs the clean stamp never takes the top spot.
                 Column(Modifier.fillMaxWidth().padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    next(Modifier.fillMaxWidth())
-                    dismiss(Modifier.fillMaxWidth())
+                    if (answerNext) {
+                        dismiss(Modifier.fillMaxWidth())
+                        next(Modifier.fillMaxWidth())
+                    } else {
+                        next(Modifier.fillMaxWidth())
+                        dismiss(Modifier.fillMaxWidth())
+                    }
                 }
             } else {
                 Row(

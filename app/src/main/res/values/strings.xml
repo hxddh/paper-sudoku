@@ -16,6 +16,7 @@
     <string name="coach">Coach</string>
     <string name="keypad_digit">%1$d, %2$d left</string>
     <string name="keypad_done">%1$d, all placed</string>
+    <string name="keypad_pencil">%1$d, pencil mark</string>
     <string name="board_description">Sudoku board, %1$d by %1$d</string>
     <string name="cell_description">Row %1$d, column %2$d, %3$s</string>
     <string name="cell_label">row %1$d, column %2$d</string>
