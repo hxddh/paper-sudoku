@@ -206,9 +206,11 @@ jobs:
           src=app/build/outputs/screenshots/reduced
           [ -d "$src" ] || { echo "No captures"; exit 0; }
           out=$(mktemp -d)
-          mkdir -p "$out/goldens" "$out/app"
+          mkdir -p "$out/goldens" "$out/app" "$out/store"
           cp "$src"/*.png "$out/goldens/"
           cp app/build/outputs/paper-sudoku-*.png "$out/app/" 2>/dev/null || true
+          # The Play listing's screenshots (artwork, not compared with goldens).
+          cp app/build/outputs/screenshots/store/*.png "$out/store/" 2>/dev/null || true
           cd "$out"
           git init -q -b "$BRANCH"
           git add .
