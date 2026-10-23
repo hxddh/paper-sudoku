@@ -43,8 +43,18 @@ data class GameResultEntity(
  * The in-progress (or finished) board for one puzzle, as [com.titpea.papersudoku.game.model.GameState]
  * JSON. [givens] and [grid] repeat the printed and current digits (one character per cell) so the
  * notebook can draw its pages without decoding every game.
+ *
+ * Room orders the table's columns by field order: [json] (up to ~110 KB with the undo history) is
+ * kept last so that queries reading only the small columns stop before its overflow pages. The two
+ * indices serve the notebook's dailies and the unfinished-practice lookups.
  */
-@Entity(tableName = "saved_games")
+@Entity(
+    tableName = "saved_games",
+    indices = [
+        Index("kind", "epochDay"),
+        Index("kind", "solved", "updatedAt"),
+    ],
+)
 data class SavedGameEntity(
     @PrimaryKey val puzzleKey: String,
     val kind: String,
@@ -52,10 +62,10 @@ data class SavedGameEntity(
     val number: Int?,
     val epochDay: Long?,
     val solved: Boolean,
-    val json: String,
     val updatedAt: Long,
     @ColumnInfo(defaultValue = "''") val givens: String = "",
     @ColumnInfo(defaultValue = "''") val grid: String = "",
+    val json: String,
 )
 
 /** What the notebook and the widget need of a saved page. */
@@ -167,7 +177,7 @@ private const val PAGE_COLUMNS = "puzzleKey, kind, difficulty, number, epochDay,
 
 @Database(
     entities = [GameResultEntity::class, SavedGameEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class SudokuDatabase : RoomDatabase() {
@@ -179,7 +189,7 @@ abstract class SudokuDatabase : RoomDatabase() {
 
         fun create(context: Context, name: String = NAME): SudokuDatabase =
             Room.databaseBuilder(context.applicationContext, SudokuDatabase::class.java, name)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
     }
 }
@@ -229,6 +239,33 @@ val MIGRATION_2_3: Migration = object : Migration(2, 3) {
                 arrayOf(game.spec.givens.digits(), game.values.digits(), key),
             )
         }
+    }
+}
+
+/**
+ * v3 → v4: `saved_games` rebuilt with `json` as its last column (so page queries never walk the large
+ * value) and indexed for the notebook's queries. Every row and value is kept.
+ */
+val MIGRATION_3_4: Migration = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `saved_games_new` (`puzzleKey` TEXT NOT NULL, `kind` TEXT NOT NULL, " +
+                "`difficulty` TEXT NOT NULL, `number` INTEGER, `epochDay` INTEGER, `solved` INTEGER NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL, `givens` TEXT NOT NULL DEFAULT '', `grid` TEXT NOT NULL DEFAULT '', " +
+                "`json` TEXT NOT NULL, PRIMARY KEY(`puzzleKey`))",
+        )
+        db.execSQL(
+            "INSERT INTO `saved_games_new` (`puzzleKey`, `kind`, `difficulty`, `number`, `epochDay`, `solved`, " +
+                "`updatedAt`, `givens`, `grid`, `json`) SELECT `puzzleKey`, `kind`, `difficulty`, `number`, " +
+                "`epochDay`, `solved`, `updatedAt`, `givens`, `grid`, `json` FROM `saved_games`",
+        )
+        db.execSQL("DROP TABLE `saved_games`")
+        db.execSQL("ALTER TABLE `saved_games_new` RENAME TO `saved_games`")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_saved_games_kind_epochDay` ON `saved_games` (`kind`, `epochDay`)")
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_saved_games_kind_solved_updatedAt` " +
+                "ON `saved_games` (`kind`, `solved`, `updatedAt`)",
+        )
     }
 }
 
