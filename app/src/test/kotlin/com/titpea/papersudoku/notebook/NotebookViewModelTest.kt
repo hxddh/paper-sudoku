@@ -57,7 +57,7 @@ class NotebookViewModelTest {
     }
 
     @Test
-    fun `only pages written on are listed; the contents reach back to the install day`() = runTest(dispatcher) {
+    fun `only pages written on are listed, and the contents reach back to the install day`() = runTest(dispatcher) {
         store.save(begun(today - 2), now = 1)
         val state = viewModel(firstDay = today - 30).loaded()
         assertEquals(listOf(today - 2), state.unfinished)
