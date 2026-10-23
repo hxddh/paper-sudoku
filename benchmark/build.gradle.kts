@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.test)
 }
 
+val benchmarkRules = providers.gradleProperty("paperSudoku.benchmarkRules").orNull ?: "Macrobenchmark"
+
 android {
     namespace = "com.titpea.papersudoku.benchmark"
     compileSdk {
@@ -17,6 +19,9 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // CI measures on an emulator; numbers there are for trend, not for the 400 ms budget.
         testInstrumentationRunnerArguments["androidx.benchmark.suppressErrors"] = "EMULATOR,LOW-BATTERY"
+        // Macrobenchmarks (and the plain SmokeTest) by default; BaselineProfileGenerator runs only
+        // with -PpaperSudoku.benchmarkRules=BaselineProfile (see that class).
+        testInstrumentationRunnerArguments["androidx.benchmark.enabledRules"] = benchmarkRules
     }
 
     buildTypes {
