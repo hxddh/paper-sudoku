@@ -33,8 +33,9 @@ import org.junit.Test
 import java.io.File
 
 /**
- * The Play listing's screenshots: phone shots at 9:16 (1080 × 1920) and a tablet shot at 16:10
- * (1600 × 1000), drawn from the same fixtures as the screenshot matrix. Saved under
+ * The Play listing's screenshots: phone shots at 9:16 (1080 × 1920) and a tablet shot at 16:9
+ * (1080 × 608), drawn from the same fixtures as the screenshot matrix. Both fit the CI device's
+ * 1080px-wide screen, since only what is on screen can be captured. Saved under
  * `screenshots/store/`; CI publishes them with the captures for review. They are not compared
  * with goldens: they are artwork, refreshed when the screens change.
  */
@@ -67,13 +68,13 @@ class StoreScreenshotsTest {
         composeRule.setContent {
             val shot = current
             val base = LocalDensity.current
-            // Pixel sizes fixed whatever the device: 360 × 640dp at 3×, or 960 × 600dp at 5/3×.
-            val scale = if (shot.tablet) 1600f / 960f else 3f
+            // Pixel sizes fixed whatever the device: 360 × 640dp at 3×, or 960 × 540dp at 1.125×.
+            val scale = if (shot.tablet) 1080f / 960f else 3f
             CompositionLocalProvider(LocalDensity provides Density(scale, base.fontScale)) {
                 SudokuTheme(darkTheme = shot.dark) {
                     Box(
                         Modifier
-                            .requiredSize(if (shot.tablet) 960.dp else 360.dp, if (shot.tablet) 600.dp else 640.dp)
+                            .requiredSize(if (shot.tablet) 960.dp else 360.dp, if (shot.tablet) 540.dp else 640.dp)
                             .background(PaperTheme.colors.background)
                             .testTag("store-frame"),
                     ) { shot.content() }
@@ -85,7 +86,7 @@ class StoreScreenshotsTest {
             composeRule.waitForIdle()
             composeRule.mainClock.advanceTimeBy(1_000)
             val bitmap = composeRule.onNodeWithTag("store-frame").captureToImage().asAndroidBitmap()
-            assertEquals(shot.name, if (shot.tablet) 1600 else 1080, bitmap.width)
+            assertEquals(shot.name, 1080, bitmap.width)
             File(dir, "${shot.name}.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
     }

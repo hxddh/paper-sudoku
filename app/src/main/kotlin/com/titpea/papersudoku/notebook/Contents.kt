@@ -218,8 +218,9 @@ private fun DayCell(day: Long, entry: PageEntry?, isToday: Boolean, openable: Bo
             .heightIn(min = 48.dp)
             .fillMaxWidth()
             .then(if (openable) Modifier.clickable(role = Role.Button, onClick = onOpen) else Modifier)
-            .clearAndSetSemantics { if (openable) contentDescription = label }
-            .testTag("contents-day-$day"),
+            // Tagged before the semantics are replaced, so tests and UI Automator still find it.
+            .testTag("contents-day-$day")
+            .clearAndSetSemantics { if (openable) contentDescription = label },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {

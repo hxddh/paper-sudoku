@@ -207,7 +207,9 @@ internal fun SettingsScaffold(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
+                    // Also when the list opens partway down (the handbook at a topic), where no
+                    // scroll has happened for the bar to notice.
+                    containerColor = if (listState.canScrollBackward) MaterialTheme.colorScheme.surfaceContainer else Color.Transparent,
                     scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ),
                 scrollBehavior = scrollBehavior,

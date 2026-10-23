@@ -100,7 +100,7 @@ substitute for a signed release check.
 4. Complete content rating and target audience for a puzzle game.
 5. Set pricing/monetization. The v1 recommendation is a one-time paid app; there is no billing
    code and no IAP.
-6. Add phone and tablet screenshots (`StoreScreenshotsTest`: 1080×1920 phone, 1600×1000 tablet;
+6. Add phone and tablet screenshots (`StoreScreenshotsTest`: 1080×1920 phone, 1080×608 tablet (16:9);
    CI publishes them under `store/` on the captures branch), the feature graphic
    (`docs/assets/feature-graphic.png`, drawn by `tools/store/feature_graphic.py`), short/full
    description, and support contact.

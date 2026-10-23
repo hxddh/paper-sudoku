@@ -490,12 +490,12 @@ private fun HandbookRow(name: String, summary: String, met: Boolean, tag: String
             .fillMaxWidth()
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = TextInset, vertical = 10.dp)
+            .testTag(tag)
             .clearAndSetSemantics {
                 contentDescription = label
                 role = Role.Button
                 onClick { onClick(); true }
-            }
-            .testTag(tag),
+            },
         verticalAlignment = Alignment.Top,
     ) {
         // Met: a moss check. Not yet: nothing (an empty ring read as a to-do to tick).
