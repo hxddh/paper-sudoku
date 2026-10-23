@@ -120,6 +120,10 @@ interface GameResultDao {
     @Query("SELECT COUNT(*) FROM game_results")
     fun observeCount(): Flow<Int>
 
+    /** When each practice (9×9) page was finished, for the contents' month counts. */
+    @Query("SELECT completedAt FROM game_results WHERE mode = 'classic'")
+    fun observePracticeCompletions(): Flow<List<Long>>
+
     /** Practice (9×9) solves without the Coach's answer, per difficulty. */
     @Query(
         """

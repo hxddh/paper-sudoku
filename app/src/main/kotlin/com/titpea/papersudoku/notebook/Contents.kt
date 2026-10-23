@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
@@ -32,6 +35,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -42,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
 import com.titpea.papersudoku.designsystem.PaperType
+import com.titpea.papersudoku.page.DOT
 import com.titpea.papersudoku.page.monthDay
 import com.titpea.papersudoku.page.spoken
 import java.time.LocalDate
@@ -51,9 +56,10 @@ import java.time.format.TextStyle
 import java.time.temporal.WeekFields
 
 /**
- * The notebook's contents page: one month at a time, a square per day. A filled dot is a clean
- * stamp, a ring a page done with the Coach's answer, a grey dot a page begun; today is circled.
- * No streak is counted — the month only shows what is there. A day opens with a tap.
+ * The notebook's contents: one month at a time, a square per day, and the way back to any of
+ * them. A filled dot is a clean stamp, a ring a page done with the Coach's answer, a grey dot a
+ * page begun; today is circled. A key under the grid says so. The month's tally counts pages, not
+ * days in a row — there is no streak. A day opens with a tap.
  *
  * [first] is the notebook's first day (install or earliest page); months before it and after
  * today are not offered.
@@ -63,6 +69,7 @@ fun MonthContents(
     pages: Map<Long, PageEntry>,
     today: Long,
     first: Long,
+    practiceByMonth: Map<YearMonth, Int>,
     onOpenDay: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -96,6 +103,21 @@ fun MonthContents(
                 IconButton(onClick = { back-- }, enabled = canGoForward, modifier = Modifier.testTag("contents-next")) {
                     Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = stringResource(R.string.contents_next))
                 }
+            }
+            val stamped = pages.values.count { it.stamped && YearMonth.from(LocalDate.ofEpochDay(it.epochDay)) == month }
+            val practice = practiceByMonth[month] ?: 0
+            val tally = listOfNotNull(
+                stamped.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.contents_stamped, it, it) },
+                practice.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.contents_practice, it, it) },
+            ).joinToString(DOT)
+            if (tally.isNotEmpty()) {
+                Text(
+                    tally,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).testTag("contents-tally"),
+                )
             }
             val weekStart = WeekFields.of(locale).firstDayOfWeek
             Row(Modifier.fillMaxWidth().clearAndSetSemantics {}) {
@@ -132,6 +154,48 @@ fun MonthContents(
                     }
                 }
             }
+            ContentsKey(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp))
+        }
+    }
+}
+
+/** What the marks mean, in the marks themselves. Read once by TalkBack; each day says its own. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ContentsKey(modifier: Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val entries = listOf(
+        DayMark.Clean to stringResource(R.string.contents_key_clean),
+        DayMark.Coached to stringResource(R.string.contents_key_coached),
+        DayMark.Begun to stringResource(R.string.page_in_progress),
+    )
+    FlowRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        entries.forEach { (mark, label) ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Mark(mark)
+                Spacer(Modifier.width(6.dp))
+                Text(label, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+private enum class DayMark { Clean, Coached, Begun }
+
+/** Shape carries the meaning, so it reads without colour too. */
+@Composable
+private fun Mark(mark: DayMark?) {
+    val colors = MaterialTheme.colorScheme
+    Box(Modifier.size(8.dp), contentAlignment = Alignment.Center) {
+        when (mark) {
+            DayMark.Clean -> Box(Modifier.size(8.dp).background(colors.primary, CircleShape))
+            DayMark.Coached -> Box(Modifier.size(8.dp).border(1.5.dp, colors.primary, CircleShape))
+            DayMark.Begun -> Box(Modifier.size(6.dp).background(colors.onSurfaceVariant, CircleShape))
+            null -> Unit
         }
     }
 }
@@ -175,14 +239,14 @@ private fun DayCell(day: Long, entry: PageEntry?, isToday: Boolean, openable: Bo
                 },
             )
         }
-        // The mark: shape carries the meaning, so it reads without colour too.
-        Box(Modifier.size(6.dp)) {
+        Mark(
             when {
-                entry == null -> Unit
-                entry.stamped && entry.clean -> Box(Modifier.size(6.dp).background(colors.primary, CircleShape))
-                entry.stamped -> Box(Modifier.size(6.dp).border(1.dp, colors.primary, CircleShape))
-                entry.saved != null -> Box(Modifier.size(6.dp).background(colors.onSurfaceVariant.copy(alpha = 0.5f), CircleShape))
-            }
-        }
+                entry == null -> null
+                entry.stamped && entry.clean -> DayMark.Clean
+                entry.stamped -> DayMark.Coached
+                entry.saved != null -> DayMark.Begun
+                else -> null
+            },
+        )
     }
 }

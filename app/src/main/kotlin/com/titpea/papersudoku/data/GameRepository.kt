@@ -101,6 +101,9 @@ interface GameStore {
 
     /** Every stamped page, dailies and practice. */
     val stampedCount: Flow<Int>
+
+    /** When each practice page was finished (epoch millis). */
+    val practiceCompletions: Flow<List<Long>>
 }
 
 class RoomGameStore(
@@ -182,6 +185,7 @@ class RoomGameStore(
 
     override val days: Flow<List<DayResult>> = results.observeDays()
     override val stampedCount: Flow<Int> = results.observeCount()
+    override val practiceCompletions: Flow<List<Long>> = results.observePracticeCompletions()
 
     private suspend fun entity(state: GameState, now: Long): SavedGameEntity {
         val spec = state.spec

@@ -108,6 +108,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
+import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.designsystem.FrauncesPrinted
 import com.titpea.papersudoku.designsystem.InkStamp
 import com.titpea.papersudoku.designsystem.PaperTheme
@@ -587,7 +588,10 @@ private fun solvedOutlook(game: GameState, state: PageUiState): Outlook? = when 
         val remaining = after.remaining
         when {
             after.leveledUp -> Outlook(stringResource(R.string.solved_level_up, difficultyName(after.level)), news = true)
-            remaining != null -> Outlook(pluralStringResource(R.plurals.practice_to_next, remaining, remaining))
+            remaining != null -> {
+                val nextLevel = Difficulty.entries.getOrElse(after.level.ordinal + 1) { after.level }
+                Outlook(pluralStringResource(R.plurals.practice_to_next, remaining, remaining, difficultyName(nextLevel)))
+            }
             else -> Outlook(stringResource(R.string.practice_top_level))
         }
     }

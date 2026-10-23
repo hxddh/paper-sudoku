@@ -41,6 +41,7 @@ class FakeGameStore : GameStore {
         if (results.any { it.puzzleKey == result.puzzleKey }) return false
         results += result
         stampedFlow.value = results.size
+        result.epochDay?.let { day -> daysFlow.update { it + DayResult(day, result.coachLevel, result.durationSeconds) } }
         return true
     }
 
@@ -76,6 +77,9 @@ class FakeGameStore : GameStore {
     override val days: Flow<List<DayResult>> = daysFlow
     private val stampedFlow = MutableStateFlow(0)
     override val stampedCount: Flow<Int> = stampedFlow
+    override val practiceCompletions: Flow<List<Long>> = savedFlow.map {
+        results.filter { it.kind == PuzzleKind.Classic }.map { it.completedAt }
+    }
 }
 
 class FakeSettings(initial: UserSettings = UserSettings()) : SettingsStore {

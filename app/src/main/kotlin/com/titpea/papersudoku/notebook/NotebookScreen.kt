@@ -52,9 +52,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -64,6 +67,7 @@ import com.titpea.papersudoku.page.month
 import com.titpea.papersudoku.page.DOT
 import com.titpea.papersudoku.designsystem.SectionHeader
 import com.titpea.papersudoku.designsystem.PaperType
+import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.engine.Technique
 import com.titpea.papersudoku.page.difficultyName
 import com.titpea.papersudoku.page.formatElapsed
@@ -93,6 +97,8 @@ fun NotebookScreen(
     onOpenPractice: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Opens the handbook at a topic: 0 is using the pen, then the techniques in order. */
+    onOpenHandbook: (Int) -> Unit = {},
     selectedKey: String? = null,
     boardTransition: @Composable (key: String) -> Modifier = { Modifier },
 ) {
@@ -121,11 +127,12 @@ fun NotebookScreen(
     ) { padding ->
         val direction = LocalLayoutDirection.current
         LazyColumn(
-            modifier = Modifier.fillMaxSize().testTag("notebook-list"),
+            // The top inset is padding, not content padding: month headers then stick just under
+            // the app bar instead of under it.
+            modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()).testTag("notebook-list"),
             contentPadding = PaddingValues(
                 start = padding.calculateStartPadding(direction) + 16.dp,
                 end = padding.calculateEndPadding(direction) + 16.dp,
-                top = padding.calculateTopPadding(),
                 bottom = padding.calculateBottomPadding() + 24.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -135,7 +142,7 @@ fun NotebookScreen(
             // scrolled past today under the app bar.
             if (!state.loaded) return@LazyColumn
             state.todayPage?.let { page ->
-                item(key = "today") {
+                item(key = "today", contentType = "card") {
                     TodayCard(
                         page = page,
                         selected = selectedKey == "daily-${page.epochDay}",
@@ -144,7 +151,7 @@ fun NotebookScreen(
                     )
                 }
             }
-            item(key = "practice") {
+            item(key = "practice", contentType = "card") {
                 PracticeCard(
                     practice = state.practice,
                     selected = selectedKey == "practice",
@@ -152,49 +159,62 @@ fun NotebookScreen(
                     thumbnailModifier = boardTransition("practice"),
                 )
             }
-            item(key = "summary") {
-                Text(
-                    if (state.stamped == 0) {
-                        stringResource(R.string.notebook_summary_empty)
-                    } else {
-                        pluralStringResource(R.plurals.notebook_summary, state.stamped, state.stamped)
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(horizontal = TextInset, vertical = 8.dp),
-                )
+            if (state.stamped == 0) {
+                item(key = "summary") {
+                    Text(
+                        stringResource(R.string.notebook_summary_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(horizontal = TextInset, vertical = 8.dp),
+                    )
+                }
             }
-            // The contents: a month at a time, the quick way back to any day.
+            // The contents: a month at a time, the way back to any day, written on or not.
             item(key = "contents-title") { SectionTitle(stringResource(R.string.contents_title)) }
             item(key = "contents") {
                 MonthContents(
                     pages = state.pages,
                     today = state.today,
-                    first = state.pastDays.lastOrNull() ?: state.today,
+                    first = state.firstDay,
+                    practiceByMonth = state.practiceByMonth,
                     onOpenDay = onOpenDay,
                 )
             }
-            // The handbook sits above the days, so it never drifts to the end of a long notebook.
+            // The handbook sits above the pages, so it never drifts to the end of a long notebook.
             item(key = "techniques") { SectionTitle(stringResource(R.string.notebook_techniques)) }
-            item(key = "handbook") { Handbook(state.techniquesMet) }
-            if (state.pastDays.isNotEmpty()) {
+            item(key = "handbook") { Handbook(state.techniquesMet, onOpenHandbook) }
+            // Only pages with something on them: blank days are reached through the contents.
+            if (state.unfinished.isNotEmpty()) {
+                item(key = "unfinished") { SectionTitle(stringResource(R.string.notebook_unfinished)) }
+                items(state.unfinished, key = { it }, contentType = { "row" }) { day -> DayRow(state, day, selectedKey, onOpenDay, boardTransition) }
+            }
+            if (state.stampedDays.isNotEmpty()) {
                 item(key = "earlier") { SectionTitle(stringResource(R.string.notebook_earlier)) }
             }
             // Grouped by month, each under a header that stays while its days scroll past.
-            state.pastDays.groupBy { YearMonth.from(LocalDate.ofEpochDay(it)) }.forEach { (month, days) ->
-                stickyHeader(key = "month-$month") { MonthHeader(month) }
-                items(days, key = { it }) { day ->
-                    val page = state.pages[day] ?: return@items
-                    PageRow(
-                        page = page,
-                        selected = selectedKey == "daily-$day",
-                        onClick = { onOpenDay(day) },
-                        thumbnailModifier = boardTransition("daily-$day"),
-                    )
-                }
+            state.stampedDays.groupBy { YearMonth.from(LocalDate.ofEpochDay(it)) }.forEach { (month, days) ->
+                stickyHeader(key = "month-$month", contentType = "month") { MonthHeader(month) }
+                items(days, key = { "stamped-$it" }, contentType = { "row" }) { day -> DayRow(state, day, selectedKey, onOpenDay, boardTransition) }
             }
         }
     }
+}
+
+@Composable
+private fun DayRow(
+    state: NotebookUiState,
+    day: Long,
+    selectedKey: String?,
+    onOpenDay: (Long) -> Unit,
+    boardTransition: @Composable (String) -> Modifier,
+) {
+    val page = state.pages[day] ?: return
+    PageRow(
+        page = page,
+        selected = selectedKey == "daily-$day",
+        onClick = { onOpenDay(day) },
+        thumbnailModifier = boardTransition("daily-$day"),
+    )
 }
 
 /** A month in the earlier pages: opaque, so the rows scrolling under it never show through. */
@@ -312,7 +332,8 @@ private fun PracticeCard(
     val progress = if (next == null) {
         stringResource(R.string.practice_top_level)
     } else {
-        pluralStringResource(R.plurals.practice_to_next, next, next)
+        val nextLevel = Difficulty.entries.getOrElse(practice.level.ordinal + 1) { practice.level }
+        pluralStringResource(R.plurals.practice_to_next, next, next, difficultyName(nextLevel))
     }
     val status = if (practice.saved != null) {
         stringResource(R.string.practice_continue, (practice.saved.number ?: 0) + 1)
@@ -426,11 +447,12 @@ private fun StampMark(clean: Boolean, modifier: Modifier, size: androidx.compose
 }
 
 /**
- * The seven techniques on one card, in learning order. A technique is checked once a stamped
- * page needed it or the Coach explained it; only those say "Seen", so the rest stay quiet.
+ * The handbook on one card: using the pen, then the seven techniques in learning order. A
+ * technique is checked once a stamped page needed it or the Coach explained it; only those say
+ * "Seen", so the rest stay quiet. Every row opens its page of the handbook.
  */
 @Composable
-private fun Handbook(met: Set<Technique>) {
+private fun Handbook(met: Set<Technique>, onOpen: (Int) -> Unit) {
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -438,24 +460,42 @@ private fun Handbook(met: Set<Technique>) {
         modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth().testTag("handbook"),
     ) {
         Column(Modifier.padding(vertical = 8.dp)) {
-            Technique.entries.forEach { TechniqueRow(it, it in met) }
+            HandbookRow(
+                name = stringResource(R.string.handbook_pen),
+                summary = stringResource(R.string.handbook_pen_summary),
+                met = false,
+                tag = "technique-pen",
+                onClick = { onOpen(0) },
+            )
+            Technique.entries.forEachIndexed { i, technique ->
+                HandbookRow(
+                    name = techniqueName(technique),
+                    summary = techniqueSummary(technique),
+                    met = technique in met,
+                    tag = "technique-${technique.name}",
+                    onClick = { onOpen(i + 1) },
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun TechniqueRow(technique: Technique, met: Boolean) {
+private fun HandbookRow(name: String, summary: String, met: Boolean, tag: String, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val seen = stringResource(R.string.technique_seen)
-    val name = techniqueName(technique)
-    val summary = techniqueSummary(technique)
     val label = spoken(name, if (met) seen else "", summary)
     Row(
         Modifier
             .fillMaxWidth()
+            .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = TextInset, vertical = 10.dp)
-            .clearAndSetSemantics { contentDescription = label }
-            .testTag("technique-${technique.name}"),
+            .clearAndSetSemantics {
+                contentDescription = label
+                role = Role.Button
+                onClick { onClick(); true }
+            }
+            .testTag(tag),
         verticalAlignment = Alignment.Top,
     ) {
         // Met: a moss check. Not yet: nothing (an empty ring read as a to-do to tick).

@@ -69,6 +69,8 @@ import com.titpea.papersudoku.page.PageKeys
 import com.titpea.papersudoku.page.PageScreen
 import com.titpea.papersudoku.page.PageViewModel
 import com.titpea.papersudoku.settings.LicencesScreen
+import com.titpea.papersudoku.notebook.HandbookScreen
+import androidx.compose.runtime.mutableIntStateOf
 import com.titpea.papersudoku.settings.SettingsScreen
 import com.titpea.papersudoku.share.printPuzzle
 import com.titpea.papersudoku.share.sharePage
@@ -77,10 +79,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
-enum class Screen { Home, Settings, Licences }
+enum class Screen { Home, Settings, Licences, Handbook }
 
 /**
- * Two destinations on a Navigation 3 back stack: the notebook (home) and Settings. The notebook
+ * Destinations on a Navigation 3 back stack: the notebook (home), the handbook, Settings and the
+ * licences. The notebook
  * itself is a Material 3 adaptive list-detail scaffold — the list of pages and the open page —
  * which shows one pane on phones and both side by side on wide windows.
  */
@@ -99,6 +102,8 @@ fun PaperSudokuApp(
     val notebookViewModel: NotebookViewModel = viewModel(factory = NotebookViewModel.factory(container))
     val scope = rememberCoroutineScope()
     val grain = rememberPaperGrain(PaperTheme.ink)
+    // The handbook topic to open at; saved with the back stack.
+    var handbookStart by rememberSaveable { mutableIntStateOf(0) }
 
     // The widget asks for today's page: leave Settings if it is open, open today, and let the
     // notebook move its detail pane once it is on screen.
@@ -157,6 +162,12 @@ fun PaperSudokuApp(
                                 notebookViewModel = notebookViewModel,
                                 // Guarded: a double tap during the transition must not stack Settings twice.
                                 onOpenSettings = { if (backStack.lastOrNull() == Screen.Home) backStack.add(Screen.Settings) },
+                                onOpenHandbook = { topic ->
+                                    if (backStack.lastOrNull() == Screen.Home) {
+                                        handbookStart = topic
+                                        backStack.add(Screen.Handbook)
+                                    }
+                                },
                                 showToday = showToday,
                                 onTodayShown = { showToday = false },
                             )
@@ -174,6 +185,14 @@ fun PaperSudokuApp(
                             Screen.Licences -> LicencesScreen(
                                 onBack = { if (backStack.lastOrNull() == Screen.Licences) backStack.removeAt(backStack.lastIndex) },
                             )
+                            Screen.Handbook -> {
+                                val state by pageViewModel.state.collectAsStateWithLifecycle()
+                                HandbookScreen(
+                                    start = handbookStart,
+                                    techniquesMet = state.settings.techniquesMet,
+                                    onBack = { if (backStack.lastOrNull() == Screen.Handbook) backStack.removeAt(backStack.lastIndex) },
+                                )
+                            }
                         }
                         }
                     }
@@ -218,6 +237,7 @@ private fun NotebookHome(
     pageViewModel: PageViewModel,
     notebookViewModel: NotebookViewModel,
     onOpenSettings: () -> Unit,
+    onOpenHandbook: (Int) -> Unit,
     showToday: Boolean,
     onTodayShown: () -> Unit,
 ) {
@@ -282,6 +302,7 @@ private fun NotebookHome(
                             scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, PageKeys.PRACTICE) }
                         },
                         onOpenSettings = onOpenSettings,
+                        onOpenHandbook = onOpenHandbook,
                         selectedKey = if (twoPane) openKey else null,
                         boardTransition = { key ->
                             Modifier.sharedBounds(rememberSharedContentState("board-$key"), paneScope)

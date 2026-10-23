@@ -110,12 +110,14 @@ fun Board(
     modifier: Modifier = Modifier,
     onAimMove: () -> Unit = {},
     showContent: Boolean = true,
+    /** False for a drawing to look at (the handbook's examples): no taps, aiming or actions. */
+    interactive: Boolean = true,
 ) {
     val ink = PaperTheme.ink
     val size = game.size
     val geometry = game.spec.geometry
     val boardDescription = stringResource(R.string.board_description, size)
-    val enabled = !game.solved && showContent
+    val enabled = interactive && !game.solved && showContent
     var aimed by remember { mutableStateOf<Int?>(null) }
     var loupeAt by remember { mutableStateOf<Offset?>(null) }
     val currentOnTap by rememberUpdatedState(onTap)

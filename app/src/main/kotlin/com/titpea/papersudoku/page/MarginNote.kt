@@ -279,6 +279,23 @@ private fun coachText(coach: CoachUi, geometry: Geometry): CoachText {
     }
 }
 
+/**
+ * The Coach's whole explanation of [hint] at once, for the handbook's worked examples: what to
+ * look for, why, and what it leaves.
+ */
+@Composable
+internal fun workedExample(geometry: Geometry, hint: CoachHint.Next): List<String> {
+    val lesson = hint.lesson
+    val placement = hint.placement
+    val why = whyText(geometry, lesson)
+    val then = if (lesson is Elimination) {
+        stringResource(R.string.sentence_space) + thenText(geometry, placement, cellLabel(geometry, placement.index))
+    } else {
+        ""
+    }
+    return listOf(lookTip(lesson.technique), why + then)
+}
+
 @Composable
 private fun thenText(geometry: Geometry, placement: Placement, cell: String): String {
     val unit = placement.unit

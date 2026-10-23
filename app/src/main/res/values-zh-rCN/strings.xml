@@ -41,7 +41,7 @@
     <string name="coach_answer_cost">看了答案，这一页就不算干净完成。</string>
     <string name="coach_more">单靠这一步还定不出数字。</string>
     <string name="coach_none_title">现在没有简单的下一步。</string>
-    <string name="coach_none_body">走一步之后再来看看。</string>
+    <string name="coach_none_body">目前页面上没有写错的数。下一步超出了教练能讲清楚的范围。</string>
     <string name="coach_mistake_title">有个数字不对。</string>
     <string name="coach_mistake_look">你填的数字里有一个不对，检查一下%1$s。</string>
     <string name="coach_mistake_why">第 %1$d 行第 %2$d 列不能是 %3$d，最终答案里这一格是别的数字。</string>
@@ -75,7 +75,7 @@
     <string name="technique_desc_x_wing">某个数字在两条线上构成矩形，可清除交叉线上的同一数字。</string>
     <string name="technique_seen">遇到过</string>
     <string name="stamp_title">完成</string>
-    <string name="coach_usage_none">干净完成，没用教练。</string>
+    <string name="coach_usage_none">干净完成，全靠自己。</string>
     <string name="coach_usage_look">干净完成，教练指了个方向。</string>
     <string name="coach_usage_why">干净完成，教练讲了一步。</string>
     <string name="coach_usage_answer">看过教练的答案后完成。</string>
@@ -125,10 +125,11 @@
     <string name="loupe_label">%1$d 行 %2$d 列</string>
     <string name="menu_next_practice">换一页练习</string>
     <string name="next_practice_title">放下这一页？</string>
-    <string name="next_practice_body">它不会被计入，新的一页练习会取代它。</string>
+    <string name="next_practice_body">这一页不计入进度，换上新的一页练习。</string>
     <string name="next_practice_confirm">换一页</string>
     <string name="notebook">本子</string>
-    <string name="notebook_earlier">之前的页</string>
+    <string name="notebook_earlier">盖过章的页</string>
+    <string name="notebook_unfinished">没做完的页</string>
     <string name="page_stamped_coached">已盖章 · %1$s · 看过答案</string>
     <string name="notebook_summary_empty">做完一页，就盖一个章。</string>
     <string name="notebook_techniques">技巧手册</string>
@@ -148,7 +149,7 @@
     <string name="solved_next_practice">下一页</string>
     <string name="solved_open_practice">去练习</string>
     <string name="status_holding">已拿起 %1$d · 点此放下</string>
-    <string name="status_pencil">铅笔模式：数字记为候选</string>
+    <string name="status_pencil">铅笔模式：写下的是铅笔记号</string>
     <string name="today">今天</string>
     <string name="widget_page_description">今天这一页</string>
     <string name="widget_stamped">已盖章</string>
@@ -159,9 +160,9 @@
     <string name="page_pane">页面</string>
     <string name="coach_step_why_spoken">原因，第 %1$d 步，共 %2$d 步</string>
     <string name="look_claiming">这条线上，某个数字只能落在一个宫里，看看那个宫。</string>
-    <string name="status_hint">先点格子再点数字；按住滑动可放大选格。</string>
+    <string name="status_hint">先点格子再点数字；也可以按住滑动来瞄准。</string>
     <string name="list_separator">"，"</string>
-    <string name="coach_back">回到盘面</string>
+    <string name="coach_back">回到这一页</string>
     <string name="coach_step_why_count">原因 %1$d/%2$d</string>
     <string name="coach_then_hidden">排除之后，%1$d 在%2$s里只剩一个位置。</string>
     <string name="sentence_space"></string>
@@ -175,7 +176,7 @@
     <string name="box_bottom_middle">下中宫</string>
     <string name="box_bottom_right">右下宫</string>
     <string name="widget_ready">随时开始</string>
-    <string name="solved_level_up">下一页起是%1$s。</string>
+    <string name="solved_level_up">升级了：从下一页起是%1$s。</string>
     <string name="solved_daily_waiting">今天的一页已经在等你了。</string>
     <string name="solved_daily_close">明天有新的一页。</string>
     <string name="page_answer_shown">看过答案</string>
@@ -185,4 +186,17 @@
     <string name="contents_clean">干净完成</string>
     <string name="contents_coached">看过答案</string>
     <string name="today_support">%2$s %1$s</string>
+<string name="contents_key_clean">干净完成</string>
+    <string name="contents_key_coached">看过答案</string>
+    <string name="handbook_example">看这个例子</string>
+    <string name="handbook_pen">怎么用笔</string>
+    <string name="handbook_pen_summary">写数、瞄准、拿起数字和铅笔。</string>
+    <string name="handbook_pen_tap">先点格子，再点数字；再点一次同一个数字就擦掉。</string>
+    <string name="handbook_pen_aim">按住滑动来瞄准：手指上方的放大镜显示是哪一格，松手就选中它。</string>
+    <string name="handbook_pen_hold">没选格子时点一个数字，就把它拿在手里；之后点哪格就写到哪格。再点一次这个数字，或点工具下方那行字，就放下。</string>
+    <string name="handbook_pen_pencil">铅笔写下的是小小的铅笔记号。写下一个数时，它看得到的格子里这个数的铅笔记号会被划掉（可在设置里关闭）。</string>
+    <string name="handbook_pen_fill">在 9×9 页面上长按铅笔，可以一次填入所有候选数。这只是笔记，不影响干净完成。</string>
+    <string name="handbook_pen_keyboard">用键盘时：方向键移动，1–9 写数，Backspace 擦除，N 切换铅笔，Ctrl+Z 撤销，H 问教练，Esc 放下数字。</string>
+    <string name="fill_candidates">填入所有候选数</string>
+    <string name="fill_candidates_done">已填入所有候选数</string>
 </resources>
