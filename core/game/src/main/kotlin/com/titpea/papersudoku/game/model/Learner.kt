@@ -97,4 +97,16 @@ object Path {
     /** The next technique to learn at [level], for "Next: X-Wing"; null once all are known. */
     fun next(learner: Learner, level: com.titpea.papersudoku.engine.Difficulty): Technique? =
         Technique.entries.firstOrNull { it.tier in 2..level.maxTier && learner.found(it) < Mastery.MASTERED }
+
+    /**
+     * What practice is teaching now, for "Learning: Naked pair" (11.0): [next], or on the first
+     * level, where there is nothing beyond the singles, the single not yet known. Null once
+     * everything the level deals is known.
+     */
+    fun learning(learner: Learner, level: com.titpea.papersudoku.engine.Difficulty): Technique? =
+        next(learner, level) ?: Technique.entries.firstOrNull { it.tier <= level.maxTier && learner.found(it) < Mastery.MASTERED }
+
+    /** How many techniques are known, for "Known: 6 of 12": out of [Technique.entries], singles included. */
+    fun known(learner: Learner): Int =
+        Technique.entries.count { learner.mastery(it, met = false) == Mastery.Mastered }
 }

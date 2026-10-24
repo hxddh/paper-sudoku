@@ -79,6 +79,29 @@ class LearnerTest {
     }
 
     @Test
+    fun `the practice card says what is being learned and how much is known`() {
+        val fresh = Learner()
+        // The first level has nothing beyond the singles: they are what it teaches.
+        assertEquals(Technique.HiddenSingle, Path.learning(fresh, Difficulty.Gentle))
+        assertEquals(Technique.Pointing, Path.learning(fresh, Difficulty.Steady))
+        assertEquals(0, Path.known(fresh))
+
+        val singles = Learner(found = mapOf(Technique.HiddenSingle to 3, Technique.NakedSingle to 5))
+        assertNull(Path.learning(singles, Difficulty.Gentle))
+        assertEquals(Technique.Pointing, Path.learning(singles, Difficulty.Steady))
+        assertEquals(2, Path.known(singles))
+
+        // Found once or twice is practised, not known.
+        val some = singles.copy(found = singles.found + mapOf(Technique.Pointing to 3, Technique.Claiming to 2))
+        assertEquals(Technique.Claiming, Path.learning(some, Difficulty.Steady))
+        assertEquals(3, Path.known(some))
+
+        val everything = Learner(found = Technique.entries.associateWith { Mastery.MASTERED })
+        assertNull(Path.learning(everything, Difficulty.Deep))
+        assertEquals(Technique.entries.size, Path.known(everything))
+    }
+
+    @Test
     fun `a page dealt for a technique needs it and keeps it in its key`() {
         val page = Catalog.practice(Difficulty.Steady, 4, Technique.Pointing)
         assertTrue(Technique.Pointing in page.techniques)

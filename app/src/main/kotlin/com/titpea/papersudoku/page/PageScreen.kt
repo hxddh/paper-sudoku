@@ -108,11 +108,12 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
-import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.designsystem.FrauncesPrinted
 import com.titpea.papersudoku.designsystem.InkStamp
 import com.titpea.papersudoku.designsystem.PaperTheme
 import com.titpea.papersudoku.game.model.GameState
+import com.titpea.papersudoku.game.model.Mastery
+import com.titpea.papersudoku.game.model.Path as TechniquePath
 import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.PuzzleKind
 import com.titpea.papersudoku.game.model.PuzzleSpec
@@ -602,37 +603,38 @@ private fun SolvedNote(
 private data class Outlook(val text: String, val news: Boolean = false)
 
 @Composable
-private fun solvedOutlook(game: GameState, state: PageUiState): Outlook? = when {
-    // A level up is news; next to it, the one true sentence about this page: what the player found.
-    state.practiceAfter?.leveledUp != true && state.foundYourself != null ->
-        Outlook(stringResource(R.string.solved_found_yourself, techniqueName(state.foundYourself)), news = true)
-    game.spec.kind == PuzzleKind.Classic -> state.practiceAfter?.let { after ->
-        val remaining = after.remaining
-        when {
-            after.leveledUp -> Outlook(stringResource(R.string.solved_level_up, difficultyName(after.level)), news = true)
-            remaining != null -> {
-                val nextLevel = Difficulty.entries.getOrElse(after.level.ordinal + 1) { after.level }
-                Outlook(pluralStringResource(R.plurals.practice_to_next, remaining, remaining, difficultyName(nextLevel)))
+private fun solvedOutlook(game: GameState, state: PageUiState): Outlook? {
+    val learner = state.settings.learner
+    val found = state.foundYourself
+    return when {
+        // The one true sentence about this page: what the player found themselves, and on the
+        // page that makes it known (11.0: progress is the technique path, never a level), that.
+        found != null && learner.found(found) == Mastery.MASTERED ->
+            Outlook(stringResource(R.string.solved_known_now, techniqueName(found)), news = true)
+        found != null -> Outlook(stringResource(R.string.solved_found_yourself, techniqueName(found)), news = true)
+        // Practice says where the path goes next; news when it has moved on to a new level's techniques.
+        game.spec.kind == PuzzleKind.Classic -> state.practiceAfter?.let { after ->
+            TechniquePath.learning(learner, after.level)?.let { next ->
+                Outlook(stringResource(R.string.practice_next, techniqueName(next)), news = after.leveledUp)
             }
-            else -> Outlook(stringResource(R.string.practice_top_level))
         }
-    }
-    // A technique page says how far that technique is known now (counted once the solve is recorded).
-    game.spec.kind == PuzzleKind.Focus -> Catalog.focusTechnique(game.spec.key)?.let { technique ->
-        val clean = state.settings.learner.found(technique)
-        if (clean > 0) {
-            Outlook(stringResource(R.string.solved_focus, techniqueName(technique), pluralStringResource(R.plurals.mastery_pages, clean, clean)))
-        } else {
-            null
+        // A technique page says how far that technique is known now (counted once the solve is recorded).
+        game.spec.kind == PuzzleKind.Focus -> Catalog.focusTechnique(game.spec.key)?.let { technique ->
+            val clean = learner.found(technique)
+            if (clean > 0) {
+                Outlook(stringResource(R.string.solved_focus, techniqueName(technique), pluralStringResource(R.plurals.mastery_pages, clean, clean)))
+            } else {
+                null
+            }
         }
+        game.spec.kind == PuzzleKind.Weekly -> Outlook(stringResource(R.string.solved_weekly_close))
+        game.spec.kind == PuzzleKind.Imported -> null
+        // Today's page closes with tomorrow's: a reason to come back, without a streak.
+        game.spec.epochDay == state.today -> Outlook(stringResource(R.string.solved_daily_close))
+        // Finished a day late, just now, with today's page still to do.
+        state.todayWaiting -> Outlook(stringResource(R.string.solved_daily_waiting))
+        else -> null
     }
-    game.spec.kind == PuzzleKind.Weekly -> Outlook(stringResource(R.string.solved_weekly_close))
-    game.spec.kind == PuzzleKind.Imported -> null
-    // Today's page closes with tomorrow's: a reason to come back, without a streak.
-    game.spec.epochDay == state.today -> Outlook(stringResource(R.string.solved_daily_close))
-    // Finished a day late, just now, with today's page still to do.
-    state.todayWaiting -> Outlook(stringResource(R.string.solved_daily_waiting))
-    else -> null
 }
 
 /** The small line above a page's title: where it comes from and how hard it is. */
