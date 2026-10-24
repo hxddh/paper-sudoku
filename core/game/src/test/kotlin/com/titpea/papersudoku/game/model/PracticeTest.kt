@@ -15,8 +15,12 @@ class PracticeTest {
         assertEquals(1, Practice.remainingToAdvance(mapOf(Difficulty.Gentle to 2)))
         assertEquals(Difficulty.Steady, Practice.level(mapOf(Difficulty.Gentle to 3)))
         assertEquals(Difficulty.Steady, Practice.level(mapOf(Difficulty.Gentle to 5, Difficulty.Steady to 2)))
-        val top = mapOf(Difficulty.Gentle to 3, Difficulty.Steady to 3)
-        assertEquals(Difficulty.Tricky, Practice.level(top))
+        val tricky = mapOf(Difficulty.Gentle to 3, Difficulty.Steady to 3)
+        assertEquals(Difficulty.Tricky, Practice.level(tricky))
+        assertEquals(3, Practice.remainingToAdvance(tricky))
+        // 9.0: a player already past Tricky goes on to Deep at once.
+        val top = tricky + (Difficulty.Tricky to 3)
+        assertEquals(Difficulty.Deep, Practice.level(top))
         assertNull(Practice.remainingToAdvance(top))
     }
 

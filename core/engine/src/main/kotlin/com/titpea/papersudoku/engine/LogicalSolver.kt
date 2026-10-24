@@ -66,6 +66,10 @@ class LogicalSolver(private val geometry: Geometry) {
             ?: nakedPair(board)
             ?: hiddenPair(board)
             ?: xWing(board)
+            ?: nakedTriple(board)
+            ?: hiddenTriple(board)
+            ?: swordfish(board)
+            ?: xyWing(board)
 
     /** Next placement only (no eliminations). */
     fun nextSingle(board: Board): Placement? =
@@ -73,6 +77,7 @@ class LogicalSolver(private val geometry: Geometry) {
 
     fun nextElimination(board: Board): Elimination? =
         pointing(board) ?: claiming(board) ?: nakedPair(board) ?: hiddenPair(board) ?: xWing(board)
+            ?: nakedTriple(board) ?: hiddenTriple(board) ?: swordfish(board) ?: xyWing(board)
 
     private fun nakedSingle(board: Board): Placement? {
         for (i in board.values.indices) {
@@ -266,6 +271,136 @@ class LogicalSolver(private val geometry: Geometry) {
             }
         }
         return null
+    }
+
+    /** Three cells of a unit whose candidates are three digits between them take those digits. */
+    private fun nakedTriple(board: Board): Elimination? {
+        for ((ref, cells) in geometry.units) {
+            val open = cells.filter { board.values[it] == 0 && board.candidates[it].digitCount() in 2..3 }
+            for (a in open.indices) for (b in a + 1 until open.size) for (c in b + 1 until open.size) {
+                val trio = listOf(open[a], open[b], open[c])
+                val mask = trio.fold(0) { m, cell -> m or board.candidates[cell] }
+                if (mask.digitCount() != 3) continue
+                val removals = cells
+                    .filter { it !in trio && board.values[it] == 0 }
+                    .flatMap { cell -> (board.candidates[cell] and mask).digits().map { Candidate(cell, it) } }
+                if (removals.isNotEmpty()) {
+                    return Elimination(Technique.NakedTriple, mask.digits(), trio, listOf(ref), removals)
+                }
+            }
+        }
+        return null
+    }
+
+    /** Three digits that fit only the same three cells of a unit: those cells hold nothing else. */
+    private fun hiddenTriple(board: Board): Elimination? {
+        for ((ref, cells) in geometry.units) {
+            val spots = (1..geometry.size).associateWith { digit ->
+                cells.filter { board.values[it] == 0 && board.candidates[it].hasDigit(digit) }
+            }.filterValues { it.size in 2..3 }
+            val digits = spots.keys.toList()
+            for (a in digits.indices) for (b in a + 1 until digits.size) for (c in b + 1 until digits.size) {
+                val trio = listOf(digits[a], digits[b], digits[c])
+                val home = trio.flatMap { spots.getValue(it) }.distinct()
+                if (home.size != 3) continue
+                val keep = trio.fold(0) { m, d -> m or (1 shl d) }
+                val removals = home.flatMap { cell ->
+                    (board.candidates[cell] and keep.inv()).digits().map { Candidate(cell, it) }
+                }
+                if (removals.isNotEmpty()) {
+                    return Elimination(Technique.HiddenTriple, trio, home.sorted(), listOf(ref), removals)
+                }
+            }
+        }
+        return null
+    }
+
+    /** An X-Wing across three lines: a digit confined to the same three cross lines in each. */
+    private fun swordfish(board: Board): Elimination? {
+        for (digit in 1..geometry.size) {
+            swordfishOriented(board, digit, geometry.rows, UnitKind.Row, UnitKind.Column)?.let { return it }
+            swordfishOriented(board, digit, geometry.columns, UnitKind.Column, UnitKind.Row)?.let { return it }
+        }
+        return null
+    }
+
+    private fun swordfishOriented(
+        board: Board,
+        digit: Int,
+        bases: List<IntArray>,
+        baseKind: UnitKind,
+        coverKind: UnitKind,
+    ): Elimination? {
+        val positions = bases.map { cells ->
+            cells.indices.filter { k -> board.values[cells[k]] == 0 && board.candidates[cells[k]].hasDigit(digit) }
+        }
+        val lines = bases.indices.filter { positions[it].size in 2..3 }
+        for (a in lines.indices) for (b in a + 1 until lines.size) for (c in b + 1 until lines.size) {
+            val trio = listOf(lines[a], lines[b], lines[c])
+            val crosses = trio.flatMap { positions[it] }.distinct().sorted()
+            if (crosses.size != 3) continue
+            val pattern = trio.flatMap { base -> positions[base].map { k -> bases[base][k] } }
+            val covers = crosses.map { k -> if (coverKind == UnitKind.Column) geometry.columns[k] else geometry.rows[k] }
+            val removals = covers.flatMap { cover ->
+                cover.filter { it !in pattern && board.values[it] == 0 && board.candidates[it].hasDigit(digit) }
+            }.map { Candidate(it, digit) }
+            if (removals.isNotEmpty()) {
+                return Elimination(
+                    technique = Technique.Swordfish,
+                    digits = listOf(digit),
+                    patternCells = pattern.sorted(),
+                    units = trio.map { UnitRef(baseKind, it) } + crosses.map { UnitRef(coverKind, it) },
+                    removals = removals,
+                )
+            }
+        }
+        return null
+    }
+
+    /**
+     * A pivot that can only be x or y, seeing one cell that can only be x or z and another that can
+     * only be y or z: whichever the pivot is, one of those two cells is z. So no cell that sees
+     * both of them can be z. Digits: z first, then x and y; units: pivot to each pincer.
+     */
+    private fun xyWing(board: Board): Elimination? {
+        val pairs = board.values.indices.filter { board.values[it] == 0 && board.candidates[it].digitCount() == 2 }
+        for (pivot in pairs) {
+            val xy = board.candidates[pivot]
+            val wings = pairs.filter { it != pivot && geometry.sees(it, pivot) }
+            for (p in wings.indices) for (q in p + 1 until wings.size) {
+                val a = wings[p]
+                val b = wings[q]
+                val ma = board.candidates[a]
+                val mb = board.candidates[b]
+                val z = ma and mb and xy.inv()
+                // Each pincer shares exactly one digit with the pivot, a different one each, and z.
+                if (z.digitCount() != 1) continue
+                if ((ma and xy).digitCount() != 1 || (mb and xy).digitCount() != 1) continue
+                if ((ma and xy) == (mb and xy) || ((ma or mb) and xy) != xy) continue
+                val zd = z.firstDigit()
+                val removals = board.values.indices.filter { cell ->
+                    cell != pivot && cell != a && cell != b && board.values[cell] == 0 &&
+                        board.candidates[cell].hasDigit(zd) && geometry.sees(cell, a) && geometry.sees(cell, b)
+                }.map { Candidate(it, zd) }
+                if (removals.isNotEmpty()) {
+                    return Elimination(
+                        technique = Technique.XYWing,
+                        digits = listOf(zd) + xy.digits(),
+                        patternCells = listOf(pivot, a, b),
+                        units = listOf(sharedUnit(pivot, a), sharedUnit(pivot, b)),
+                        removals = removals,
+                    )
+                }
+            }
+        }
+        return null
+    }
+
+    /** The unit two cells that see each other share: their box first, else their line. */
+    private fun sharedUnit(a: Int, b: Int): UnitRef = when {
+        geometry.box(a) == geometry.box(b) -> UnitRef(UnitKind.Box, geometry.box(a))
+        geometry.row(a) == geometry.row(b) -> UnitRef(UnitKind.Row, geometry.row(a))
+        else -> UnitRef(UnitKind.Column, geometry.column(a))
     }
 
     private fun sharedLine(cells: List<Int>): UnitRef? {

@@ -15,7 +15,7 @@ class Grader(private val geometry: Geometry) {
      * Solves [givens] with the Coach's techniques only. Returns null if logic gets stuck (the
      * puzzle would need guessing or a technique we do not teach) or if [maxTier] is exceeded.
      */
-    fun grade(givens: IntArray, maxTier: Int = 3): Grade? {
+    fun grade(givens: IntArray, maxTier: Int = Difficulty.Tricky.maxTier): Grade? {
         val board = Board.from(geometry, givens)
         val used = linkedSetOf<Technique>()
         var hardest = Technique.HiddenSingle

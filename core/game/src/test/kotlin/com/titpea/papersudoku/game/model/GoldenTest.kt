@@ -46,10 +46,13 @@ class GoldenTest {
     fun `stored names are pinned`() {
         // These names are written to the database, saved JSON and settings: renaming one would
         // silently orphan saved pages, results or techniques met.
-        assertEquals(listOf("Gentle", "Steady", "Tricky"), Difficulty.entries.map { it.name })
+        assertEquals(listOf("Gentle", "Steady", "Tricky", "Deep"), Difficulty.entries.map { it.name })
         assertEquals(listOf("Daily", "Classic"), PuzzleKind.entries.map { it.name })
         assertEquals(
-            listOf("HiddenSingle", "NakedSingle", "Pointing", "Claiming", "NakedPair", "HiddenPair", "XWing"),
+            listOf(
+                "HiddenSingle", "NakedSingle", "Pointing", "Claiming", "NakedPair", "HiddenPair", "XWing",
+                "NakedTriple", "HiddenTriple", "Swordfish", "XYWing",
+            ),
             com.titpea.papersudoku.engine.Technique.entries.map { it.name },
         )
     }

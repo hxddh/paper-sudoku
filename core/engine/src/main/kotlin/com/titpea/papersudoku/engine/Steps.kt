@@ -12,12 +12,19 @@ enum class Technique(val tier: Int) {
     NakedPair(2),
     HiddenPair(3),
     XWing(3),
+    // Tier 4 (9.0): found only where tiers 1–3 are stuck, so every puzzle graded up to tier 3 —
+    // every daily and every Gentle, Steady and Tricky page — comes out exactly as before.
+    NakedTriple(4),
+    HiddenTriple(4),
+    Swordfish(4),
+    XYWing(4),
 }
 
 enum class Difficulty(val maxTier: Int) {
     Gentle(1),
     Steady(2),
-    Tricky(3);
+    Tricky(3),
+    Deep(4);
 
     companion object {
         fun forTier(tier: Int): Difficulty = entries.first { tier <= it.maxTier }

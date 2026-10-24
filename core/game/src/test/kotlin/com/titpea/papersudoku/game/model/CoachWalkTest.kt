@@ -24,7 +24,8 @@ class CoachWalkTest {
 
     @Test
     fun `every step the Coach shows is true`() {
-        val pages = (0 until 8).map { Catalog.classic(Difficulty.Tricky, it) } +
+        val pages = (0 until 10).map { Catalog.classic(Difficulty.Deep, it) } +
+            (0 until 8).map { Catalog.classic(Difficulty.Tricky, it) } +
             (0 until 6).map { Catalog.classic(Difficulty.Steady, it) } +
             (20_454L until 20_470L).map { Catalog.daily(it) }
         for (spec in pages) {
@@ -47,8 +48,10 @@ class CoachWalkTest {
             fun has(cell: Int, digit: Int) = values[cell] == 0 && (board.candidates[cell] shr digit) and 1 == 1
             for (step in hint.groundwork) {
                 assertTrue("${spec.key}: ${step.technique} crosses out nothing", step.removals.any { has(it.index, it.digit) })
+                // Sound: never the answer.
+                assertTrue("${spec.key}: ${step.technique} crosses out an answer", step.removals.none { spec.solution[it.index] == it.digit })
                 board.eliminate(step.removals)
-                assertTrue("${spec.key}: ${step.technique} leaves what it rules out", holds(step, geometry::cells, ::has))
+                assertTrue("${spec.key}: ${step.technique} leaves what it rules out", holds(step, geometry::cells, geometry::sees, ::has))
             }
             val p = hint.placement
             val unit = p.unit
@@ -63,7 +66,12 @@ class CoachWalkTest {
     }
 
     /** The step's sentence, checked on the board after it. */
-    private fun holds(step: Elimination, cells: (com.titpea.papersudoku.engine.UnitRef) -> IntArray, has: (Int, Int) -> Boolean): Boolean {
+    private fun holds(
+        step: Elimination,
+        cells: (com.titpea.papersudoku.engine.UnitRef) -> IntArray,
+        sees: (Int, Int) -> Boolean,
+        has: (Int, Int) -> Boolean,
+    ): Boolean {
         val units = step.units.map { cells(it).toList() }
         val d = step.digits.first()
         return when (step.technique) {
@@ -72,11 +80,18 @@ class CoachWalkTest {
             // "Every place a D could go is inside <box>": none left in the box outside the line.
             Technique.Claiming -> units[1].none { it !in units[0] && has(it, d) }
             // "They take both, so no other cell there can."
-            Technique.NakedPair -> units[0].none { it !in step.patternCells && step.digits.any { digit -> has(it, digit) } }
+            Technique.NakedPair, Technique.NakedTriple ->
+                units[0].none { it !in step.patternCells && step.digits.any { digit -> has(it, digit) } }
             // "Those cells hold nothing else."
-            Technique.HiddenPair -> step.patternCells.all { cell -> (1..9).none { it !in step.digits && has(cell, it) } }
+            Technique.HiddenPair, Technique.HiddenTriple ->
+                step.patternCells.all { cell -> (1..9).none { it !in step.digits && has(cell, it) } }
             // "The rest of <cover lines> can't be D."
             Technique.XWing -> (units[2] + units[3]).none { it !in step.patternCells && has(it, d) }
+            Technique.Swordfish -> (units[3] + units[4] + units[5]).none { it !in step.patternCells && has(it, d) }
+            // "No cell that sees both pincers can be Z."
+            Technique.XYWing -> (0 until 81).none { cell ->
+                cell !in step.patternCells && sees(cell, step.patternCells[1]) && sees(cell, step.patternCells[2]) && has(cell, d)
+            }
             else -> true
         }
     }
