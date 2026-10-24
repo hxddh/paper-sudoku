@@ -91,9 +91,12 @@ class SudokuApplication : Application() {
         super.onCreate()
         // Trace sections ("ps.*") are what the start-up benchmark measures beyond its timings.
         Trace.beginSection("ps.appCreate")
-        container = DefaultAppContainer(this).also {
-            it.warmUp(CoroutineScope(SupervisorJob() + Dispatchers.IO))
+        try {
+            container = DefaultAppContainer(this).also {
+                it.warmUp(CoroutineScope(SupervisorJob() + Dispatchers.IO))
+            }
+        } finally {
+            Trace.endSection()
         }
-        Trace.endSection()
     }
 }

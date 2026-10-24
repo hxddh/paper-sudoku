@@ -1,5 +1,6 @@
 package com.titpea.papersudoku.page
 
+import android.os.Build
 import android.os.Trace
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
@@ -541,11 +542,11 @@ class PageViewModel(
         _state.update { it.copy(game = foldClock(it), runningSince = null, loading = true, coach = null) }
         loadJob = viewModelScope.launch {
             val cookie = ++openings
-            Trace.beginAsyncSection("ps.openPage", cookie)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) Trace.beginAsyncSection("ps.openPage", cookie)
             val next = try {
                 source()
             } finally {
-                Trace.endAsyncSection("ps.openPage", cookie)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) Trace.endAsyncSection("ps.openPage", cookie)
             }
             show(next, keepPrevious)
             prepareAhead()
