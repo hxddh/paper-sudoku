@@ -32,11 +32,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -356,13 +358,16 @@ private fun Controls(at: Int, count: Int, onMove: (Int) -> Unit) {
                 Icon(painterResource(R.drawable.ic_chevron_left), contentDescription = stringResource(R.string.review_previous))
             }
             if (count > 1) {
+                // One step per move, so accessibility swipes go a move at a time; the ticks
+                // themselves would crowd a long page, so they are not drawn.
+                val slider = remember(count) {
+                    SliderState(value = at.toFloat(), steps = (count - 2).coerceAtLeast(0), valueRange = 0f..(count - 1).toFloat())
+                }
+                // The move shown is the source of truth: the arrows move it as well as the slider.
+                SideEffect { if (slider.value.roundToInt() != at) slider.value = at.toFloat() }
                 Slider(
-                    value = at.toFloat(),
+                    state = slider,
                     onValueChange = { onMove(it.roundToInt().coerceIn(0, count - 1)) },
-                    valueRange = 0f..(count - 1).toFloat(),
-                    // One step per move, so accessibility swipes go a move at a time; the ticks
-                    // themselves would crowd a long page, so they are not drawn.
-                    steps = (count - 2).coerceAtLeast(0),
                     // Ink, not a control's colour: terracotta is the Coach's, blue the player's pen.
                     thumb = {
                         Box(Modifier.size(12.dp).background(ink, CircleShape))
