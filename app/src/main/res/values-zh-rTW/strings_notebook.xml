@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="practice_learning">正在學：%1$s</string>
+    <string name="practice_known">已掌握 %1$d 個，共 %2$d 個</string>
+    <string name="notebook_continue">接著做</string>
+    <string name="notebook_version">版本 %1$s</string>
+    <string name="notebook_privacy">沒有帳號、廣告或網路連線。</string>
+    <string name="notebook_licences">開放原始碼授權</string>
+    <string name="solved_known_now">%1$s，現在你已經掌握了。</string>
+</resources>

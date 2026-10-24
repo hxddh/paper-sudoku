@@ -1,5 +1,41 @@
 # Changelog
 
+## 11.0.0
+
+Everything on the one page: the Coach stays beside your work, nothing to set, nothing hidden, and
+a quieter, faster notebook.
+
+**Changed**
+- The Coach stays on the page. Its note sits above the keys, which keep working; its marks stay on
+  the board until you write in the cell it means, and writing the right digit there closes it.
+  Look and Why are one line that opens; the answer is a small "Show the answer".
+- Progress is said one way: the technique you are learning and how many you know. Level names are
+  gone from the screen (they still decide which pages you get); today's page is just today.
+- One archive: today, practice, and one calendar where every page you wrote sits on its day,
+  9×9 pages included. A day with several pages lists them; the last unfinished page waits under
+  today as "Continue". The separate unfinished list, the journal and the calendar's key are gone.
+- Typing in a page keeps your draft, asks before you leave it, moves to the next cell after each
+  digit, and takes a pasted 81-digit page. It lives on the practice card.
+- No settings: the theme follows the phone, pencil marks are always tidied, and the language is
+  the phone's per-app language. The version and licences are at the foot of the notebook.
+- Nothing hidden: a digit is picked up only when no cell is chosen; pencil mode has a visible
+  "Fill every candidate"; a one-line hint shows the first time you use the pencil, hold a digit or
+  ask the Coach.
+- Old weekly and technique pages are plain 9×9 pages.
+
+**Looks**
+- Red is the Coach's, the stamp's and the held digit's only. Five text styles, one spacing scale,
+  one left edge; the board sits at the same place under every page's title.
+- Paper sheets with a hairline edge in both themes; no floating toolbar, no filled buttons; keys
+  keep their shape; ink settles without a bounce and the stamp presses instead of bouncing.
+- The board has three tints: your cell, the same digit, and the Coach's area.
+
+**Faster**
+- Today's page is read while the app starts; nothing is tidied or written on the way in, and the
+  next pages are prepared only once you are writing.
+- The paper is one opaque layer, made once; the board is one drawn surface instead of 81 cells.
+- The widget is plain Android (no Glance or WorkManager); the notebook reads its pages in one query.
+
 ## 10.0.0
 
 A notebook that knows you: practice follows what you have shown you can do, the Coach reads your

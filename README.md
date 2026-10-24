@@ -21,26 +21,25 @@ signing secrets exist (see [docs/release.md](docs/release.md)).
 
 ## What it is
 
-- **A notebook, not a menu.** Today's 6×6 page on top (gentle on weekdays, steady at the
-  weekend), the practice card ("Next: X-Wing"), the month's contents (every day since you
-  started, one tap away), then the pages you have written on, 9×9 pages included. There is no
-  streak.
-- **One path that knows you.** One never-ending stack of 9×9 pages whose level rises after three
-  pages solved without the Coach's answer — singles, then pointing and pairs, then hidden pairs
+- **A notebook, not a menu.** Today's 6×6 page on top, the practice card ("Learning: X-Wing ·
+  Known: 6 of 12"), and one calendar where every page you wrote sits on its day, 9×9 pages
+  included. No settings, no streak.
+- **One path that knows you.** One never-ending stack of 9×9 pages that grows harder after three
+  pages solved without the Coach's answer (the levels stay behind the scenes) — singles, then pointing and pairs, then hidden pairs
   and X-Wings, then (Deep) triples, Swordfish and XY-Wing. Each page is dealt to need what you are
   about to learn, judged from the digits you wrote with each technique yourself, and every few
   pages it goes back to one you found long ago. No scores: a solved page says what you found.
 - **Pages of your own.** Type in a puzzle from a book or newspaper; it is checked for one
   solution, graded and coached.
-- **A Coach in the margin.** Look → Why → Answer, with an ink line to the part of the board it is
+- **A Coach on the page.** Look → Why → Answer, above keys that keep working, with an ink line to the part of the board it is
   talking about; when a placement needs several eliminations, Why walks through each one. It reads
   your page: a pencil mark that leaves out a cell's answer comes first, steps near your cell come
-  before others, and it is brief about what you already know. It fills exactly the space of the
-  tools, so the page never moves.
-- **Pen and paper.** Printed digits, your ink, pencil notes (hold the pencil on a 9×9 page to
-  pencil in every candidate). Press and slide to aim at a cell (a loupe shows where you are);
+  before others, and it is brief about what you already know. Its marks stay on the board until
+  you write in the cell it means.
+- **Pen and paper.** Printed digits, your ink, pencil notes ("Fill every candidate" in pencil
+  mode on a 9×9 page). Press and slide to aim at a cell (a loupe shows where you are);
   lift to write. Tap a digit with nothing selected to pick it up and write it across the page.
-- **A handbook that teaches.** Using the pen, then every technique with a worked example from a
+- **A handbook that teaches.** Every technique with a worked example from a
   real page, drawn the way the Coach draws it, a page each. Each technique shows how well you know
   it (seen, practised, known) from the digits you wrote with it yourself.
 - **Read a page back.** Every digit of a solved page in order, with the technique that justified
@@ -84,12 +83,12 @@ review the images and commit them as the new goldens.
                writing frames; a smoke test of the minified build; a Baseline Profile generator
 ```
 
-- Home is a Navigation 3 back stack (Notebook, Settings, Licences). The notebook is a Material 3 adaptive
+- Home is a Navigation 3 back stack (Notebook, Handbook, Review, Type in, Licences). The notebook is a Material 3 adaptive
   `NavigableListDetailPaneScaffold`: pages list and open page, one pane or two.
 - `GameState` is immutable and saved as JSON in Room within 0.4s of a move and on leaving, with the printed and
   current digits beside it for the notebook (schema 4: the JSON last, indexed by kind and day); a solve is saved and recorded in one
   transaction, once per puzzle. Upcoming pages are generated ahead into a disk cache.
-- One custom-drawn surface (the board); everything else is Material 3 / Expressive.
+- One custom-drawn surface (the board, drawn in one pass with 81 semantics nodes); everything else is Material 3 under the app's own tokens (docs/design.md).
 
 Docs: [design](docs/design.md) · [Android checklist](docs/android-standards.md) ·
 [release](docs/release.md) · [store listing](docs/store-listing.md) · [privacy](PRIVACY.md) ·
@@ -100,4 +99,4 @@ Docs: [design](docs/design.md) · [Android checklist](docs/android-standards.md)
 Fraunces is © Undercase Type, SIL Open Font License 1.1
 ([third_party/fraunces/OFL.txt](third_party/fraunces/OFL.txt)); the app bundles a Latin subset. Icons are
 Material Symbols Rounded (Apache 2.0). Both licences, and AndroidX's, are shown in full in the app
-(Settings → Open-source licences).
+(the foot of the notebook → Licences).

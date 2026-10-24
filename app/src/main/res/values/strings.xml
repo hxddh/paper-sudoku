@@ -78,7 +78,6 @@
     <string name="restart_title">Start this page over?</string>
     <string name="restart_body">Your digits, pencil marks and time on this page will be cleared. The Coach’s help stays on record.</string>
     <string name="restart_confirm">Start over</string>
-    <string name="settings_title">Settings</string>
     <string name="settings_version">Version %1$s</string>
     <string name="settings_privacy_title">Privacy</string>
     <string name="settings_privacy_body">No accounts, ads, analytics or network access. Your notebook stays on this device and in your own Android backup.</string>
@@ -158,7 +157,6 @@
     <string name="solved_daily_waiting">Today’s page is waiting.</string>
     <string name="solved_daily_close">A new page tomorrow.</string>
     <string name="page_answer_shown">answer shown</string>
-    <string name="contents_title">Contents</string>
     <string name="contents_previous">Previous month</string>
     <string name="contents_next">Next month</string>
     <string name="contents_clean">stamped clean</string>
@@ -166,7 +164,6 @@
     <string name="today_support">%1$s\u00A0· %2$s</string>
     <string name="handbook_example">In this example</string>
     <string name="fill_candidates">Fill every candidate</string>
-    <string name="fill_candidates_done">Every candidate pencilled in</string>
     <!-- 11.0: one-line hints, each shown the first time; the Coach's note closes with ×. -->
     <string name="first_hint_pencil">Pencil writes small marks. Digits tidy them away.</string>
     <string name="first_hint_pick_up">Tap cells to write %1$d. Tap %1$d again to put it down.</string>

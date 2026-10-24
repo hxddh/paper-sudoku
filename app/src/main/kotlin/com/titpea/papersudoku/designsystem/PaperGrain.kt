@@ -2,10 +2,7 @@ package com.titpea.papersudoku.designsystem
 
 import android.graphics.Bitmap
 import android.os.Build
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageShader
 import androidx.compose.ui.graphics.ShaderBrush
@@ -148,25 +145,3 @@ private fun hash(px: Float, py: Float): Float {
     return fract((x + y) * x)
 }
 
-/** 10.0's grain, drawn over a background. Null where it is not drawn (before Android 13). */
-@Deprecated("Fill with Modifier.paper(color): one opaque layer instead of a background plus the grain.")
-@Composable
-fun rememberPaperGrain(ink: PaperInk): ShaderBrush? =
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) null else remember(ink.grain) { overlay(ink.grain) }
-
-@Deprecated("Fill with Modifier.paper(color): one opaque layer instead of a background plus the grain.")
-fun Modifier.paperGrain(brush: ShaderBrush?): Modifier =
-    if (brush == null) this else drawBehind { drawRect(brush) }
-
-private fun overlay(grain: Color): ShaderBrush {
-    val rgb = grain.toArgb() and 0xFFFFFF
-    val pixels = IntArray(UNITS * UNITS)
-    for (y in 0 until UNITS) {
-        for (x in 0 until UNITS) {
-            val n = hash(x.toFloat(), y.toFloat()) * 0.65f + hash(floor((x + 0.5f) * 0.08f), floor((y + 0.5f) * 0.6f)) * 0.35f
-            pixels[y * UNITS + x] = ((n * STRENGTH * 255f).roundToInt().coerceIn(0, 255) shl 24) or rgb
-        }
-    }
-    val bitmap = Bitmap.createBitmap(pixels, UNITS, UNITS, Bitmap.Config.ARGB_8888)
-    return ShaderBrush(ImageShader(bitmap.asImageBitmap(), TileMode.Repeated, TileMode.Repeated))
-}

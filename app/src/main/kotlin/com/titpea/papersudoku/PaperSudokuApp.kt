@@ -14,7 +14,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -37,10 +36,8 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.listSaver
@@ -60,8 +57,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import com.titpea.papersudoku.designsystem.PaperTheme
-import com.titpea.papersudoku.designsystem.paperGrain
-import com.titpea.papersudoku.designsystem.rememberPaperGrain
+import com.titpea.papersudoku.designsystem.paper
 import com.titpea.papersudoku.notebook.NotebookScreen
 import com.titpea.papersudoku.notebook.NotebookViewModel
 import com.titpea.papersudoku.page.PageEvent
@@ -72,7 +68,9 @@ import com.titpea.papersudoku.page.PageScreen
 import com.titpea.papersudoku.page.PageViewModel
 import com.titpea.papersudoku.settings.LicencesScreen
 import com.titpea.papersudoku.notebook.HandbookScreen
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import com.titpea.papersudoku.share.printPuzzle
 import com.titpea.papersudoku.share.sharePage
 import androidx.window.core.layout.WindowSizeClass
@@ -107,7 +105,6 @@ fun PaperSudokuApp(
     ) { mutableStateListOf(Screen.Home) }
     val pageViewModel: PageViewModel = viewModel(factory = PageViewModel.factory(container))
     val notebookViewModel: NotebookViewModel = viewModel(factory = NotebookViewModel.factory(container))
-    val grain = rememberPaperGrain(PaperTheme.ink)
     // The handbook topic to open at; saved with the back stack.
     var handbookStart by rememberSaveable { mutableIntStateOf(0) }
 
@@ -167,7 +164,7 @@ fun PaperSudokuApp(
                     NavEntry(screen) {
                         // Every page is its own sheet of paper, so a page leaving never shows
                         // the one beneath through it.
-                        PaperPage(grain) {
+                        PaperPage {
                         when (screen) {
                             Screen.Home -> NotebookHome(
                                 pageViewModel = pageViewModel,
@@ -234,7 +231,7 @@ fun PaperSudokuApp(
  * tap), its corners round and it lifts, so it reads as a sheet over the page beneath.
  */
 @Composable
-private fun PaperPage(grain: ShaderBrush?, content: @Composable () -> Unit) {
+private fun PaperPage(content: @Composable () -> Unit) {
     val leaving = LocalNavAnimatedContentScope.current.transition
         .animateFloat(label = "leaving") { if (it == EnterExitState.PostExit) 1f else 0f }
     val background = PaperTheme.colors.background
@@ -249,8 +246,7 @@ private fun PaperPage(grain: ShaderBrush?, content: @Composable () -> Unit) {
                     shadowElevation = LEAVING_ELEVATION.toPx() * f
                 }
             }
-            // v11: paper()
-            .background(background).paperGrain(grain),
+            .paper(background),
     ) { content() }
 }
 

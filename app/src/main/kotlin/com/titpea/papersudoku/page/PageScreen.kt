@@ -376,7 +376,7 @@ private fun BoardArea(
                 }
             }
         }
-        if (state.loading) LoadingIndicator(Modifier.testTag("loading"))
+        if (state.loadingIndicator) LoadingIndicator(Modifier.testTag("loading"))
     }
 }
 

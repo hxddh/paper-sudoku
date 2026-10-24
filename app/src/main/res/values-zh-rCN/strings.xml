@@ -78,7 +78,6 @@
     <string name="restart_title">重新开始这一页？</string>
     <string name="restart_body">这一页上的数字、铅笔记号和用时都会清空，教练的帮助仍会记录。</string>
     <string name="restart_confirm">重新开始</string>
-    <string name="settings_title">设置</string>
     <string name="settings_version">版本 %1$s</string>
     <string name="settings_privacy_title">隐私</string>
     <string name="settings_privacy_body">没有账号、广告、统计或网络访问。你的本子只保存在本机和你自己的 Android 备份中。</string>
@@ -157,7 +156,6 @@
     <string name="solved_daily_waiting">今天的一页已经在等你了。</string>
     <string name="solved_daily_close">明天有新的一页。</string>
     <string name="page_answer_shown">看过答案</string>
-    <string name="contents_title">目录</string>
     <string name="contents_previous">上个月</string>
     <string name="contents_next">下个月</string>
     <string name="contents_clean">干净完成</string>
@@ -165,7 +163,6 @@
     <string name="today_support">%2$s %1$s</string>
     <string name="handbook_example">看这个例子</string>
     <string name="fill_candidates">填入所有候选数</string>
-    <string name="fill_candidates_done">已填入所有候选数</string>
     <!-- 11.0: one-line hints, each shown the first time; the Coach's note closes with ×. -->
     <string name="first_hint_pencil">铅笔写小记号，写下数字时会自动擦掉相关记号。</string>
     <string name="first_hint_pick_up">点格子就写 %1$d，再点 %1$d 键放下。</string>
