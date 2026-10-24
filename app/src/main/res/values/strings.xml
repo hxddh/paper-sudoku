@@ -27,10 +27,6 @@
     <string name="cell_conflict">clashes with another digit</string>
     <string name="unit_row">row %1$d</string>
     <string name="unit_column">column %1$d</string>
-    <string name="coach_step_look">Look</string>
-    <string name="coach_step_why">Why</string>
-    <string name="coach_step_answer">Answer</string>
-    <string name="coach_not_now">Not now</string>
     <string name="coach_show_why">Show me why</string>
     <string name="coach_show_answer">Show the answer</string>
     <string name="coach_place">Place %1$d</string>
@@ -83,20 +79,9 @@
     <string name="restart_body">Your digits, pencil marks and time on this page will be cleared. The Coach’s help stays on record.</string>
     <string name="restart_confirm">Start over</string>
     <string name="settings_title">Settings</string>
-    <string name="settings_appearance">Appearance</string>
-    <string name="settings_theme">Theme</string>
-    <string name="theme_system">System</string>
-    <string name="theme_light">Paper</string>
-    <string name="theme_dark">Night</string>
-    <string name="settings_play">Play</string>
-    <string name="settings_auto_clear">Tidy pencil marks</string>
-    <string name="settings_auto_clear_desc">Writing a digit removes it from pencil marks in the same row, column and box.</string>
-    <string name="settings_about">About</string>
     <string name="settings_version">Version %1$s</string>
     <string name="settings_privacy_title">Privacy</string>
     <string name="settings_privacy_body">No accounts, ads, analytics or network access. Your notebook stays on this device and in your own Android backup.</string>
-    <string name="settings_licences_title">Open-source licences</string>
-    <string name="settings_licences_body">The typeface, icons and libraries the app is made with</string>
     <string name="licences_title">Open-source licences</string>
     <string name="licences_fonts">Typeface</string>
     <string name="licences_fraunces">Fraunces</string>
@@ -137,15 +122,13 @@
     <string name="practice_continue">Continue page %1$d</string>
     <string name="practice_new_page">A fresh page</string>
     <string name="practice_page">Page %1$d</string>
-    <string name="settings_language">Language</string>
-    <string name="settings_language_desc">Opens system settings to change the app’s language</string>
     <string name="shortcut_put_down">Put down a held digit or close the Coach (Esc)</string>
     <string name="solved_back_to_notebook">Back to the notebook</string>
     <string name="solved_time">Solved in %1$s</string>
     <string name="solved_next_practice">Next page</string>
     <string name="solved_open_practice">Practice</string>
     <string name="status_holding">%1$d in hand · Tap to put down</string>
-    <string name="status_pencil">Pencil on: digits go in as pencil marks</string>
+    <string name="status_pencil">Pencil on</string>
     <string name="today">Today</string>
     <string name="widget_page_description">Today’s page</string>
     <string name="widget_stamped">Stamped</string>
@@ -159,7 +142,6 @@
     <string name="look_claiming">On this line, one digit can only sit inside one box. Look at that box.</string>
     <string name="status_hint">Tap a cell, then a digit. Or press and slide to aim.</string>
     <string name="list_separator">", "</string>
-    <string name="coach_back">Back to the page</string>
     <string name="coach_step_why_count">Why %1$d/%2$d</string>
     <string name="coach_then_hidden">With that ruled out, %1$d has only one place left in %2$s.</string>
     <string name="sentence_space">" "</string>
@@ -183,14 +165,11 @@
     <string name="contents_coached">stamped with the answer</string>
     <string name="today_support">%1$s\u00A0· %2$s</string>
     <string name="handbook_example">In this example</string>
-    <string name="handbook_pen">Using the pen</string>
-    <string name="handbook_pen_summary">Writing, aiming, holding a digit and the pencil.</string>
-    <string name="handbook_pen_tap">Tap a cell, then a digit. Tap the same digit again to clear it.</string>
-    <string name="handbook_pen_aim">Press and slide to aim: a loupe above your finger shows the cell, and lifting chooses it.</string>
-    <string name="handbook_pen_hold">With no cell chosen, tap a digit to hold it; every cell you tap then gets it. Tap the digit again, or the line under the tools, to put it down.</string>
-    <string name="handbook_pen_pencil">The pencil writes small marks instead of digits. Writing a digit removes it from the pencil marks in its row, column and box (you can turn this off in Settings).</string>
-    <string name="handbook_pen_fill">On 9×9 pages, hold the pencil to pencil in every candidate at once. They are only notes: the page stays clean.</string>
-    <string name="handbook_pen_keyboard">With a keyboard: arrows move, 1–9 write, Backspace erases, N switches the pencil, Ctrl+Z undoes, H asks the Coach and Esc puts a digit down.</string>
-    <string name="fill_candidates">Pencil in every candidate</string>
+    <string name="fill_candidates">Fill every candidate</string>
     <string name="fill_candidates_done">Every candidate pencilled in</string>
+    <!-- 11.0: one-line hints, each shown the first time; the Coach's note closes with ×. -->
+    <string name="first_hint_pencil">Pencil writes small marks. Digits tidy them away.</string>
+    <string name="first_hint_pick_up">Tap cells to write %1$d. Tap %1$d again to put it down.</string>
+    <string name="first_hint_coach">The marks stay until you write in the cell.</string>
+    <string name="coach_close">Put the note away</string>
 </resources>

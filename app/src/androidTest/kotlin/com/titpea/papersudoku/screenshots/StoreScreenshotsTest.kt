@@ -55,7 +55,7 @@ class StoreScreenshotsTest {
         Shot("2-coach", false, false, page(Fixtures.page(coach = Fixtures.coach(2)))),
         Shot("3-solved", false, false, page(Fixtures.page(game = Fixtures.solved()))),
         Shot("4-notebook", false, false) { NotebookScreen(state = notebookState(), onOpenDay = {}, onOpenPractice = {}, onOpenLicences = {}, versionName = "11.0.0") },
-        Shot("5-handbook", false, false) { HandbookScreen(start = 7, techniquesMet = setOf(Technique.XWing), onBack = {}) },
+        Shot("5-handbook", false, false) { HandbookScreen(start = 6, techniquesMet = setOf(Technique.XWing), onBack = {}) },
         Shot("6-night", true, false, page(Fixtures.page(game = Fixtures.practice()))),
         Shot("7-tablet", false, true, page(Fixtures.page(game = Fixtures.practice()))),
     )

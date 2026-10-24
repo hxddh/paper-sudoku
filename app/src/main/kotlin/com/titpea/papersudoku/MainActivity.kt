@@ -17,7 +17,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.titpea.papersudoku.data.ThemeMode
 import com.titpea.papersudoku.data.UserSettings
 import com.titpea.papersudoku.designsystem.SudokuTheme
 import kotlinx.coroutines.channels.Channel
@@ -35,7 +34,8 @@ class MainActivity : ComponentActivity() {
 
         val container = (application as SudokuApplication).container
         val versionName = BuildConfig.VERSION_NAME
-        // Hold the splash until the theme is known, so a dark-theme choice never flashes paper.
+        // Hold the splash until the settings are read, so the first frame already has them (the
+        // theme follows the system since 11.0 and no longer needs the wait).
         var settingsLoaded = false
         splash.setKeepOnScreenCondition { !settingsLoaded }
         if (savedInstanceState == null) handle(intent)
@@ -46,13 +46,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settingsFlow = remember { container.settingsStore.settings.map<UserSettings, UserSettings?> { it } }
             val loaded by settingsFlow.collectAsStateWithLifecycle(initialValue = null)
-            val settings = loaded ?: return@setContent
+            if (loaded == null) return@setContent
             settingsLoaded = true
-            val darkTheme = when (settings.theme) {
-                ThemeMode.System -> isSystemInDarkTheme()
-                ThemeMode.Light -> false
-                ThemeMode.Dark -> true
-            }
+            // 11.0: the theme follows the system; there is no theme setting.
+            val darkTheme = isSystemInDarkTheme()
             // System bars follow the app's theme, not the system's: on Android 8–9 the navigation
             // bar's scrim is drawn by the app, so it must match the icons it sits behind.
             DisposableEffect(darkTheme) {

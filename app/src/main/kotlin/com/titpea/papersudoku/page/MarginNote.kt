@@ -1,43 +1,57 @@
 package com.titpea.papersudoku.page
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
 import com.titpea.papersudoku.game.model.Mastery
 import com.titpea.papersudoku.game.model.Learner
 import com.titpea.papersudoku.designsystem.PaperTheme
+import com.titpea.papersudoku.designsystem.SheetShape
+import com.titpea.papersudoku.designsystem.Space
+import com.titpea.papersudoku.designsystem.hairline
 import com.titpea.papersudoku.engine.CoachHint
 import com.titpea.papersudoku.engine.Elimination
 import com.titpea.papersudoku.engine.Geometry
@@ -47,10 +61,18 @@ import com.titpea.papersudoku.engine.Technique
 import com.titpea.papersudoku.engine.UnitKind
 import com.titpea.papersudoku.engine.UnitRef
 
+/** The note's pen rule hangs in the page margin; its words sit on the page's one text edge. */
+private val RuleWidth = 2.dp
+private val RuleGap = Space.TextEdge - Space.S - RuleWidth
+
 /**
- * The Coach writes in the margin: no card, no dialog — a pen rule down the side, the note in ink,
- * and three steps (look, why, answer). It fills exactly the space the tools use, so the page
- * never moves when it appears; with very large text it grows rather than hide words.
+ * The Coach writes in the margin, above the keys, which stay in use: no card, no dialog, a pen rule
+ * in the margin and the note in ink. At rest it is the technique and one line, where to look;
+ * the line opens into why (step by step, when a placement needs eliminations first), and only then
+ * is the answer offered, as a small text action that says what it costs. Its marks stay on the
+ * board until the step is done; × (or back) puts it away.
+ *
+ * Laid out from the screen's edge: the rule sits 8dp in, the words at 20dp.
  */
 @Composable
 fun MarginNote(
@@ -60,177 +82,188 @@ fun MarginNote(
     modifier: Modifier = Modifier,
     /** What the player has shown they know: the Coach is brief about it, and introduces the rest. */
     learner: Learner = Learner(),
+    /** The first Coach ever: one line on how the note behaves. */
+    firstTime: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val ink = PaperTheme.ink
     val text = coachText(coach, geometry, learner)
-    // As tall as the note needs (at least what the caller asks), so large text is never hidden
-    // behind the actions; the rule runs the note's full height.
+    val hint = coach.hint
+    // Look opens into Why; once open, the line folds it away again (the Coach has still said it).
+    val opens = hint is CoachHint.Next && coach.level == 1
+    var folded by rememberSaveable(hint, coach.level, coach.step) { mutableStateOf(false) }
+    val foldable = hint is CoachHint.Next && coach.level >= 2
+    val showBody = text.body.isNotEmpty() && !(foldable && folded)
+    val large = LocalDensity.current.fontScale > 1.3f
+    // As tall as the note needs; the rule runs the note's full height.
     Row(modifier.fillMaxWidth().height(IntrinsicSize.Min).testTag("coach-panel")) {
+        Spacer(Modifier.width(Space.S))
         Box(
             Modifier
-                .padding(vertical = 4.dp)
-                .width(2.dp)
+                .padding(vertical = Space.XS)
+                .width(RuleWidth)
                 .fillMaxHeight()
                 .background(ink.margin),
         )
-        Column(
-            Modifier
-                .weight(1f)
-                .padding(start = 14.dp)
-                .fillMaxHeight(),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
-                // With large text the steps take their own line, so the tag is never squeezed.
-                val stacked = LocalDensity.current.fontScale > 1.15f
-                if (stacked) {
-                    Text(text.tag, style = MaterialTheme.typography.labelLarge, color = ink.margin)
-                    if (coach.hint != null) {
-                        Spacer(Modifier.height(4.dp))
-                        LevelSteps(coach)
+        Spacer(Modifier.width(RuleGap))
+        Box(Modifier.weight(1f)) {
+            Column(Modifier.fillMaxWidth().padding(end = Space.L)) {
+                Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
+                    // The technique, in the Coach's red, and (walking through Why) which step.
+                    Row(Modifier.padding(end = Space.XXL), verticalAlignment = Alignment.CenterVertically) {
+                        Text(text.tag, style = MaterialTheme.typography.labelMedium, color = ink.margin)
+                        val total = coach.steps.size
+                        if (coach.level == 2 && total > 1) {
+                            val spoken = stringResource(R.string.coach_step_why_spoken, coach.step + 1, total)
+                            Text(
+                                DOT + stringResource(R.string.coach_step_why_count, coach.step + 1, total),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = colors.onSurfaceVariant,
+                                modifier = Modifier.clearAndSetSemantics { contentDescription = spoken },
+                            )
+                        }
                     }
-                } else {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(Modifier.height(Space.XS))
+                    // The one line at rest: where to look. It opens into why.
+                    val lineModifier = when {
+                        opens -> Modifier.clickable(
+                            onClickLabel = stringResource(R.string.coach_show_why),
+                            role = Role.Button,
+                        ) { onEvent(PageEvent.CoachDeeper) }
+                        foldable -> Modifier.clickable(role = Role.Button) { folded = !folded }
+                        else -> Modifier
+                    }
+                    Row(
+                        lineModifier.fillMaxWidth().heightIn(min = 48.dp).testTag("coach-why"),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Text(
-                            text = text.tag,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = ink.margin,
-                            modifier = Modifier.weight(1f),
+                            text.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colors.onSurface,
+                            modifier = Modifier.weight(1f).semantics { heading() },
                         )
-                        if (coach.hint != null) LevelSteps(coach)
+                        if (opens || foldable) {
+                            // Down to open, up to fold; the chevron mirrors in right-to-left text.
+                            val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+                            val down = if (rtl) -90f else 90f
+                            Icon(
+                                painterResource(R.drawable.ic_chevron_right),
+                                contentDescription = null,
+                                tint = colors.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp).rotate(if (opens || folded) down else -down),
+                            )
+                        }
+                    }
+                    // The Coach's own voice: upright, in ink, not the player's pen.
+                    if (showBody) {
+                        Text(
+                            text.body,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.onSurface,
+                            modifier = Modifier.padding(top = Space.XS),
+                        )
                     }
                 }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = colors.onSurface,
-                    modifier = Modifier.semantics { heading() },
-                )
-                // The Coach's own voice: upright and quiet, not the player's pen. A known technique's
-                // Look has no body: the title is the whole note.
-                if (text.body.isNotEmpty()) {
-                    Spacer(Modifier.height(2.dp))
+                CoachActions(coach, onEvent, large)
+                if (firstTime) {
                     Text(
-                        text.body,
+                        stringResource(R.string.first_hint_coach),
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.onSurfaceVariant,
+                        modifier = Modifier.padding(top = Space.XS).testTag("first-hint"),
                     )
                 }
             }
-            val hint = coach.hint
-            // Asking for the answer costs the clean stamp: it is the quiet choice, and says so.
-            val answerNext = hint is CoachHint.Next && coach.level == 2 && coach.lastStep
-            if (answerNext) {
-                Text(
-                    stringResource(R.string.coach_answer_cost),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = colors.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp),
+            // Put away: also back, or Esc. Its target reaches above the note, not into the words.
+            IconButton(
+                onClick = { onEvent(PageEvent.DismissCoach) },
+                modifier = Modifier.align(Alignment.TopEnd).offset(y = -Space.M).testTag("coach-close"),
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_close),
+                    contentDescription = stringResource(R.string.coach_close),
+                    tint = colors.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
                 )
-            }
-            // Once the Coach has said something, closing the note is going back to the page.
-            val dismissLabel = stringResource(if (hint == null) R.string.coach_not_now else R.string.coach_back)
-            val dismiss = @Composable { modifier: Modifier ->
-                TextButton(
-                    onClick = { onEvent(PageEvent.DismissCoach) },
-                    modifier = modifier.heightIn(min = 48.dp),
-                ) { Text(dismissLabel) }
-            }
-            val next = @Composable { modifier: Modifier ->
-                if (hint != null) {
-                    val label = when {
-                        coach.level == 1 -> stringResource(R.string.coach_show_why)
-                        coach.level == 2 && !coach.lastStep -> stringResource(R.string.coach_next_step)
-                        coach.level == 2 -> stringResource(R.string.coach_show_answer)
-                        hint is CoachHint.Next -> stringResource(R.string.coach_place, hint.placement.digit)
-                        hint is CoachHint.MissingMark -> stringResource(R.string.coach_add_mark)
-                        else -> stringResource(R.string.coach_erase)
-                    }
-                    val onClick = { onEvent(if (coach.level < 3) PageEvent.CoachDeeper else PageEvent.CoachApply) }
-                    val buttonModifier = modifier.heightIn(min = 48.dp).testTag("coach-next")
-                    if (answerNext) {
-                        OutlinedButton(onClick = onClick, modifier = buttonModifier) { Text(label) }
-                    } else {
-                        Button(onClick = onClick, modifier = buttonModifier) { Text(label) }
-                    }
-                }
-            }
-            if (LocalDensity.current.fontScale > 1.3f) {
-                // Very large text: one action per line, full width, the step forward first, except
-                // when it is the answer: what costs the clean stamp never takes the top spot.
-                Column(Modifier.fillMaxWidth().padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (answerNext) {
-                        dismiss(Modifier.fillMaxWidth())
-                        next(Modifier.fillMaxWidth())
-                    } else {
-                        next(Modifier.fillMaxWidth())
-                        dismiss(Modifier.fillMaxWidth())
-                    }
-                }
-            } else {
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    dismiss(Modifier)
-                    next(Modifier)
-                }
             }
         }
     }
 }
 
 /**
- * Look, Why, Answer as pips. When Why walks through several steps, its label counts them
- * ("Why 2/3"), so there is one progress marker, not two.
+ * At most one step forward: the next step of Why (an ink text button), the answer once Why is
+ * done (a small text action, with its cost said beside it), or, with the answer shown, writing it
+ * (the one hairline-outlined button). The player can always write it with the keys instead.
  */
 @Composable
-private fun LevelSteps(coach: CoachUi) {
+private fun CoachActions(coach: CoachUi, onEvent: (PageEvent) -> Unit, large: Boolean) {
+    val hint = coach.hint ?: return
     val colors = MaterialTheme.colorScheme
-    val level = coach.level
-    val total = coach.steps.size
-    val why = if (total > 1) {
-        stringResource(R.string.coach_step_why_count, coach.step + 1, total)
-    } else {
-        stringResource(R.string.coach_step_why)
-    }
-    val labels = listOf(stringResource(R.string.coach_step_look), why, stringResource(R.string.coach_step_answer))
-    // Said once, in words: "Why, step 2 of 3" (a written "2/3" is read as a fraction).
-    val progress = if (level == 2 && total > 1) {
-        stringResource(R.string.coach_step_why_spoken, coach.step + 1, total)
-    } else {
-        labels[level - 1]
-    }
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.clearAndSetSemantics { contentDescription = progress },
-    ) {
-        labels.forEachIndexed { i, label ->
-            val reached = i < level
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Filled for steps taken, hollow for steps ahead: shape as well as colour.
-                Box(
-                    Modifier
-                        .size(7.dp)
-                        .then(
-                            if (reached) {
-                                Modifier.background(colors.primary, CircleShape)
-                            } else {
-                                Modifier.border(1.dp, colors.onSurfaceVariant, CircleShape)
-                            },
-                        ),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (reached) colors.onSurface else colors.onSurfaceVariant,
-                )
+    val deeper = { onEvent(PageEvent.CoachDeeper) }
+    val buttonModifier = Modifier.heightIn(min = 48.dp).testTag("coach-next")
+    val ink = ButtonDefaults.textButtonColors(contentColor = colors.onSurface)
+    val padding = PaddingValues(horizontal = Space.S)
+    when {
+        coach.level == 1 && hint !is CoachHint.Next -> TextButton(
+            onClick = deeper,
+            colors = ink,
+            shape = SheetShape,
+            contentPadding = padding,
+            modifier = buttonModifier.offset(x = -Space.S),
+        ) { Text(stringResource(R.string.coach_show_why)) }
+        coach.level == 1 -> Unit
+        coach.level == 2 && hint is CoachHint.Next && !coach.lastStep -> TextButton(
+            onClick = deeper,
+            colors = ink,
+            shape = SheetShape,
+            contentPadding = padding,
+            modifier = buttonModifier.offset(x = -Space.S),
+        ) { Text(stringResource(R.string.coach_next_step)) }
+        // Asking for the answer costs the clean stamp: the quiet choice, and it says so. Being
+        // shown a wrong digit or a missing mark costs nothing.
+        coach.level == 2 -> {
+            val action = @Composable {
+                TextButton(
+                    onClick = deeper,
+                    colors = ButtonDefaults.textButtonColors(contentColor = colors.onSurfaceVariant),
+                    shape = SheetShape,
+                    contentPadding = padding,
+                    modifier = buttonModifier.offset(x = -Space.S),
+                ) { Text(stringResource(R.string.coach_show_answer), style = MaterialTheme.typography.bodyMedium) }
             }
+            if (hint is CoachHint.Next) {
+                val cost = @Composable { modifier: Modifier ->
+                    Text(
+                        stringResource(R.string.coach_answer_cost),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colors.onSurfaceVariant,
+                        modifier = modifier,
+                    )
+                }
+                if (large) {
+                    Column { action(); cost(Modifier) }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) { action(); cost(Modifier.weight(1f)) }
+                }
+            } else {
+                action()
+            }
+        }
+        else -> OutlinedButton(
+            onClick = { onEvent(PageEvent.CoachApply) },
+            shape = SheetShape,
+            border = hairline(),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.onSurface),
+            modifier = buttonModifier.padding(top = Space.S),
+        ) {
+            Text(
+                when (hint) {
+                    is CoachHint.Next -> stringResource(R.string.coach_place, hint.placement.digit)
+                    is CoachHint.MissingMark -> stringResource(R.string.coach_add_mark)
+                    is CoachHint.Mistake -> stringResource(R.string.coach_erase)
+                },
+            )
         }
     }
 }
@@ -288,12 +321,19 @@ private fun coachText(coach: CoachUi, geometry: Geometry, learner: Learner): Coa
             } else {
                 stringResource(R.string.coach_look_title, unitLabel(geometry, focusUnit(geometry, lesson)))
             }
+            // At rest the note is one line, where to look; what to look for opens with the why.
+            val opening = when {
+                coach.step != 0 -> ""
+                first -> techniqueSummary(technique) + stringResource(R.string.sentence_space)
+                !known -> lookTip(lesson.technique) + stringResource(R.string.sentence_space)
+                else -> ""
+            }
             when (coach.level) {
-                1 -> CoachText(tag = tag, title = lookTitle, body = if (known) "" else lookTip(lesson.technique))
+                1 -> CoachText(tag = tag, title = lookTitle, body = "")
                 2 -> CoachText(
                     tag = tag,
                     title = lookTitle,
-                    body = (if (first && coach.step == 0) techniqueSummary(technique) + stringResource(R.string.sentence_space) else "") +
+                    body = opening +
                         whyText(geometry, lesson) + when {
                         lesson !is Elimination -> ""
                         // After the last elimination, say what became single, the way it is single:

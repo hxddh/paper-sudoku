@@ -723,4 +723,101 @@ class PageViewModelTest {
         assertFalse(store.saved.containsKey(Catalog.dailyKey(today.toEpochDay() - 3)))
         assertTrue(store.saved.containsKey(begun.spec.key))
     }
+
+    @Test
+    fun `a digit pressed on a printed digit shows where it is and picks nothing up`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        val spec = vm.game().spec
+        val given = spec.givens.indexOfFirst { it != 0 }
+        vm.onEvent(PageEvent.Tap(given))
+        vm.onEvent(PageEvent.Digit(3))
+        assertNull(vm.game().lockedDigit)
+        assertEquals(3, vm.state.value.peek)
+        // The same key again hides it; anything else the player does ends it too.
+        vm.onEvent(PageEvent.Digit(3))
+        assertNull(vm.state.value.peek)
+        vm.onEvent(PageEvent.Digit(4))
+        vm.onEvent(PageEvent.ToggleNotes)
+        assertNull(vm.state.value.peek)
+    }
+
+    @Test
+    fun `tapping the selected cell again lets go of it, and then a digit is picked up`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        val spec = vm.game().spec
+        val given = spec.givens.indexOfFirst { it != 0 }
+        vm.onEvent(PageEvent.Tap(given))
+        vm.onEvent(PageEvent.Tap(given))
+        assertNull(vm.game().selected)
+        vm.onEvent(PageEvent.Digit(2))
+        assertEquals(2, vm.game().lockedDigit)
+        assertEquals(com.titpea.papersudoku.data.FirstHint.PickUp, vm.state.value.firstHint)
+    }
+
+    @Test
+    fun `the Coach's note stays with the keys until its cell is written`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.Coach)
+        val hint = checkNotNull(vm.state.value.coach).hint as CoachHint.Next
+        val target = hint.placement.index
+        val spec = vm.game().spec
+        val other = spec.givens.indices.first { spec.givens[it] == 0 && it != target }
+        // Choosing cells, the pencil and a pencil mark leave the note and its marks on the board.
+        vm.onEvent(PageEvent.Tap(other))
+        vm.onEvent(PageEvent.ToggleNotes)
+        vm.onEvent(PageEvent.Digit(1))
+        vm.onEvent(PageEvent.ToggleNotes)
+        assertEquals(hint, vm.state.value.coach?.hint)
+        // The right digit in its cell is the step done: the note goes by itself, the page clean.
+        vm.onEvent(PageEvent.Tap(target))
+        vm.onEvent(PageEvent.Digit(hint.placement.digit))
+        assertEquals(hint.placement.digit, vm.game().values[target])
+        assertNull(vm.state.value.coach)
+        assertEquals(1, vm.game().coach.deepest)
+    }
+
+    @Test
+    fun `a digit written elsewhere ends the Coach's note`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.Coach)
+        val target = (checkNotNull(vm.state.value.coach).hint as CoachHint.Next).placement.index
+        val spec = vm.game().spec
+        val other = spec.givens.indices.first { spec.givens[it] == 0 && it != target }
+        vm.onEvent(PageEvent.Tap(other))
+        vm.onEvent(PageEvent.Digit(spec.solution[other]))
+        assertNull(vm.state.value.coach)
+    }
+
+    @Test
+    fun `asking again for the same step keeps the note as far as it went`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.Coach)
+        vm.onEvent(PageEvent.CoachDeeper)
+        assertEquals(2, vm.state.value.coach?.level)
+        vm.onEvent(PageEvent.Coach)
+        assertEquals(2, vm.state.value.coach?.level)
+        assertEquals(1, vm.game().coach.asks)
+    }
+
+    @Test
+    fun `each first-time hint is shown once`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.ToggleNotes)
+        assertEquals(com.titpea.papersudoku.data.FirstHint.Pencil, vm.state.value.firstHint)
+        assertTrue(com.titpea.papersudoku.data.FirstHint.Pencil in settings.flow.value.hintsSeen)
+        vm.onEvent(PageEvent.ToggleNotes)
+        assertNull(vm.state.value.firstHint)
+        vm.onEvent(PageEvent.ToggleNotes)
+        assertNull(vm.state.value.firstHint)
+        vm.onEvent(PageEvent.Coach)
+        assertEquals(com.titpea.papersudoku.data.FirstHint.Coach, vm.state.value.firstHint)
+        vm.onEvent(PageEvent.DismissCoach)
+        assertNull(vm.state.value.firstHint)
+    }
 }

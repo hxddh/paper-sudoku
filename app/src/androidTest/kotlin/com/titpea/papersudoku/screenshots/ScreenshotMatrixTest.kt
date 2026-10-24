@@ -62,7 +62,7 @@ class ScreenshotMatrixTest {
     private val notebook: @Composable () -> Unit = { NotebookScreen(state = notebookState(), onOpenDay = {}, onOpenPractice = {}, onOpenLicences = {}, versionName = "11.0.0") }
 
     private val handbook: @Composable () -> Unit = {
-        HandbookScreen(start = 7, techniquesMet = setOf(Technique.HiddenSingle, Technique.XWing), onBack = {})
+        HandbookScreen(start = 6, techniquesMet = setOf(Technique.HiddenSingle, Technique.XWing), onBack = {})
     }
 
     private val review: @Composable () -> Unit = {

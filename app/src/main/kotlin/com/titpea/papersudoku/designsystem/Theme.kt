@@ -1,7 +1,6 @@
 package com.titpea.papersudoku.designsystem
 
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MaterialTheme
@@ -14,11 +13,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 
 /**
  * Paper (light) and Night (dark), with every Material 3 color role defined so no component
  * falls back to the baseline purple. Contrast of text roles on their surfaces is ≥ 4.5:1.
+ *
+ * 11.0: one accent. Terracotta (`primary`) is for the Coach, the stamp and the digit in hand;
+ * everything else is ink (`onSurface`, `onSurfaceVariant`) or the player's pen (`secondary`). The
+ * tertiary roles repeat the pen, so no component can bring back the old moss green, and nothing
+ * on screen is drawn in a primary or secondary container.
  */
 private val Paper = lightColorScheme(
     primary = Color(0xFFA8442F),
@@ -30,10 +33,10 @@ private val Paper = lightColorScheme(
     onSecondary = Color(0xFFFFFFFF),
     secondaryContainer = Color(0xFFD8E4EE),
     onSecondaryContainer = Color(0xFF0E2436),
-    tertiary = Color(0xFF5E6B3A),
+    tertiary = Color(0xFF2D5577),
     onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFE2E8C8),
-    onTertiaryContainer = Color(0xFF1B2208),
+    tertiaryContainer = Color(0xFFD8E4EE),
+    onTertiaryContainer = Color(0xFF0E2436),
     background = Color(0xFFF4EFE5),
     onBackground = Color(0xFF1F1C18),
     surface = Color(0xFFF4EFE5),
@@ -69,10 +72,10 @@ private val Night = darkColorScheme(
     onSecondary = Color(0xFF0F2F48),
     secondaryContainer = Color(0xFF2A4964),
     onSecondaryContainer = Color(0xFFD2E5F7),
-    tertiary = Color(0xFFC3CF9B),
-    onTertiary = Color(0xFF2E3611),
-    tertiaryContainer = Color(0xFF444D25),
-    onTertiaryContainer = Color(0xFFDFEBB5),
+    tertiary = Color(0xFFA9C8E8),
+    onTertiary = Color(0xFF0F2F48),
+    tertiaryContainer = Color(0xFF2A4964),
+    onTertiaryContainer = Color(0xFFD2E5F7),
     background = Color(0xFF14130F),
     onBackground = Color(0xFFEDE6DA),
     surface = Color(0xFF14130F),
@@ -98,12 +101,16 @@ private val Night = darkColorScheme(
     surfaceContainerHighest = Color(0xFF37342E),
 )
 
+/**
+ * Three radii (see Tokens.kt): marks 2dp, everything held 8dp. Menus take the mark's corner;
+ * cards, sheets, dialogs and buttons given a shape take the sheet's.
+ */
 private val PaperShapes = Shapes(
-    extraSmall = RoundedCornerShape(4.dp),
-    small = RoundedCornerShape(8.dp),
-    medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(24.dp),
-    extraLarge = RoundedCornerShape(32.dp),
+    extraSmall = MarkShape,
+    small = SheetShape,
+    medium = SheetShape,
+    large = SheetShape,
+    extraLarge = SheetShape,
 )
 
 /** Roles the board needs beyond Material's: the three writing layers and the coach marks. */
@@ -147,7 +154,8 @@ fun SudokuTheme(
     CompositionLocalProvider(LocalPaperInk provides inkFor(scheme, darkTheme)) {
         MaterialExpressiveTheme(
             colorScheme = scheme,
-            motionScheme = MotionScheme.expressive(),
+            // Quiet ink: the standard scheme's springs settle without the expressive overshoot.
+            motionScheme = MotionScheme.standard(),
             typography = PaperTypography,
             shapes = PaperShapes,
             content = content,
