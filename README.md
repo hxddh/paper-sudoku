@@ -22,7 +22,7 @@ signing secrets exist (see [docs/release.md](docs/release.md)).
 ## What it is
 
 - **A notebook, not a menu.** Today's 6×6 page on top, the practice card ("Learning: X-Wing ·
-  Known: 6 of 12"), and one calendar where every page you wrote sits on its day, 9×9 pages
+  Known: 6 of 11"), and one calendar where every page you wrote sits on its day, 9×9 pages
   included. No settings, no streak.
 - **One path that knows you.** One never-ending stack of 9×9 pages that grows harder after three
   pages solved without the Coach's answer (the levels stay behind the scenes) — singles, then pointing and pairs, then hidden pairs

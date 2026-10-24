@@ -56,7 +56,7 @@ data class PageEntry(
 data class PracticeEntry(
     /** What the next pages teach ("Learning: Naked pair"); null once all the level deals is known. */
     val learning: Technique?,
-    /** Techniques known, of [Technique.entries] ("Known: 6 of 12"). */
+    /** Techniques known, of [Technique.entries] ("Known: 6 of 11"). */
     val known: Int,
     /** The unfinished page that will be continued, if any. */
     val saved: PageSummary?,

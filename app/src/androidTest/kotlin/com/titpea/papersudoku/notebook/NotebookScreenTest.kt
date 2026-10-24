@@ -87,7 +87,7 @@ class NotebookScreenTest {
         composeRule.onNodeWithTag("notebook-practice").performClick()
         composeRule.onNodeWithTag("notebook-practice")
             .assert(hasContentDescription("Learning: Naked pair", substring = true))
-            .assert(hasContentDescription("Known: 4 of 12", substring = true))
+            .assert(hasContentDescription("Known: 4 of ${Technique.entries.size}", substring = true))
         assertEquals(listOf(today, today - 6), opened)
         assertTrue(practice)
     }

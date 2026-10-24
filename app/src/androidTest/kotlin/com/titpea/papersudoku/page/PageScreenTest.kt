@@ -17,7 +17,12 @@ import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.junit4.accessibility.disableAccessibilityChecks
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
+import com.google.android.apps.common.testing.accessibility.framework.AccessibilityCheckResult.AccessibilityCheckResultType
+import com.google.android.apps.common.testing.accessibility.framework.AccessibilityCheckResultUtils.matchesCheckNames
+import com.google.android.apps.common.testing.accessibility.framework.integrations.espresso.AccessibilityValidator
+import org.hamcrest.Matchers.`is`
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onChildren
@@ -47,6 +52,20 @@ class PageScreenTest {
     @Before
     fun enableAccessibilityChecks() {
         composeRule.enableAccessibilityChecks()
+    }
+
+    /**
+     * A 9×9 board's cells are under 48dp on a phone by design; reaching them is what press-and-slide
+     * aiming with the loupe and the keyboard are for. Every other check still runs.
+     */
+    private fun checkAllButCellSize() {
+        composeRule.disableAccessibilityChecks()
+        composeRule.enableAccessibilityChecks(
+            AccessibilityValidator()
+                .setRunChecksFromRootView(true)
+                .setThrowExceptionFor(AccessibilityCheckResultType.ERROR)
+                .setSuppressingResultMatcher(matchesCheckNames(`is`("TouchTargetSizeCheck"))),
+        )
     }
 
     private fun show(
@@ -181,6 +200,7 @@ class PageScreenTest {
     fun pencilOnANineByNinePageOffersEveryCandidate() {
         val events = mutableListOf<PageEvent>()
         val pencil = GameState.new(Fixtures.practice().spec).toggleNotesMode()
+        checkAllButCellSize()
         show(Fixtures.page(game = pencil), events)
         composeRule.onNodeWithTag("fill-candidates").assertIsDisplayed().performClick()
         assertEquals(listOf<PageEvent>(PageEvent.FillCandidates), events)

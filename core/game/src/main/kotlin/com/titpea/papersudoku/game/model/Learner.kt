@@ -106,7 +106,7 @@ object Path {
     fun learning(learner: Learner, level: com.titpea.papersudoku.engine.Difficulty): Technique? =
         next(learner, level) ?: Technique.entries.firstOrNull { it.tier <= level.maxTier && learner.found(it) < Mastery.MASTERED }
 
-    /** How many techniques are known, for "Known: 6 of 12": out of [Technique.entries], singles included. */
+    /** How many techniques are known, for "Known: 6 of 11": out of [Technique.entries], singles included. */
     fun known(learner: Learner): Int =
         Technique.entries.count { learner.mastery(it, met = false) == Mastery.Mastered }
 }
