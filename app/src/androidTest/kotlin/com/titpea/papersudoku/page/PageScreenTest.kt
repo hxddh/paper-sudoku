@@ -81,7 +81,7 @@ class PageScreenTest {
         val expected = if (spec.givens[0] == 0) "empty" else "printed ${spec.givens[0]}"
         composeRule.onNodeWithTag("cell-0")
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Role))
-            .assertContentDescriptionEquals("Row 1, column 1, $expected")
+            .assertContentDescriptionEquals("Row 1, column 1, the top-left box, $expected")
     }
 
     @Test

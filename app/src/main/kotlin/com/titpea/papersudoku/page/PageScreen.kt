@@ -113,13 +113,16 @@ import com.titpea.papersudoku.designsystem.FrauncesPrinted
 import com.titpea.papersudoku.designsystem.InkStamp
 import com.titpea.papersudoku.designsystem.PaperTheme
 import com.titpea.papersudoku.game.model.GameState
+import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.PuzzleKind
+import com.titpea.papersudoku.game.model.PuzzleSpec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.util.Locale
 
 private enum class WorkMode { Play, Coach, Solved }
 
@@ -150,6 +153,8 @@ fun PageScreen(
     modifier: Modifier = Modifier,
     effects: Flow<PageEffect> = emptyFlow(),
     boardModifier: Modifier = Modifier,
+    /** Opens the page's move-by-move reading; null where there is nowhere to read it. */
+    onReadBack: ((GameState) -> Unit)? = null,
 ) {
     // Standard feedback types go through the view, so the system's touch-feedback setting applies.
     val haptics = LocalHapticFeedback.current
@@ -206,6 +211,7 @@ fun PageScreen(
                     onPrint = onPrint,
                     onShare = onShare,
                     onRestart = { confirmRestart = true },
+                    onReadBack = onReadBack,
                     onNextPractice = {
                         if (game != null && !game.solved && game.history.isNotEmpty()) {
                             confirmNextPractice = true
@@ -455,25 +461,31 @@ private fun WorkArea(
                     },
                 )
             } ?: Spacer(Modifier)
-            WorkMode.Solved -> SolvedNote(
-                game = game,
-                outlook = solvedOutlook(game, state),
-                onShare = { onShare(game) },
-                onPrint = { onPrint(game) },
-                onNext = {
-                    when {
-                        game.spec.kind == PuzzleKind.Classic -> onEvent(PageEvent.NextPractice)
-                        onBack != null -> onBack()
-                        else -> onEvent(PageEvent.OpenPractice)
-                    }
-                },
-                nextLabel = when {
-                    game.spec.kind == PuzzleKind.Classic -> stringResource(R.string.solved_next_practice)
-                    onBack != null -> stringResource(R.string.solved_back_to_notebook)
-                    else -> stringResource(R.string.solved_open_practice)
-                },
-                modifier = Modifier.fillMaxWidth().heightIn(min = height),
-            )
+            WorkMode.Solved -> {
+                val focused = Catalog.focusTechnique(game.spec.key)
+                SolvedNote(
+                    game = game,
+                    outlook = solvedOutlook(game, state),
+                    onShare = { onShare(game) },
+                    onPrint = { onPrint(game) },
+                    onReadBack = onReadBack?.takeIf { game.moves.isNotEmpty() }?.let { read -> { read(game) } },
+                    onNext = {
+                        when {
+                            game.spec.kind == PuzzleKind.Classic -> onEvent(PageEvent.NextPractice)
+                            focused != null -> onEvent(PageEvent.PractiseTechnique(focused))
+                            onBack != null -> onBack()
+                            else -> onEvent(PageEvent.OpenPractice)
+                        }
+                    },
+                    nextLabel = when {
+                        game.spec.kind == PuzzleKind.Classic -> stringResource(R.string.solved_next_practice)
+                        focused != null -> stringResource(R.string.focus_another)
+                        onBack != null -> stringResource(R.string.solved_back_to_notebook)
+                        else -> stringResource(R.string.solved_open_practice)
+                    },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = height),
+                )
+            }
         }
     }
 }
@@ -525,6 +537,7 @@ private fun SolvedNote(
     outlook: Outlook?,
     onShare: () -> Unit,
     onPrint: () -> Unit,
+    onReadBack: (() -> Unit)?,
     onNext: () -> Unit,
     nextLabel: String,
     modifier: Modifier = Modifier,
@@ -562,6 +575,11 @@ private fun SolvedNote(
                 color = if (outlook.news) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag("solved-outlook"),
             )
+        }
+        if (onReadBack != null) {
+            TextButton(onClick = onReadBack, modifier = Modifier.heightIn(min = 48.dp).testTag("solved-read-back")) {
+                Text(stringResource(R.string.solved_read_back))
+            }
         }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -603,6 +621,34 @@ private fun solvedOutlook(game: GameState, state: PageUiState): Outlook? = when 
     else -> null
 }
 
+/** The small line above a page's title: where it comes from and how hard it is. */
+@Composable
+fun pageOverline(spec: PuzzleSpec, locale: Locale): String {
+    val level = difficultyName(spec.difficulty)
+    val day = spec.epochDay
+    return when (spec.kind) {
+        PuzzleKind.Daily -> if (day != null) weekday(LocalDate.ofEpochDay(day), locale) + DOT + level else level
+        PuzzleKind.Classic -> stringResource(R.string.practice) + DOT + level
+        PuzzleKind.Weekly -> stringResource(R.string.weekly) + DOT + level
+        PuzzleKind.Focus -> stringResource(R.string.focus) + DOT + level
+        PuzzleKind.Imported -> stringResource(R.string.imported) + DOT +
+            if (spec.beyondCoach) stringResource(R.string.imported_beyond_coach) else level
+    }
+}
+
+/** A page's title: its date, its number, or what it practises. */
+@Composable
+fun pageTitle(spec: PuzzleSpec, locale: Locale): String {
+    val day = spec.epochDay
+    return when (spec.kind) {
+        PuzzleKind.Daily -> day?.let { monthDay(LocalDate.ofEpochDay(it), locale) }.orEmpty()
+        PuzzleKind.Classic -> stringResource(R.string.practice_page, (spec.number ?: 0) + 1)
+        PuzzleKind.Weekly -> stringResource(R.string.weekly_title, day?.let { monthDay(LocalDate.ofEpochDay(it), locale) }.orEmpty())
+        PuzzleKind.Focus -> Catalog.focusTechnique(spec.key)?.let { techniqueName(it) } ?: stringResource(R.string.focus)
+        PuzzleKind.Imported -> stringResource(R.string.imported)
+    }
+}
+
 @Composable
 fun coachUsageLine(deepest: Int): String = stringResource(
     when (deepest) {
@@ -621,6 +667,7 @@ private fun PageHeader(
     onPrint: (GameState) -> Unit,
     onShare: (GameState) -> Unit,
     onRestart: () -> Unit,
+    onReadBack: ((GameState) -> Unit)?,
     onNextPractice: () -> Unit,
 ) {
     val game = state.game
@@ -637,15 +684,10 @@ private fun PageHeader(
         title = {
             if (game != null) {
                 val spec = game.spec
-                val day = spec.epochDay
                 Column {
                     Text(
                         text = (
-                            if (spec.kind == PuzzleKind.Daily && day != null) {
-                                weekday(LocalDate.ofEpochDay(day), locale) + DOT + difficultyName(spec.difficulty)
-                            } else {
-                                stringResource(R.string.practice) + DOT + difficultyName(spec.difficulty)
-                            }
+                            pageOverline(spec, locale)
                             // Once the answer is shown, the page says so while you play, not only at the end.
                             ) + if (game.coach.deepest >= 3) DOT + stringResource(R.string.page_answer_shown) else "",
                         style = MaterialTheme.typography.labelMedium,
@@ -654,11 +696,7 @@ private fun PageHeader(
                         maxLines = if (LocalDensity.current.fontScale > 1.3f) 2 else 1,
                     )
                     Text(
-                        text = if (spec.kind == PuzzleKind.Daily && day != null) {
-                            monthDay(LocalDate.ofEpochDay(day), locale)
-                        } else {
-                            stringResource(R.string.practice_page, (spec.number ?: 0) + 1)
-                        },
+                        text = pageTitle(spec, locale),
                         style = MaterialTheme.typography.titleLarge,
                         maxLines = 1,
                     )
@@ -698,6 +736,16 @@ private fun PageHeader(
                                 onPrint(game)
                             },
                         )
+                        if (onReadBack != null && game.solved && game.moves.isNotEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.menu_read_back)) },
+                                onClick = {
+                                    menuOpen = false
+                                    onReadBack(game)
+                                },
+                                modifier = Modifier.testTag("menu-read-back"),
+                            )
+                        }
                         if (game.solved) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.action_share)) },
@@ -758,11 +806,19 @@ private fun InkConnector(
         val bracketFrom: Offset
         val bracketTo: Offset
         // A column runs the board's whole height: its bracket goes along the bottom edge, under
-        // it. Anything else gets a bracket down the board's side, beside its rows: on the side the
-        // note faces when it sits beside the board, on the side of its margin rule when it sits
-        // underneath. (Along the bottom edge, a box's columns would read as the bottom box.)
-        val column = !wide && rows.distinct().size == size
-        val nearSide = if (wide) !rtl else rtl
+        // it, in either layout. Anything else gets a bracket down the board's side, beside its
+        // rows: on the side the note faces when it sits beside the board. Underneath, a box is
+        // bracketed on its own side of the board (on the far side it would read as the box
+        // there); a row or a middle box on the side of the note's margin rule. (Along the bottom
+        // edge, a box's columns would read as the bottom box.)
+        val column = rows.distinct().size == size
+        val box = !column && cols.distinct().size < size
+        val nearSide = when {
+            wide -> !rtl
+            box && cols.min() * 2 >= size -> true
+            box && (cols.max() + 1) * 2 <= size -> false
+            else -> rtl
+        }
         if (column) {
             val y = board.bottom + gap
             bracketFrom = Offset(board.left + cols.min() * cell + cell * 0.2f, y)

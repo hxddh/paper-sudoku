@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <plurals name="contents_stamped">
-        <item quantity="one">%1$d page stamped</item>
-        <item quantity="other">%1$d pages stamped</item>
+        <item quantity="one">%1$d daily</item>
+        <item quantity="other">%1$d daily</item>
     </plurals>
     <plurals name="contents_practice">
-        <item quantity="one">%1$d practice page</item>
-        <item quantity="other">%1$d practice pages</item>
+        <item quantity="one">%1$d practice</item>
+        <item quantity="other">%1$d practice</item>
+    </plurals>
+    <!-- The month's tally: "3 daily · 2 practice pages stamped"; the count is the total. -->
+    <plurals name="contents_tally">
+        <item quantity="one">%2$s page stamped</item>
+        <item quantity="other">%2$s pages stamped</item>
     </plurals>
     <plurals name="practice_to_next">
         <item quantity="one">One more clean page to %2$s</item>

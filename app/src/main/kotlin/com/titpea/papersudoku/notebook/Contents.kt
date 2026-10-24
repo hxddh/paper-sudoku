@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -109,7 +110,9 @@ fun MonthContents(
             val tally = listOfNotNull(
                 stamped.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.contents_stamped, it, it) },
                 practice.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.contents_practice, it, it) },
-            ).joinToString(DOT)
+            ).joinToString(DOT).let { parts ->
+                if (parts.isEmpty()) parts else pluralStringResource(R.plurals.contents_tally, stamped + practice, stamped + practice, parts)
+            }
             if (tally.isNotEmpty()) {
                 Text(
                     tally,
@@ -194,7 +197,8 @@ private fun Mark(mark: DayMark?) {
         when (mark) {
             DayMark.Clean -> Box(Modifier.size(8.dp).background(colors.primary, CircleShape))
             DayMark.Coached -> Box(Modifier.size(8.dp).border(1.5.dp, colors.primary, CircleShape))
-            DayMark.Begun -> Box(Modifier.size(6.dp).background(colors.onSurfaceVariant, CircleShape))
+            // A short dash, not a smaller dot: told apart by shape, not by size and colour alone.
+            DayMark.Begun -> Box(Modifier.size(width = 8.dp, height = 2.dp).background(colors.onSurfaceVariant, RoundedCornerShape(1.dp)))
             null -> Unit
         }
     }

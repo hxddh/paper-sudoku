@@ -123,7 +123,11 @@ class RoomGameStore(
         val json = savedGames.get(puzzleKey)?.json ?: return null
         return withContext(Dispatchers.Default) { GameState.decode(json) } ?: null.also {
             Log.w(TAG, "Unreadable saved page $puzzleKey; set aside, starting it afresh")
-            savedGames.setAside(puzzleKey, "damaged-$puzzleKey-${System.currentTimeMillis()}")
+            // Its stamp goes with it: the day reads as not done, and finishing it again stamps it.
+            database.withTransaction {
+                savedGames.setAside(puzzleKey, "damaged-$puzzleKey-${System.currentTimeMillis()}")
+                results.forget(puzzleKey)
+            }
         }
     }
 

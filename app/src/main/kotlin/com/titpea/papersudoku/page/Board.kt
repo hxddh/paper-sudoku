@@ -72,7 +72,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.TextUnit
@@ -83,6 +83,7 @@ import com.titpea.papersudoku.designsystem.FrauncesPen
 import com.titpea.papersudoku.designsystem.FrauncesPrinted
 import com.titpea.papersudoku.designsystem.PaperTheme
 import com.titpea.papersudoku.engine.DigitMask
+import com.titpea.papersudoku.engine.Geometry
 import com.titpea.papersudoku.game.model.GameState
 import kotlin.math.roundToInt
 
@@ -413,7 +414,8 @@ private fun Cell(
     }
 
     val description = cellDescription(
-        row, column, value, notes, given, conflict,
+        row, column, boxName(geometryOf(size), geometryOf(size).box(index)),
+        value, notes, given, conflict,
         ghost = marks.ghost.takeIf { isTarget && value == 0 },
         removed = removed,
     )
@@ -525,6 +527,8 @@ private fun cellHighlight(index: Int, selected: Int?, game: GameState, showConte
     )
 }
 
+private fun geometryOf(size: Int): Geometry = if (size == 6) Geometry.Mini else Geometry.Classic
+
 @Composable
 private fun NoteGrid(
     notes: Int,
@@ -547,6 +551,23 @@ private fun NoteGrid(
                         val noted = DigitMask.contains(notes, digit)
                         if (digit <= size && (noted || struck)) {
                             val emphasised = digit == highlightDigit
+                            // Struck: a firm diagonal slash across the mark, readable at arm's length
+                            // (a text strike-through is a hairline at this size).
+                            val slash = if (struck) {
+                                Modifier.drawWithContent {
+                                    drawContent()
+                                    val inset = this.size.minDimension * 0.18f
+                                    drawLine(
+                                        colors.primary,
+                                        Offset(inset, this.size.height - inset),
+                                        Offset(this.size.width - inset, inset),
+                                        strokeWidth = 1.5.dp.toPx(),
+                                        cap = StrokeCap.Round,
+                                    )
+                                }
+                            } else {
+                                Modifier
+                            }
                             Text(
                                 text = digit.toString(),
                                 color = when {
@@ -558,9 +579,9 @@ private fun NoteGrid(
                                     fontSize = noteSize,
                                     fontWeight = if (emphasised) FontWeight.Bold else FontWeight.Normal,
                                     fontFeatureSettings = "tnum",
-                                    textDecoration = if (struck) TextDecoration.LineThrough else null,
                                     textAlign = TextAlign.Center,
                                 ),
+                                modifier = slash,
                             )
                         }
                     }
@@ -574,6 +595,8 @@ private fun NoteGrid(
 private fun cellDescription(
     row: Int,
     column: Int,
+    /** The box by name, as the Coach says it ("the top-right box"), so its notes can be followed. */
+    box: Int,
     value: Int,
     notes: Int,
     given: Boolean,
@@ -591,7 +614,7 @@ private fun cellDescription(
     var suffix = if (conflict) separator + stringResource(R.string.cell_conflict) else ""
     if (ghost != null) suffix += separator + stringResource(R.string.cell_coach_answer, ghost)
     if (removed.isNotEmpty()) suffix += separator + stringResource(R.string.cell_coach_removes, removed.sorted().joinToString(" "))
-    return stringResource(R.string.cell_description, row + 1, column + 1, state) + suffix
+    return stringResource(R.string.cell_description, row + 1, column + 1, state, stringResource(box)) + suffix
 }
 
 /** A strip along one side of the board, at most [budget] tall and anchored at its bottom. */

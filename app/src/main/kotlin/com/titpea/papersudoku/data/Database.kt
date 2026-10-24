@@ -107,6 +107,10 @@ interface GameResultDao {
     @Query("SELECT EXISTS(SELECT 1 FROM game_results WHERE puzzleKey = :puzzleKey)")
     suspend fun exists(puzzleKey: String): Boolean
 
+    /** Drops a page's result when its saved page could not be read and was set aside. */
+    @Query("DELETE FROM game_results WHERE puzzleKey = :puzzleKey AND puzzleKey != ''")
+    suspend fun forget(puzzleKey: String)
+
     @Query(
         """
         SELECT mode, difficulty, COUNT(*) AS solved,

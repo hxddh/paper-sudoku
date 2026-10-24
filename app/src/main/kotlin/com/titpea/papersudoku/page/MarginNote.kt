@@ -329,7 +329,7 @@ fun unitLabel(geometry: Geometry, unit: UnitRef): String = when (unit.kind) {
 }
 
 /** The name of box [index] by its place: 3 × 3 boxes on 9×9, 3 rows × 2 columns on 6×6. */
-private fun boxName(geometry: Geometry, index: Int): Int {
+internal fun boxName(geometry: Geometry, index: Int): Int {
     val across = geometry.size / geometry.boxCols
     val down = geometry.size / geometry.boxRows
     val vertical = position(index / across, down)

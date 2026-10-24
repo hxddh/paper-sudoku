@@ -91,8 +91,11 @@ object Catalog {
 
     fun dayOfWeekly(key: String): Long? = key.takeIf { it.startsWith("weekly-") }?.removePrefix("weekly-")?.toLongOrNull()
 
+    /** The level the weekly page is dealt at. */
+    val WEEKLY_LEVEL: Difficulty = Difficulty.Steady
+
     fun weekly(sunday: Long): PuzzleSpec {
-        val generated = PuzzleGenerator(Geometry.Classic).generate(seed(WEEKLY_STREAM, sunday), Difficulty.Steady)
+        val generated = PuzzleGenerator(Geometry.Classic).generate(seed(WEEKLY_STREAM, sunday), WEEKLY_LEVEL)
         return spec(weeklyKey(sunday), PuzzleKind.Weekly, generated, epochDay = sunday)
     }
 
