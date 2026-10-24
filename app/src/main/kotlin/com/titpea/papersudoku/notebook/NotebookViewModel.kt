@@ -46,6 +46,25 @@ data class PracticeEntry(
     val saved: PageSummary?,
 )
 
+/** A row of the notebook's journal: a stamped day, or a finished 9×9 page filed under the day it was finished. */
+sealed interface JournalRow {
+    /** The page's key: the list key, and what the open page is matched against. */
+    val key: String
+    val date: LocalDate
+
+    data class Day(val page: PageEntry) : JournalRow {
+        override val key: String get() = "daily-${page.epochDay}"
+        override val date: LocalDate get() = LocalDate.ofEpochDay(page.epochDay)
+    }
+
+    data class Page(val page: PageSummary, override val date: LocalDate) : JournalRow {
+        override val key: String get() = page.key
+    }
+}
+
+/** One month of the journal, newest row first. */
+data class JournalMonth(val month: YearMonth, val rows: List<JournalRow>)
+
 data class NotebookUiState(
     val today: Long = 0,
     val todayPage: PageEntry? = null,
@@ -69,13 +88,19 @@ data class NotebookUiState(
     val weekly: PageSummary? = null,
     /** Pages the player typed in, most recently touched first. */
     val imported: List<PageSummary> = emptyList(),
+    /** Begun and not finished, other than days: typed-in pages and this week's page. */
+    val unfinishedPages: List<PageSummary> = emptyList(),
+    /** Stamped days and finished 9×9 pages together, by month, newest first. */
+    val journal: List<JournalMonth> = emptyList(),
+    /** The technique practice is about to teach ("Next: X-Wing"); null once the level's are known. */
+    val nextTechnique: Technique? = null,
     /** False until the store has answered; the list stays empty so it opens at today, not below it. */
     val loaded: Boolean = true,
 )
 
 /**
  * The notebook is the app's home and its journal at once: today on top, the practice stack, the
- * month's contents, the technique handbook, then the pages written on. The contents reach every
+ * month's contents, then the pages written on (stamped days and finished 9×9 pages, by month). The contents reach every
  * day since the notebook began (the install day, or the earliest page it already holds); the list
  * below holds only pages with something on them, so it never fills with blank days. There is no
  * streak — only stamped pages.
@@ -98,15 +123,25 @@ class NotebookViewModel(
             store.dailies(0),
             store.days,
             store.unfinishedPractice,
-            combine(store.cleanPractice, store.page(Catalog.weeklyKey(sunday)), store.imported, ::Triple),
+            combine(store.cleanPractice, store.page(Catalog.weeklyKey(sunday)), store.imported, store.solvedNineByNine, ::Pages),
             combine(settingsStore.settings, store.stampedCount, store.practiceCompletions, ::Triple),
-        ) { dailies, days, practice, (clean, weekly, imported), (settings, stampedCount, completions) ->
+        ) { dailies, days, practice, (clean, weekly, imported, finished), (settings, stampedCount, completions) ->
             val saved = dailies.associateBy { it.epochDay }
             val results = days.associateBy { it.epochDay }
             // A saved page says what it was dealt at; the calendar rule is for days not yet opened.
             fun entry(d: Long) = PageEntry(d, saved[d]?.difficulty ?: Catalog.dailyDifficulty(d), saved[d], results[d])
             val written = (saved.keys.filterNotNull() + results.keys).filter { it < day }.distinct().sortedDescending()
             val pages = (written + day).associateWith(::entry)
+            val stampedDays = written.filter { pages.getValue(it).stamped }
+            // Grouped here, not while the list is drawn: a day by its own date, any other page by
+            // the day it was finished.
+            val journal = (
+                stampedDays.map { JournalRow.Day(pages.getValue(it)) } +
+                    finished.map { JournalRow.Page(it, Instant.ofEpochMilli(it.updatedAt).atZone(clock.zone).toLocalDate()) }
+                )
+                .sortedByDescending { it.date }
+                .groupBy { YearMonth.from(it.date) }
+                .map { (month, rows) -> JournalMonth(month, rows) }
             NotebookUiState(
                 today = day,
                 todayPage = entry(day),
@@ -119,7 +154,7 @@ class NotebookViewModel(
                 // Pages restored from a backup may predate the install; they open the notebook instead.
                 firstDay = minOf(firstDay, written.lastOrNull() ?: day),
                 unfinished = written.filter { pages.getValue(it).let { p -> !p.stamped && p.saved != null } },
-                stampedDays = written.filter { pages.getValue(it).stamped },
+                stampedDays = stampedDays,
                 pages = pages,
                 practiceByMonth = completions
                     .groupingBy { YearMonth.from(Instant.ofEpochMilli(it).atZone(clock.zone)) }
@@ -130,6 +165,10 @@ class NotebookViewModel(
                 weekOf = sunday,
                 weekly = weekly,
                 imported = imported,
+                // Finished weekly pages are in the journal; this week's waits here once begun.
+                unfinishedPages = imported.filter { !it.solved } +
+                    listOfNotNull(weekly?.takeIf { !it.solved && it.grid != it.givens }),
+                journal = journal,
                 loaded = true,
             )
         }
@@ -139,6 +178,13 @@ class NotebookViewModel(
     fun refreshDate() {
         today.value = LocalDate.now(clock).toEpochDay()
     }
+
+    private data class Pages(
+        val clean: Map<Difficulty, Int>,
+        val weekly: PageSummary?,
+        val imported: List<PageSummary>,
+        val finished: List<PageSummary>,
+    )
 
     companion object {
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {

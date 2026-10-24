@@ -78,6 +78,12 @@ class FakeGameStore : GameStore {
         map.values.filter { (g, _) -> g.spec.kind == PuzzleKind.Imported }.sortedByDescending { it.second }.map { PageSummary.of(it.first) }
     }
 
+    override val solvedNineByNine: Flow<List<PageSummary>> = savedFlow.map { map ->
+        map.values.filter { (g, _) -> g.spec.kind != PuzzleKind.Daily && g.solved }
+            .sortedByDescending { it.second }
+            .map { (g, at) -> PageSummary.of(g).copy(updatedAt = at) }
+    }
+
     override val unfinishedPractice: Flow<PageSummary?> = savedFlow.map { map ->
         map.values.filter { (g, _) -> g.spec.kind == PuzzleKind.Classic && !g.solved }.maxByOrNull { it.second }?.first
             ?.let(PageSummary::of)

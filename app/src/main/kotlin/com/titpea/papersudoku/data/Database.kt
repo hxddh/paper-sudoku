@@ -78,6 +78,8 @@ data class SavedPageRow(
     val solved: Boolean,
     val givens: String,
     val grid: String,
+    /** When the page was last written on (epoch millis): the date a finished page is filed under. */
+    val updatedAt: Long,
 )
 
 /** Per mode and difficulty. [bestSeconds] ignores games where the Coach gave the answer. */
@@ -181,6 +183,10 @@ interface SavedGameDao {
     @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind = :kind ORDER BY updatedAt DESC")
     fun observeKind(kind: String): Flow<List<SavedPageRow>>
 
+    /** Finished 9×9 pages (practice, weekly, technique and typed-in), most recently finished first. */
+    @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind != 'Daily' AND kind != 'Damaged' AND solved = 1 ORDER BY updatedAt DESC")
+    fun observeSolvedNineByNine(): Flow<List<SavedPageRow>>
+
     @Query("DELETE FROM saved_games WHERE kind = 'Classic' AND solved = 0 AND puzzleKey != :except")
     suspend fun discardUnsolvedPractice(except: String)
 
@@ -199,7 +205,7 @@ interface SavedGameDao {
     suspend fun setAside(puzzleKey: String, newKey: String)
 }
 
-private const val PAGE_COLUMNS = "puzzleKey, kind, difficulty, number, epochDay, solved, givens, grid"
+private const val PAGE_COLUMNS = "puzzleKey, kind, difficulty, number, epochDay, solved, givens, grid, updatedAt"
 
 @Database(
     entities = [GameResultEntity::class, SavedGameEntity::class],

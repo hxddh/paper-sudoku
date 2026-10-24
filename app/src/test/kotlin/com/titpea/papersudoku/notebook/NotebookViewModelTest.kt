@@ -23,6 +23,7 @@ import org.junit.Test
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneOffset
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -92,5 +93,21 @@ class NotebookViewModelTest {
         val state = vm.state.first { it.loaded && it.stamped == 1 }
         assertEquals(1, state.stamped)
         assertEquals(1, state.practiceByMonth.values.sum())
+    }
+
+    @Test
+    fun `finished practice pages are filed in the journal among the stamped days`() = runTest(dispatcher) {
+        val day = Catalog.daily(today - 1).let { spec -> GameState.new(spec).copy(values = spec.solution).settle(5) }
+        store.saveSolved(day, GameResult(day.spec.key, PuzzleKind.Daily, day.spec.difficulty, 60, 0, 0, 1, today - 1), now = 1)
+        val practice = Catalog.classic(Difficulty.Gentle, 0).let { spec -> GameState.new(spec).copy(values = spec.solution).settle(5) }
+        val finishedAt = Instant.parse("2026-10-21T08:00:00Z").toEpochMilli()
+        store.saveSolved(practice, GameResult(practice.spec.key, PuzzleKind.Classic, Difficulty.Gentle, 60, 0, 0, 1, null), now = finishedAt)
+        val state = viewModel(firstDay = today - 10).state.first { it.loaded && it.journal.sumOf { m -> m.rows.size } == 2 }
+        val month = state.journal.single()
+        assertEquals(YearMonth.of(2026, 10), month.month)
+        // Newest first: the practice page finished today, then yesterday's stamped day.
+        assertEquals(listOf(practice.spec.key, Catalog.dailyKey(today - 1)), month.rows.map { it.key })
+        assertEquals(LocalDate.of(2026, 10, 21), month.rows.first().date)
+        assertEquals(listOf(today - 1), state.stampedDays)
     }
 }

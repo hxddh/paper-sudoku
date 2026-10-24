@@ -38,6 +38,8 @@ data class PageSummary(
     val solved: Boolean,
     val givens: String,
     val grid: String,
+    /** When the page was last written on (epoch millis); 0 where it is not known. */
+    val updatedAt: Long = 0,
 ) {
     val size: Int get() = if (grid.length == 36) 6 else 9
     val boxRows: Int get() = if (size == 6) 2 else 3
@@ -97,6 +99,9 @@ interface GameStore {
 
     /** Pages the player typed in, most recently touched first. */
     val imported: Flow<List<PageSummary>>
+
+    /** Finished pages other than dailies (all 9×9), most recently finished first. */
+    val solvedNineByNine: Flow<List<PageSummary>>
 
     /** The practice page to continue, if one is unfinished. */
     val unfinishedPractice: Flow<PageSummary?>
@@ -195,6 +200,12 @@ class RoomGameStore(
             .distinctUntilChanged()
             .flowOn(Dispatchers.Default)
 
+    override val solvedNineByNine: Flow<List<PageSummary>> =
+        savedGames.observeSolvedNineByNine()
+            .map { rows -> rows.mapNotNull(::summary) }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
+
     override val unfinishedPractice: Flow<PageSummary?> =
         savedGames.observeLatestUnsolvedPractice().map { it?.let(::summary) }.distinctUntilChanged()
 
@@ -229,7 +240,7 @@ class RoomGameStore(
         val kind = PuzzleKind.entries.firstOrNull { it.name == row.kind } ?: return null
         val difficulty = Difficulty.entries.firstOrNull { it.name == row.difficulty } ?: return null
         if (row.grid.length != 36 && row.grid.length != 81) return null
-        return PageSummary(row.puzzleKey, kind, difficulty, row.number, row.epochDay, row.solved, row.givens, row.grid)
+        return PageSummary(row.puzzleKey, kind, difficulty, row.number, row.epochDay, row.solved, row.givens, row.grid, row.updatedAt)
     }
 
     companion object {
