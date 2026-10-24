@@ -11,12 +11,14 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.titpea.papersudoku.AppContainer
+import com.titpea.papersudoku.data.FirstHint
 import com.titpea.papersudoku.data.GameResult
 import com.titpea.papersudoku.data.GameStore
 import com.titpea.papersudoku.data.SettingsStore
 import com.titpea.papersudoku.data.UserSettings
 import com.titpea.papersudoku.engine.CoachHint
 import com.titpea.papersudoku.engine.Difficulty
+import com.titpea.papersudoku.engine.DigitMask
 import com.titpea.papersudoku.engine.Step
 import com.titpea.papersudoku.engine.SudokuEngine
 import com.titpea.papersudoku.engine.Technique
@@ -124,6 +126,13 @@ data class PageUiState(
     val todayWaiting: Boolean = false,
     /** The hardest technique the player wrote with themselves on the page just solved (10.0). */
     val foundYourself: Technique? = null,
+    /**
+     * A digit pressed while a printed digit is selected: the board shows where that digit is, and
+     * nothing is picked up (11.0). Gone with the next thing the player does.
+     */
+    val peek: Int? = null,
+    /** A first-time hint to show while what it is about lasts (11.0); each is shown once. */
+    val firstHint: FirstHint? = null,
 ) {
     val boardLocked: Boolean get() = loading || game?.solved != false
 }
@@ -177,8 +186,12 @@ enum class PageEffect { Placed, Conflict, Solved, Toggled }
  * - Every change is saved (debounced) as JSON in Room; a page survives process death, a swipe from
  *   Recents, a reboot and an update.
  * - The clock is hidden and only runs while the page is on screen; it surfaces on the stamp.
- * - Digits: with an editable cell selected a digit is written; otherwise the digit is picked up
- *   and every tap on the board writes it (digit-first), until it is put down again.
+ * - Digits: with an editable cell selected a digit is written; with no cell selected it is picked
+ *   up and every tap on the board writes it (digit-first), until it is put down again; with a
+ *   printed digit selected it only shows where that digit is (11.0). Tapping the selected cell
+ *   again lets go of it.
+ * - The Coach's note stays on the page with the keys: its marks last until its step is done or
+ *   the page changes elsewhere (11.0).
  * - Practice difficulty follows clean solves ([Practice]).
  */
 class PageViewModel(
@@ -231,10 +244,16 @@ class PageViewModel(
     }
 
     fun onEvent(event: PageEvent) {
+        // Showing where a digit is lasts until the next thing the player does.
+        val peeked = _state.value.peek
+        if (peeked != null) _state.update { it.copy(peek = null) }
         when (event) {
-            is PageEvent.Tap -> mutate { it.tap(event.index, TIDY_NOTES) }
+            is PageEvent.Tap -> mutate { g ->
+                // Tapping the selected cell again lets go of it, so a digit can be picked up.
+                if (g.lockedDigit == null && g.selected == event.index) g.select(null) else g.tap(event.index, TIDY_NOTES)
+            }
             is PageEvent.Select -> mutate { it.select(event.index) }
-            is PageEvent.Digit -> digit(event.digit)
+            is PageEvent.Digit -> digit(event.digit, peeked)
             is PageEvent.TypeDigit -> mutate { g ->
                 val selected = g.selected
                 if (selected != null && g.isEditable(selected)) g.input(event.digit, TIDY_NOTES) else g
@@ -242,7 +261,10 @@ class PageViewModel(
             PageEvent.ClearLock -> mutate(PageEffect.Toggled) { g -> g.lockedDigit?.let { g.toggleLock(it) } ?: g }
             PageEvent.Erase -> mutate { it.erase() }
             PageEvent.Undo -> mutate { it.undo() }
-            PageEvent.ToggleNotes -> mutate(PageEffect.Toggled) { it.toggleNotesMode() }
+            PageEvent.ToggleNotes -> {
+                mutate(PageEffect.Toggled) { it.toggleNotesMode() }
+                if (_state.value.game?.notesMode == true) firstTime(FirstHint.Pencil)
+            }
             PageEvent.FillCandidates -> mutate { if (it.size == 9) it.pencilInCandidates() else it }
             PageEvent.Coach -> openCoach()
             PageEvent.CoachDeeper -> deepenCoach()
@@ -259,22 +281,52 @@ class PageViewModel(
             is PageEvent.OpenSaved -> open(PageTarget.Saved(event.key))
             PageEvent.StampLanded -> _state.update { it.copy(justSolved = false) }
         }
+        settleFirstHint()
     }
 
     // region Board
 
     /**
-     * Write into the selected cell, or pick the digit up (digit-first) when there is nothing to
-     * write into. A picked-up digit is put down by tapping it again; another digit swaps it.
+     * Write into the selected cell; with no cell selected, pick the digit up (digit-first); with a
+     * printed digit selected, show where [digit] is ([peeked] is the digit shown until now: the
+     * same key again hides it). A picked-up digit is put down by tapping it again; another digit
+     * swaps it.
      */
-    private fun digit(digit: Int) {
-        val game = _state.value.game ?: return
+    private fun digit(digit: Int, peeked: Int?) {
+        val current = _state.value
+        val game = current.game ?: return
         val selected = game.selected
         when {
             // Holding a digit: tapping it again puts it down, another digit swaps it.
             game.lockedDigit != null -> mutate(PageEffect.Toggled) { it.toggleLock(digit) }
-            selected != null && game.isEditable(selected) -> mutate { it.input(digit, TIDY_NOTES) }
-            else -> mutate(PageEffect.Toggled) { it.toggleLock(digit) }
+            selected == null -> {
+                mutate(PageEffect.Toggled) { it.toggleLock(digit) }
+                if (_state.value.game?.lockedDigit != null) firstTime(FirstHint.PickUp)
+            }
+            game.isEditable(selected) -> mutate { it.input(digit, TIDY_NOTES) }
+            // A printed digit selected: where this digit is, and no mode to leave afterwards.
+            !current.boardLocked && digit in 1..game.size ->
+                _state.update { it.copy(peek = digit.takeIf { d -> d != peeked }) }
+        }
+    }
+
+    /** Shows [hint] now if it was never shown, and remembers that it was. */
+    private fun firstTime(hint: FirstHint) {
+        if (hint in _state.value.settings.hintsSeen) return
+        _state.update { it.copy(firstHint = hint) }
+        viewModelScope.launch { updateSettings { it.copy(hintsSeen = it.hintsSeen + hint) } }
+    }
+
+    /** A first-time hint lasts as long as what it is about: the pencil, the digit in hand, the note. */
+    private fun settleFirstHint() {
+        _state.update { s ->
+            val live = when (s.firstHint) {
+                null -> true
+                FirstHint.Pencil -> s.game?.notesMode == true
+                FirstHint.PickUp -> s.game?.lockedDigit != null
+                FirstHint.Coach -> s.coach != null
+            }
+            if (live) s else s.copy(firstHint = null)
         }
     }
 
@@ -285,7 +337,6 @@ class PageViewModel(
         var after = block(before)
         if (after == before) return
 
-        val boardChanged = after.values != before.values || after.notes != before.notes
         var running = current.runningSince
         var feedback = effect
         if (after.values == after.spec.solution) {
@@ -305,7 +356,7 @@ class PageViewModel(
             it.copy(
                 game = after,
                 runningSince = running,
-                coach = if (boardChanged) null else it.coach,
+                coach = it.coach?.takeIf { coach -> coach.outlives(before, after) },
                 justSolved = after.solved && !before.solved,
                 // A solve is dated now: an earlier day's page finished today points at today's.
                 today = if (after.solved && !before.solved) today() else it.today,
@@ -324,8 +375,26 @@ class PageViewModel(
     // region Coach
 
     /**
+     * Whether the note (and its marks) stays through a change from [before] to [after]: it stays
+     * on the page with the keys until its step is done or the page changes elsewhere. A digit
+     * written or erased anywhere ends it (the right digit in its cell is the step done, by itself);
+     * a pencil mark ends it only when the note was about that mark, or had nothing to say.
+     */
+    private fun CoachUi.outlives(before: GameState, after: GameState): Boolean {
+        if (after.values != before.values) return false
+        if (after.notes == before.notes) return true
+        return when (val hint = hint) {
+            is CoachHint.MissingMark -> !DigitMask.contains(after.notes[hint.index], hint.digit)
+            null -> false
+            else -> true
+        }
+    }
+
+    /**
      * The Coach reads the page as the player has it: their digits, their pencil marks and where
      * they are. The search runs off the main thread; if the page changes meanwhile, it is dropped.
+     * Asked again with the note still open, it reads the page again: the same step keeps the note
+     * as far as it went, another starts a new note.
      */
     private fun openCoach() {
         val current = _state.value
@@ -338,8 +407,11 @@ class PageViewModel(
             val now = _state.value
             val live = now.game ?: return@launch
             if (now.boardLocked || live.values != game.values || live.notes != game.notes) return@launch
+            val open = now.coach
+            if (open != null && open.hint == hint) return@launch
             val updated = if (hint != null) live.coachAsked() else live
             _state.update { it.copy(game = updated, coach = CoachUi(hint, level = 1)) }
+            if (hint != null) firstTime(FirstHint.Coach)
             scheduleSave()
         }
     }
@@ -446,7 +518,7 @@ class PageViewModel(
      */
     private fun open(target: PageTarget) {
         // Choosing a page is the reference point for the midnight turn in [onForeground].
-        _state.update { it.copy(today = today()) }
+        _state.update { it.copy(today = today(), peek = null, firstHint = null) }
         val current = _state.value.game
         if (current != null && target.isShowing(current)) {
             resumeCurrent()
