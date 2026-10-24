@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 9.0：复盘，以及抄进自己的题目。 -->
+<resources>
+    <!-- 复盘 -->
+    <string name="review_title">复盘</string>
+    <string name="review_empty">这一页写于 9.0 之前，那时还不会记录每一步。</string>
+    <string name="review_summary_title">这一页</string>
+    <string name="review_summary_technique">%1$s：%2$d</string>
+    <plurals name="review_summary_beyond">
+        <item quantity="other">%1$d 个数字超出了教练的技巧</item>
+    </plurals>
+    <plurals name="review_summary_mistakes">
+        <item quantity="other">写错 %1$d 次</item>
+    </plurals>
+    <string name="review_summary_no_mistakes">没有写错。</string>
+    <plurals name="review_summary_coach">
+        <item quantity="other">教练出手 %1$d 步</item>
+    </plurals>
+    <string name="review_position">第 %1$d 步，共 %2$d 步</string>
+    <string name="review_written">第 %1$d 行第 %2$d 列：%3$d</string>
+    <string name="review_erased">第 %1$d 行第 %2$d 列：擦掉 %3$d</string>
+    <string name="review_cell">第 %1$d 行第 %2$d 列</string>
+    <string name="review_why_technique">这一步用到：%1$s。</string>
+    <string name="review_why_beyond">在当时，这一步超出了教练的技巧。</string>
+    <string name="review_why_mistake">写错了：最终答案里这一格是别的数字。</string>
+    <string name="review_why_erased">擦掉了，这一格又空了。</string>
+    <string name="review_coach_answer">这是教练给的答案。</string>
+    <string name="review_coach_took_back">教练把它收回了。</string>
+    <string name="review_previous">上一步</string>
+    <string name="review_next">下一步</string>
+    <string name="review_slider">步数</string>
+
+    <!-- 抄题 -->
+    <string name="import_title">抄一页自己的题</string>
+    <string name="import_intro">把报纸或书上的题目抄进来。教练会像对待其他页一样帮你。</string>
+    <string name="import_check">检查并加入</string>
+    <string name="import_checking">正在检查…</string>
+    <string name="import_clear">清空</string>
+    <string name="import_clear_title">清空这一页？</string>
+    <string name="import_clear_body">你填进去的数字都会被擦掉。</string>
+    <string name="import_clash">有数字在同一行、列或宫里重复了。</string>
+    <string name="import_too_few">一道数独至少要有 17 个题目数字。</string>
+    <string name="import_no_solution">这一页无解。请对照原题检查数字。</string>
+    <string name="import_many_solutions">这一页不止一个解，教练没法讲解。请对照原题检查数字。</string>
+    <string name="import_shape">这不是一张 9×9 的题。</string>
+</resources>
