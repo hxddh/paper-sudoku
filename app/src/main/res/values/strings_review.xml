@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 9.0: reading a page back, and bringing your own page. -->
+<resources>
+    <!-- Read back -->
+    <string name="review_title">Read back</string>
+    <string name="review_empty">This page was written before 9.0 kept a record of its moves.</string>
+    <string name="review_summary_title">On this page</string>
+    <!-- A technique and how many digits it placed, e.g. "Hidden single: 12". -->
+    <string name="review_summary_technique">%1$s: %2$d</string>
+    <plurals name="review_summary_beyond">
+        <item quantity="one">%1$d digit beyond the Coach’s techniques</item>
+        <item quantity="other">%1$d digits beyond the Coach’s techniques</item>
+    </plurals>
+    <plurals name="review_summary_mistakes">
+        <item quantity="one">%1$d mistake</item>
+        <item quantity="other">%1$d mistakes</item>
+    </plurals>
+    <string name="review_summary_no_mistakes">No mistakes.</string>
+    <plurals name="review_summary_coach">
+        <item quantity="one">%1$d move by the Coach</item>
+        <item quantity="other">%1$d moves by the Coach</item>
+    </plurals>
+    <!-- Position in the move record: "Move 12 of 54". -->
+    <string name="review_position">Move %1$d of %2$d</string>
+    <string name="review_written">Row %1$d, column %2$d: %3$d</string>
+    <string name="review_erased">Row %1$d, column %2$d: %3$d erased</string>
+    <string name="review_cell">Row %1$d, column %2$d</string>
+    <string name="review_why_technique">The step it needed: %1$s.</string>
+    <string name="review_why_beyond">Beyond the Coach’s techniques at that moment.</string>
+    <string name="review_why_mistake">A mistake: the solution has a different digit here.</string>
+    <string name="review_why_erased">Erased; the cell is empty again.</string>
+    <string name="review_coach_answer">The Coach’s answer.</string>
+    <string name="review_coach_took_back">The Coach took it back.</string>
+    <string name="review_previous">Previous move</string>
+    <string name="review_next">Next move</string>
+    <string name="review_slider">Move</string>
+
+    <!-- Bring your own page -->
+    <string name="import_title">Bring your own page</string>
+    <string name="import_intro">Copy a puzzle from a newspaper or a book. The Coach can help with it like any page.</string>
+    <string name="import_check">Check and add</string>
+    <string name="import_checking">Checking…</string>
+    <string name="import_clear">Clear</string>
+    <string name="import_clear_title">Clear this page?</string>
+    <string name="import_clear_body">Every digit you typed will be erased.</string>
+    <string name="import_clash">These digits clash in a row, column or box.</string>
+    <string name="import_too_few">A sudoku needs at least 17 printed digits.</string>
+    <string name="import_no_solution">This page has no solution. Check the digits against the original.</string>
+    <string name="import_many_solutions">This page has more than one solution, so the Coach could not teach it. Check the digits against the original.</string>
+    <string name="import_shape">This is not a 9×9 page.</string>
+</resources>
