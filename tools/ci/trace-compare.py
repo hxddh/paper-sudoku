@@ -60,6 +60,16 @@ def measure(tp):
         group by state, io_wait"""):
         label = row.state + (" (io)" if row.io_wait == 1 else "")
         out["main thread states"][label] += row.dur / 1e6
+    # What the main thread waits on while it opens the app's code (bindApplication).
+    for row in tp.query(f"""
+        select ts.state as state, ts.io_wait as io_wait, ts.blocked_function as fn,
+        sum(min(ts.ts + ts.dur, s.ts + s.dur) - max(ts.ts, s.ts)) as dur
+        from slice s join thread_track t on s.track_id = t.id
+        join thread_state ts on ts.utid = t.utid and ts.ts < s.ts + s.dur and ts.ts + ts.dur > s.ts
+        where t.utid = {utid} and s.name like 'OpenDexFilesFromOat%'
+        group by 1, 2, 3"""):
+        label = row.state + (" (io)" if row.io_wait == 1 else "") + (f" {row.fn}" if row.fn else "")
+        out["main thread states in OpenDexFilesFromOat"][label] += row.dur / 1e6
     for row in tp.query(f"""
         select t.name as name, sum(s.dur) as dur from sched s join thread t using (utid)
         where t.upid = {upid} group by t.name"""):
@@ -107,7 +117,7 @@ def main(base_root, head_root):
         b = medians(base.get(bench, []))
         h = medians(head.get(bench, []))
         print(f"\n=== {bench}: {len(base.get(bench, []))} base / {len(head.get(bench, []))} head traces (median ms) ===")
-        for section in ["main thread states", "main thread slices", "app threads CPU", "other processes CPU"]:
+        for section in ["main thread states", "main thread states in OpenDexFilesFromOat", "main thread slices", "app threads CPU", "other processes CPU"]:
             rows = set(b.get(section, {})) | set(h.get(section, {}))
             diff = sorted(
                 rows,
