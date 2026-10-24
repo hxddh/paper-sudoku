@@ -33,6 +33,7 @@ fun difficultyRes(difficulty: Difficulty): Int = when (difficulty) {
     Difficulty.Gentle -> R.string.difficulty_gentle
     Difficulty.Steady -> R.string.difficulty_steady
     Difficulty.Tricky -> R.string.difficulty_tricky
+    Difficulty.Deep -> R.string.difficulty_deep
 }
 
 @Composable

@@ -141,7 +141,7 @@
     <string name="practice_continue">Continue page %1$d</string>
     <string name="practice_new_page">A fresh page</string>
     <string name="practice_page">Page %1$d</string>
-    <string name="practice_top_level">Top level: hidden pairs and X-Wings</string>
+    <string name="practice_top_level">Top level: triples, Swordfish and XY-Wings</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_desc">Opens system settings to change the app’s language</string>
     <string name="shortcut_put_down">Put down a held digit or close the Coach (Esc)</string>

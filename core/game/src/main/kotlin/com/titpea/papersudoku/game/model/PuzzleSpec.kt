@@ -12,9 +12,10 @@ import kotlinx.serialization.Serializable
 
 /**
  * Where a page comes from. Stored by name: Daily (the 6×6 page of the day), Classic (practice),
- * Weekly (9.0: the Sunday 9×9 page, open all week), Imported (9.0: a page typed in by the player).
+ * Weekly (9.0: the Sunday 9×9 page, open all week), Imported (9.0: a page typed in by the player),
+ * Focus (9.0: a page for practising one technique, outside the practice levels).
  */
-enum class PuzzleKind { Daily, Classic, Weekly, Imported }
+enum class PuzzleKind { Daily, Classic, Weekly, Imported, Focus }
 
 /**
  * A puzzle plus where it came from. Givens and solution are stored, never re-derived, so a saved
@@ -88,6 +89,8 @@ object Catalog {
 
     fun weeklyKey(sunday: Long): String = "weekly-$sunday"
 
+    fun dayOfWeekly(key: String): Long? = key.takeIf { it.startsWith("weekly-") }?.removePrefix("weekly-")?.toLongOrNull()
+
     fun weekly(sunday: Long): PuzzleSpec {
         val generated = PuzzleGenerator(Geometry.Classic).generate(seed(WEEKLY_STREAM, sunday), Difficulty.Steady)
         return spec(weeklyKey(sunday), PuzzleKind.Weekly, generated, epochDay = sunday)
@@ -95,6 +98,9 @@ object Catalog {
 
     /** Every practice page dealt to practise [technique] has a key starting with this. */
     fun focusPrefix(technique: Technique): String = "focus-${technique.name.lowercase()}-"
+
+    /** The technique a focus page's key practises, or null for any other key. */
+    fun focusTechnique(key: String): Technique? = Technique.entries.firstOrNull { key.startsWith(focusPrefix(it)) }
 
     /** The level whose pages are graded up to [technique]: where it is taught. */
     fun focusLevel(technique: Technique): Difficulty = Difficulty.forTier(technique.tier)
@@ -114,7 +120,7 @@ object Catalog {
             generated = generator.generate(seed(FOCUS_STREAM + technique.ordinal, number.toLong() * FOCUS_TRIES + attempt), level)
             attempt++
         }
-        return spec(focusPrefix(technique) + number, PuzzleKind.Classic, generated, number = number)
+        return spec(focusPrefix(technique) + number, PuzzleKind.Focus, generated, number = number)
     }
 
     /**

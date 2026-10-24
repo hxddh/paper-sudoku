@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.Flow
 )
 data class GameResultEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    /** "mini" or "classic" (kept from v1). */
+    /** "mini" (dailies) or "classic" (practice), kept from v1; 9.0 adds "weekly", "imported" and "focus". */
     val mode: String,
     val durationSeconds: Long,
     /** Number of times the Coach was opened. */
@@ -168,16 +168,23 @@ interface SavedGameDao {
     @Query(
         """
         SELECT MAX(CAST(substr(puzzleKey, length(:prefix) + 1) AS INTEGER)) FROM saved_games
-        WHERE kind = 'Classic' AND substr(puzzleKey, 1, length(:prefix)) = :prefix
+        WHERE kind = :kind AND substr(puzzleKey, 1, length(:prefix)) = :prefix
         """,
     )
-    suspend fun maxClassicNumber(prefix: String): Int?
+    suspend fun maxNumber(kind: String, prefix: String): Int?
+
+    /** Pages of one kind (the player's own), most recently touched first. */
+    @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind = :kind ORDER BY updatedAt DESC")
+    fun observeKind(kind: String): Flow<List<SavedPageRow>>
 
     @Query("DELETE FROM saved_games WHERE kind = 'Classic' AND solved = 0 AND puzzleKey != :except")
     suspend fun discardUnsolvedPractice(except: String)
 
     @Query("DELETE FROM saved_games WHERE puzzleKey = :puzzleKey")
     suspend fun delete(puzzleKey: String)
+
+    @Query("DELETE FROM saved_games WHERE puzzleKey = :puzzleKey AND updatedAt = :updatedAt")
+    suspend fun deleteIfUnchanged(puzzleKey: String, updatedAt: Long)
 
     /** Unsolved dailies with no digit written: the only rows that may hold a page never begun. */
     @Query("SELECT puzzleKey FROM saved_games WHERE kind = 'Daily' AND solved = 0 AND grid = givens")

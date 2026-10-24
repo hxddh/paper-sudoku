@@ -598,8 +598,8 @@ private fun solvedOutlook(game: GameState, state: PageUiState): Outlook? = when 
     }
     // Today's page closes with tomorrow's: a reason to come back, without a streak.
     game.spec.epochDay == state.today -> Outlook(stringResource(R.string.solved_daily_close))
-    // Finished a day late: today's page is already out.
-    (game.spec.epochDay ?: Long.MAX_VALUE) < state.today -> Outlook(stringResource(R.string.solved_daily_waiting))
+    // Finished a day late, just now, with today's page still to do.
+    state.todayWaiting -> Outlook(stringResource(R.string.solved_daily_waiting))
     else -> null
 }
 

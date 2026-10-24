@@ -141,7 +141,7 @@
     <string name="practice_continue">继续第 %1$d 页</string>
     <string name="practice_new_page">新的一页</string>
     <string name="practice_page">第 %1$d 页</string>
-    <string name="practice_top_level">已到最高级：隐性数对与 X 翼</string>
+    <string name="practice_top_level">已到最高级：三数组、剑鱼与 XY 翼</string>
     <string name="settings_language">语言</string>
     <string name="settings_language_desc">打开系统设置，更改应用语言</string>
     <string name="shortcut_put_down">放下拿起的数字或收起教练（Esc）</string>

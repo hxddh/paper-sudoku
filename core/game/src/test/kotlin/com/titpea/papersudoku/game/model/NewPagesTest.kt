@@ -36,6 +36,8 @@ class NewPagesTest {
             assertTrue("$technique", technique in page.techniques)
             assertEquals(Catalog.focusLevel(technique), page.difficulty)
             assertTrue(page.key.startsWith(Catalog.focusPrefix(technique)))
+            assertEquals(PuzzleKind.Focus, page.kind)
+            assertEquals(technique, Catalog.focusTechnique(page.key))
         }
     }
 
