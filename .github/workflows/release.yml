@@ -210,7 +210,7 @@ jobs:
           if [ -f "paper-sudoku-$version.apk" ]; then
             certs=$("$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose --print-certs "paper-sudoku-$version.apk")
             echo "$certs"
-            digest=$(echo "$certs" | sed -n 's/^Signer.* certificate SHA-256 digest: *//p' | head -n 1)
+            digest=$(echo "$certs" | sed -n 's/^.*Signer.* certificate SHA-256 digest: *//p' | head -n 1)
             [ -n "$digest" ] || { echo "::error::apksigner printed no certificate digest"; exit 1; }
             # So testers can check that an update comes from the same key.
             { echo; echo "Signing certificate SHA-256: \`$digest\`"; } >> release-notes.md
