@@ -27,4 +27,9 @@ class GeneratingPuzzleSource(
 
     override suspend fun classic(difficulty: Difficulty, number: Int): PuzzleSpec =
         withContext(dispatcher) { Catalog.classic(difficulty, number) }
+
+    override suspend fun weekly(sunday: Long): PuzzleSpec = withContext(dispatcher) { Catalog.weekly(sunday) }
+
+    override suspend fun focus(technique: Technique, number: Int): PuzzleSpec =
+        withContext(dispatcher) { Catalog.focus(technique, number) }
 }

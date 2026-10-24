@@ -81,7 +81,8 @@ class PageViewModelTest {
     private fun PageViewModel.solveFully() {
         val spec = game().spec
         for (i in spec.givens.indices) {
-            if (spec.givens[i] == 0) {
+            // Cells already right are left alone: tapping their digit again would clear them.
+            if (spec.givens[i] == 0 && game().values[i] != spec.solution[i]) {
                 onEvent(PageEvent.Tap(i))
                 onEvent(PageEvent.Digit(spec.solution[i]))
             }

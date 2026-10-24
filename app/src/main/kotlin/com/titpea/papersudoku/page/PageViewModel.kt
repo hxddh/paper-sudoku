@@ -197,9 +197,9 @@ class PageViewModel(
             open != null && PageKeys.dayOf(open) != null -> load { store.load(open) ?: dailyFor(today()) }
             open != null && open.startsWith(CLASSIC_PREFIX) -> load { store.load(open) ?: openablePractice() }
             open != null && Catalog.dayOfWeekly(open) != null -> openWeekly(Catalog.dayOfWeekly(open)!!)
+            open == PageKeys.PRACTICE -> openPractice()
             // A page typed in or a technique page lives only in its save.
             open != null -> load { store.load(open) ?: dailyFor(today()) }
-            open == PageKeys.PRACTICE -> openPractice()
             else -> openDaily(today())
         }
     }
