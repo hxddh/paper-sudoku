@@ -1,5 +1,12 @@
 package com.titpea.papersudoku.page
 
+import android.content.Context
+import androidx.activity.compose.BackHandler
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.TopAppBarDefaults
@@ -9,7 +16,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.heightIn
@@ -18,7 +24,6 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -57,6 +62,7 @@ import com.titpea.papersudoku.game.model.PuzzleSpec
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * The blank page givens are typed into. Its solution is all zeros, so it is never a real puzzle:
@@ -77,6 +83,58 @@ private val DraftSpec = PuzzleSpec(
 
 private fun blankDraft(): GameState = GameState.new(DraftSpec)
 
+/**
+ * A 9×9 page as text, pasted or kept on disk: 81 cells, a digit each, 0 or "." for a blank. Spaces,
+ * line breaks and a printed grid's rules (| - +) are skipped. Null for anything else.
+ */
+fun parsePage(text: String): List<Int>? {
+    val cells = text.filterNot { it.isWhitespace() || it in "|-+" }
+    if (cells.length != 81) return null
+    return cells.map { c ->
+        when (c) {
+            '.', '0' -> 0
+            in '1'..'9' -> c - '0'
+            else -> return null
+        }
+    }
+}
+
+/**
+ * The page being typed in, kept on disk (11.0) so leaving the screen, or the app, loses nothing:
+ * one small file of 81 digits, gone once the page is added or thrown away. Written whole to a
+ * temporary file and renamed, so it is never left half written.
+ */
+class ImportDraft(private val file: File) {
+    fun read(): List<Int>? = runCatching { if (file.exists()) parsePage(file.readText()) else null }.getOrNull()
+
+    fun write(values: List<Int>) {
+        if (values.all { it == 0 }) {
+            clear()
+            return
+        }
+        runCatching {
+            val temp = File(file.parentFile, file.name + ".tmp")
+            temp.writeText(values.joinToString(""))
+            if (!temp.renameTo(file)) {
+                file.delete()
+                temp.renameTo(file)
+            }
+        }
+    }
+
+    fun clear() {
+        file.delete()
+    }
+
+    companion object {
+        fun of(context: Context) = ImportDraft(File(context.filesDir, "import-draft.txt"))
+    }
+}
+
+/** After a digit is written into [from], the cursor moves on to the next cell, as on paper. */
+private fun GameState.movedOnFrom(from: Int): GameState =
+    if (values[from] != 0 && from + 1 < values.size) select(from + 1) else this
+
 /** The draft survives rotation and process death as its digits, selection and held digit. */
 private val DraftSaver: Saver<GameState, Any> = listSaver(
     save = { listOf(it.values.toIntArray(), it.selected ?: -1, it.lockedDigit ?: -1) },
@@ -95,9 +153,11 @@ private val DraftSaver: Saver<GameState, Any> = listSaver(
 )
 
 /**
- * "Bring your own page": type the printed digits of a puzzle from a newspaper or a book, then
- * check it. A page with one solution is handed to [onImported]; otherwise the reason is shown (and
- * clashing digits outlined) so it can be checked against the original.
+ * "Bring your own page": type the printed digits of a puzzle from a newspaper or a book (or paste
+ * them as 81 characters), then check it. A page with one solution is handed to [onImported];
+ * otherwise the reason is shown (and clashing digits outlined) so it can be checked against the
+ * original. The draft is kept on disk until it is added or thrown away; leaving with digits on it
+ * asks whether to keep them.
  */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -107,11 +167,54 @@ fun ImportScreen(onBack: () -> Unit, onImported: (PuzzleSpec) -> Unit) {
     // The last refusal, with the digits it was about: it stands only while they are unchanged.
     var refusal by remember { mutableStateOf<Pair<List<Int>, Import.Invalid>?>(null) }
     var confirmClear by rememberSaveable { mutableStateOf(false) }
+    var confirmLeave by rememberSaveable { mutableStateOf(false) }
+    // The digits a paste found no page in: the note stands only while they are unchanged.
+    var pasteRefused by remember { mutableStateOf<List<Int>?>(null) }
+    var menuOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val currentOnImported by rememberUpdatedState(onImported)
+    val currentOnBack by rememberUpdatedState(onBack)
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val draft = remember(context) { ImportDraft.of(context.applicationContext) }
 
     val values = game.values
     val shown = refusal?.takeIf { it.first == values }?.second
+    val hasDigits = values.any { it != 0 }
+
+    // The draft on disk is read once per visit; after rotation the saved state already holds it.
+    var draftRead by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (draftRead) return@LaunchedEffect
+        val stored = withContext(Dispatchers.IO) { draft.read() }
+        // Only onto a blank page: nothing typed meanwhile is overwritten.
+        if (stored != null && game.values.all { it == 0 }) game = blankDraft().copy(values = stored)
+        draftRead = true
+    }
+    LaunchedEffect(values, draftRead) {
+        if (draftRead) withContext(Dispatchers.IO) { draft.write(values) }
+    }
+
+    // Back with digits on the page asks first; a blank page just closes.
+    fun leave() {
+        if (hasDigits) confirmLeave = true else onBack()
+    }
+    BackHandler(enabled = hasDigits) { confirmLeave = true }
+
+    fun paste() {
+        scope.launch {
+            val clip = clipboard.getClipEntry()?.clipData
+            val text = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
+            val pasted = text?.let(::parsePage)
+            if (pasted != null) {
+                refusal = null
+                pasteRefused = null
+                game = blankDraft().copy(values = pasted)
+            } else {
+                pasteRefused = game.values
+            }
+        }
+    }
     val conflicts = remember(values) {
         val peers = DraftSpec.geometry.peers
         values.indices.filter { i -> values[i] != 0 && peers[i].any { values[it] == values[i] } }.toSet()
@@ -127,11 +230,11 @@ fun ImportScreen(onBack: () -> Unit, onImported: (PuzzleSpec) -> Unit) {
                 val selected = g.selected
                 when {
                     g.lockedDigit != null -> g.toggleLock(event.digit)
-                    selected != null && g.isEditable(selected) -> g.input(event.digit, false)
+                    selected != null && g.isEditable(selected) -> g.input(event.digit, false).movedOnFrom(selected)
                     else -> g.toggleLock(event.digit)
                 }
             }
-            is PageEvent.TypeDigit -> g.input(event.digit, false)
+            is PageEvent.TypeDigit -> g.selected?.let { selected -> g.input(event.digit, false).movedOnFrom(selected) } ?: g
             PageEvent.Erase -> g.erase()
             PageEvent.ClearLock -> g.lockedDigit?.let { g.toggleLock(it) } ?: g
             else -> g
@@ -145,7 +248,11 @@ fun ImportScreen(onBack: () -> Unit, onImported: (PuzzleSpec) -> Unit) {
             val result = withContext(Dispatchers.Default) { Catalog.imported(typed) }
             checking = false
             when (result) {
-                is Import.Ok -> currentOnImported(result.spec)
+                is Import.Ok -> {
+                    // Added: the draft has done its work.
+                    withContext(Dispatchers.IO) { draft.clear() }
+                    currentOnImported(result.spec)
+                }
                 is Import.Invalid -> refusal = typed to result
             }
         }
@@ -175,18 +282,37 @@ fun ImportScreen(onBack: () -> Unit, onImported: (PuzzleSpec) -> Unit) {
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { leave() }) {
                         Icon(painterResource(R.drawable.ic_back), contentDescription = stringResource(R.string.back))
                     }
                 },
                 // The actions sit in the bar, so the board keeps the height its cells need.
                 actions = {
-                    TextButton(
-                        onClick = { confirmClear = true },
-                        enabled = !checking && values.any { it != 0 },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-                        modifier = Modifier.heightIn(min = 48.dp).testTag("import-clear"),
-                    ) { Text(stringResource(R.string.import_clear)) }
+                    // Paste and Clear wait in the menu; checking the page is the one action in sight.
+                    Box {
+                        IconButton(onClick = { menuOpen = true }, enabled = !checking, modifier = Modifier.testTag("import-menu")) {
+                            Icon(painterResource(R.drawable.ic_more), contentDescription = stringResource(R.string.more_options))
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.import_paste)) },
+                                onClick = {
+                                    menuOpen = false
+                                    paste()
+                                },
+                                modifier = Modifier.testTag("import-paste"),
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.import_clear)) },
+                                onClick = {
+                                    menuOpen = false
+                                    confirmClear = true
+                                },
+                                enabled = hasDigits,
+                                modifier = Modifier.testTag("import-clear"),
+                            )
+                        }
+                    }
                     // Ink, not the stamp's red: adding a page is a way on, as "Back to the notebook" is.
                     FilledTonalButton(
                         onClick = { check() },
@@ -219,6 +345,7 @@ fun ImportScreen(onBack: () -> Unit, onImported: (PuzzleSpec) -> Unit) {
                 )
             }
             val message = shown?.let { messageFor(it.reason) }
+                ?: if (pasteRefused == values) stringResource(R.string.import_paste_none) else null
             Text(
                 message ?: stringResource(R.string.import_intro),
                 style = MaterialTheme.typography.bodyMedium,
@@ -258,6 +385,38 @@ fun ImportScreen(onBack: () -> Unit, onImported: (PuzzleSpec) -> Unit) {
             },
             dismissButton = {
                 TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+
+    // Leaving keeps the digits on disk for next time, unless they are thrown away; dismissing stays.
+    if (confirmLeave) {
+        AlertDialog(
+            onDismissRequest = { confirmLeave = false },
+            title = { Text(stringResource(R.string.import_leave_title)) },
+            text = { Text(stringResource(R.string.import_leave_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmLeave = false
+                        currentOnBack()
+                    },
+                    modifier = Modifier.testTag("import-leave-keep"),
+                ) { Text(stringResource(R.string.import_leave_keep)) }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        confirmLeave = false
+                        refusal = null
+                        game = blankDraft()
+                        scope.launch {
+                            withContext(Dispatchers.IO) { draft.clear() }
+                            currentOnBack()
+                        }
+                    },
+                    modifier = Modifier.testTag("import-leave-discard"),
+                ) { Text(stringResource(R.string.import_leave_discard)) }
             },
         )
     }

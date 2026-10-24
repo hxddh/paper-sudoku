@@ -50,4 +50,11 @@
     <string name="import_no_solution">This page has no solution. Check the digits against the original.</string>
     <string name="import_many_solutions">This page has more than one solution, so the Coach could not teach it. Check the digits against the original.</string>
     <string name="import_shape">This is not a 9×9 page.</string>
+    <!-- 11.0: a page pasted as 81 characters, and leaving a page half typed in. -->
+    <string name="import_paste">Paste a page</string>
+    <string name="import_paste_none">The clipboard holds no page. It needs 81 digits, with 0 or . for blanks.</string>
+    <string name="import_leave_title">Keep this page for later?</string>
+    <string name="import_leave_body">The digits you typed wait here until you come back.</string>
+    <string name="import_leave_keep">Keep</string>
+    <string name="import_leave_discard">Discard</string>
 </resources>
