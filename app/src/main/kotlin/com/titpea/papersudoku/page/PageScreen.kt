@@ -209,9 +209,7 @@ fun PageScreen(
                     state = state,
                     onBack = onBack,
                     onPrint = onPrint,
-                    onShare = onShare,
                     onRestart = { confirmRestart = true },
-                    onReadBack = onReadBack,
                     onNextPractice = {
                         if (game != null && !game.solved && game.history.isNotEmpty()) {
                             confirmNextPractice = true
@@ -455,6 +453,7 @@ private fun WorkArea(
                     coach = coach,
                     geometry = game.spec.geometry,
                     onEvent = onEvent,
+                    learner = state.settings.learner,
                     // The tools' height at normal sizes; with large text the note grows to show it all.
                     modifier = Modifier.fillMaxWidth().heightIn(min = height).graphicsLayer {
                         val s = 1f - 0.06f * coachBack.value
@@ -465,7 +464,6 @@ private fun WorkArea(
                 )
             } ?: Spacer(Modifier)
             WorkMode.Solved -> {
-                val focused = Catalog.focusTechnique(game.spec.key)
                 SolvedNote(
                     game = game,
                     outlook = solvedOutlook(game, state),
@@ -475,14 +473,12 @@ private fun WorkArea(
                     onNext = {
                         when {
                             game.spec.kind == PuzzleKind.Classic -> onEvent(PageEvent.NextPractice)
-                            focused != null -> onEvent(PageEvent.PractiseTechnique(focused))
                             onBack != null -> onBack()
                             else -> onEvent(PageEvent.OpenPractice)
                         }
                     },
                     nextLabel = when {
                         game.spec.kind == PuzzleKind.Classic -> stringResource(R.string.solved_next_practice)
-                        focused != null -> stringResource(R.string.focus_another)
                         onBack != null -> stringResource(R.string.solved_back_to_notebook)
                         else -> stringResource(R.string.solved_open_practice)
                     },
@@ -607,6 +603,9 @@ private data class Outlook(val text: String, val news: Boolean = false)
 
 @Composable
 private fun solvedOutlook(game: GameState, state: PageUiState): Outlook? = when {
+    // A level up is news; next to it, the one true sentence about this page: what the player found.
+    state.practiceAfter?.leveledUp != true && state.foundYourself != null ->
+        Outlook(stringResource(R.string.solved_found_yourself, techniqueName(state.foundYourself)), news = true)
     game.spec.kind == PuzzleKind.Classic -> state.practiceAfter?.let { after ->
         val remaining = after.remaining
         when {
@@ -620,7 +619,7 @@ private fun solvedOutlook(game: GameState, state: PageUiState): Outlook? = when 
     }
     // A technique page says how far that technique is known now (counted once the solve is recorded).
     game.spec.kind == PuzzleKind.Focus -> Catalog.focusTechnique(game.spec.key)?.let { technique ->
-        val clean = state.settings.cleanPages[technique] ?: 0
+        val clean = state.settings.learner.found(technique)
         if (clean > 0) {
             Outlook(stringResource(R.string.solved_focus, techniqueName(technique), pluralStringResource(R.plurals.mastery_pages, clean, clean)))
         } else {
@@ -680,9 +679,7 @@ private fun PageHeader(
     state: PageUiState,
     onBack: (() -> Unit)?,
     onPrint: (GameState) -> Unit,
-    onShare: (GameState) -> Unit,
     onRestart: () -> Unit,
-    onReadBack: ((GameState) -> Unit)?,
     onNextPractice: () -> Unit,
 ) {
     val game = state.game
@@ -719,13 +716,17 @@ private fun PageHeader(
             }
         },
         actions = {
-            if (game != null) {
+            // A solved page's note already offers share, print and read back: the menu keeps only
+            // what the note does not (a new practice page). With nothing left, there is no menu.
+            val unsolved = game != null && !game.solved
+            val practice = game?.spec?.kind == PuzzleKind.Classic
+            if (game != null && (unsolved || practice)) {
                 Box {
                     IconButton(onClick = { menuOpen = true }, modifier = Modifier.testTag("page-menu")) {
                         Icon(painterResource(R.drawable.ic_more), contentDescription = stringResource(R.string.more_options))
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        if (!game.solved) {
+                        if (unsolved) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.menu_restart)) },
                                 onClick = {
@@ -734,7 +735,7 @@ private fun PageHeader(
                                 },
                             )
                         }
-                        if (game.spec.kind == PuzzleKind.Classic) {
+                        if (practice) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.menu_next_practice)) },
                                 onClick = {
@@ -743,31 +744,13 @@ private fun PageHeader(
                                 },
                             )
                         }
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.action_print)) },
-                            leadingIcon = { Icon(painterResource(R.drawable.ic_print), contentDescription = null) },
-                            onClick = {
-                                menuOpen = false
-                                onPrint(game)
-                            },
-                        )
-                        if (onReadBack != null && game.solved && game.moves.isNotEmpty()) {
+                        if (unsolved) {
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.menu_read_back)) },
+                                text = { Text(stringResource(R.string.action_print)) },
+                                leadingIcon = { Icon(painterResource(R.drawable.ic_print), contentDescription = null) },
                                 onClick = {
                                     menuOpen = false
-                                    onReadBack(game)
-                                },
-                                modifier = Modifier.testTag("menu-read-back"),
-                            )
-                        }
-                        if (game.solved) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.action_share)) },
-                                leadingIcon = { Icon(painterResource(R.drawable.ic_share), contentDescription = null) },
-                                onClick = {
-                                    menuOpen = false
-                                    onShare(game)
+                                    onPrint(game)
                                 },
                             )
                         }

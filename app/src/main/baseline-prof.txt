@@ -1,4 +1,7 @@
 # Hand-written Baseline Profile rules (ART pre-compiles these at install via profileinstaller).
+# Keep it narrow: 10.0 tried whole libraries (kotlin.*, Room, SQLite, DataStore) and start-up
+# lost ~0.5 s opening the larger compiled code. CI records the real journey
+# (BaselineProfileGenerator) and prints what ran outside these rules (tools/ci/profile-coverage.py).
 # Everything on the launch → today's page → first input path lives in these packages.
 HSPLcom/titpea/papersudoku/**;->**(**)**
 Lcom/titpea/papersudoku/**;

@@ -3,6 +3,7 @@ package com.titpea.papersudoku
 import android.app.Application
 import android.content.Context
 import android.os.SystemClock
+import android.os.Trace
 import android.util.Log
 import com.titpea.papersudoku.data.CachedPuzzleSource
 import com.titpea.papersudoku.data.DataStoreSettings
@@ -88,8 +89,14 @@ class SudokuApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        container = DefaultAppContainer(this).also {
-            it.warmUp(CoroutineScope(SupervisorJob() + Dispatchers.IO))
+        // Trace sections ("ps.*") are what the start-up benchmark measures beyond its timings.
+        Trace.beginSection("ps.appCreate")
+        try {
+            container = DefaultAppContainer(this).also {
+                it.warmUp(CoroutineScope(SupervisorJob() + Dispatchers.IO))
+            }
+        } finally {
+            Trace.endSection()
         }
     }
 }

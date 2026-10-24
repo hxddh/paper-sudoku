@@ -1,40 +1,64 @@
 package com.titpea.papersudoku.page
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
 import com.titpea.papersudoku.engine.Technique
@@ -43,16 +67,23 @@ import com.titpea.papersudoku.game.model.Move
 import com.titpea.papersudoku.game.model.PuzzleSpec
 import com.titpea.papersudoku.game.model.Review
 import com.titpea.papersudoku.game.model.ReviewStep
-import com.titpea.papersudoku.settings.SettingsScaffold
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
+/** The page's work area: at least this tall, as tall as tools, status line and keys (see PageScreen). */
+private val WorkAreaMinHeight: Dp = 176.dp
+private val StatusLineHeight: Dp = 48.dp
+
 /**
- * Reads a page back from its move record: the board after each move, the move's cell marked, and
- * what justified the digit there and then. Opens at the last move. The reading is worked out off
- * the main thread; until it is ready the page stays blank rather than flashing a half state.
+ * Reads a page back from its move record, as the page itself: the same header, the board at the
+ * page's size showing the digits after each move (the move's cell selected), and, where the keys
+ * were, the move and what justified it there and then, over the slider and previous/next. "This
+ * page" in the header swaps the note for the page's counts. Opens at the last move. The reading is
+ * worked out off the main thread; until it is ready the page stays blank rather than flashing a
+ * half state.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewScreen(
     spec: PuzzleSpec,
@@ -65,61 +96,183 @@ fun ReviewScreen(
         value = withContext(Dispatchers.Default) { Review.of(spec, moves, from) }
     }
     var index by rememberSaveable(spec.key, moves.size) { mutableIntStateOf(moves.lastIndex) }
-    val ready = steps
-    val at = if (ready.isNullOrEmpty()) 0 else index.coerceIn(0, ready.lastIndex)
-    SettingsScaffold(
-        title = stringResource(R.string.review_title),
-        onBack = onBack,
-        tag = "review",
-    ) {
-        if (moves.isEmpty()) {
-            item(key = "empty") {
-                ReviewColumn("review-empty") { Body(stringResource(R.string.review_empty)) }
-            }
-            return@SettingsScaffold
+    var showSummary by rememberSaveable(spec.key) { mutableStateOf(false) }
+    val ready = steps?.takeIf { it.isNotEmpty() }
+    val at = if (ready == null) 0 else index.coerceIn(0, ready.lastIndex)
+    val locale = LocalConfiguration.current.locales[0]
+    Scaffold(
+        modifier = Modifier.testTag("review"),
+        containerColor = Color.Transparent,
+        // A transparent container names no content colour: text and icons would fall back to black.
+        contentColor = MaterialTheme.colorScheme.onBackground,
+        contentWindowInsets = WindowInsets.safeDrawing,
+        topBar = {
+            TopAppBar(
+                windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
+                navigationIcon = {
+                    IconButton(onClick = onBack, modifier = Modifier.testTag("review-back")) {
+                        Icon(painterResource(R.drawable.ic_back), contentDescription = stringResource(R.string.back))
+                    }
+                },
+                // The page's own header, with "Read back" before where it comes from.
+                title = {
+                    Column {
+                        Text(
+                            stringResource(R.string.review_title) + DOT + pageOverline(spec, locale),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = if (LocalDensity.current.fontScale > 1.3f) 2 else 1,
+                        )
+                        Text(pageTitle(spec, locale), style = MaterialTheme.typography.titleLarge, maxLines = 1)
+                    }
+                },
+                actions = {
+                    if (ready != null) {
+                        TextButton(
+                            onClick = { showSummary = !showSummary },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                            modifier = Modifier.padding(end = 4.dp).heightIn(min = 48.dp).testTag("review-this-page"),
+                        ) {
+                            Text(stringResource(if (showSummary) R.string.review_show_moves else R.string.review_this_page))
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent,
+                ),
+                expandedHeight = LocalDensity.current.fontScale.let { scale ->
+                    val lines = if (scale > 1.3f) 3 else 2
+                    maxOf(TopAppBarDefaults.TopAppBarExpandedHeight, (24 * lines * scale + 12).dp)
+                },
+            )
+        },
+    ) { padding ->
+        val step = ready?.get(at)
+        // The moved cell is selected, in the player's blue; a slip shows as a clash would.
+        // Terracotta is the Coach's, so it is not used for the player's own moves.
+        val game = remember(spec, step) {
+            if (step == null) GameState.new(spec) else GameState.new(spec).copy(values = step.values, selected = step.move.cell)
         }
-        if (ready.isNullOrEmpty()) return@SettingsScaffold
-        // The board first, with the move under it: the page, the slider and the note are seen together.
-        item(key = "board") {
-            val step = ready[at]
-            // The moved cell is selected, in the player's blue; a slip shows as a clash would.
-            // Terracotta is the Coach's, so it is not used for the player's own moves.
-            val game = remember(spec, step) { GameState.new(spec).copy(values = step.values, selected = step.move.cell) }
-            ReviewColumn("review-board") {
+        // Blank while the reading is worked out; a page with no record shows its printed digits.
+        val showBoard = step != null || moves.isEmpty()
+        val conflicts = if (step != null && step.kind == ReviewStep.Kind.Mistake) setOf(step.move.cell) else emptySet()
+        val fontScale = LocalDensity.current.fontScale.coerceIn(1f, 1.3f)
+        val workHeight = maxOf(WorkAreaMinHeight * fontScale, ToolbarHeight + StatusLineHeight + keypadHeight(spec.size))
+        val panel = @Composable { modifier: Modifier ->
+            ReviewPanel(
+                from = from,
+                spec = spec,
+                steps = ready,
+                at = at,
+                empty = moves.isEmpty(),
+                showSummary = showSummary,
+                onMove = { index = it },
+                modifier = modifier,
+            )
+        }
+        BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+            // As the page lays itself out: beside the board on a wide window, under it otherwise.
+            if (maxWidth > maxHeight && maxWidth >= 560.dp) {
+                val side = (maxWidth * 0.4f).coerceIn(320.dp, 440.dp)
+                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    ReviewBoard(
+                        game, conflicts, showBoard,
+                        Modifier.weight(1f).fillMaxHeight().padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
+                        Alignment.CenterEnd,
+                    )
+                    Column(
+                        Modifier.width(side).fillMaxHeight().padding(end = 24.dp),
+                        verticalArrangement = Arrangement.Center,
+                    ) { panel(Modifier.fillMaxWidth().height(workHeight)) }
+                }
+            } else {
+                Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    ReviewBoard(
+                        game, conflicts, showBoard,
+                        Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .widthIn(max = 720.dp)
+                            .padding(horizontal = if (spec.size == 9) 8.dp else 12.dp),
+                        BiasAlignment(0f, 0.4f),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    panel(
+                        Modifier
+                            .widthIn(max = 640.dp)
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
+                            .padding(bottom = 12.dp)
+                            .height(workHeight),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** The board at the page's size: as large as the space allows, square, at most 720dp. */
+@Composable
+private fun ReviewBoard(game: GameState, conflicts: Set<Int>, show: Boolean, modifier: Modifier, alignment: Alignment) {
+    BoxWithConstraints(modifier, contentAlignment = alignment) {
+        val side = minOf(maxWidth, maxHeight).coerceAtMost(720.dp)
+        Box(Modifier.size(side).testTag("review-board"), contentAlignment = Alignment.Center) {
+            if (show) {
                 Board(
                     game = game,
-                    conflicts = if (step.kind == ReviewStep.Kind.Mistake) setOf(step.move.cell) else emptySet(),
+                    conflicts = conflicts,
                     marks = CoachMarks.None,
                     onTap = {},
                     onCellAction = { _, _ -> },
                     interactive = false,
-                    modifier = Modifier
-                        .widthIn(max = 360.dp)
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .align(Alignment.CenterHorizontally),
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
         }
-        item(key = "controls") {
-            Controls(at = at, count = ready.size, onMove = { index = it })
-        }
-        item(key = "why") {
-            val before = if (at > 0) ready[at - 1].values else from
-            StepNote(spec, ready[at], before[ready[at].move.cell])
-        }
-        item(key = "summary") { Summary(ready) }
     }
 }
 
+/**
+ * Where the keys are on the page: the move and why (or the page's counts), and under it, near the
+ * hand, the slider with previous and next. One height, so the board never moves.
+ */
+@Composable
+private fun ReviewPanel(
+    spec: PuzzleSpec,
+    from: List<Int>,
+    steps: List<ReviewStep>?,
+    at: Int,
+    empty: Boolean,
+    showSummary: Boolean,
+    onMove: (Int) -> Unit,
+    modifier: Modifier,
+) {
+    Column(modifier.testTag("review-panel")) {
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+            if (empty) {
+                ReviewColumn("review-empty") { Body(stringResource(R.string.review_empty)) }
+            } else if (steps != null) {
+                if (showSummary) {
+                    Summary(steps)
+                } else {
+                    val before = if (at > 0) steps[at - 1].values else from
+                    StepNote(spec, steps[at], before[steps[at].move.cell])
+                }
+            }
+        }
+        if (steps != null) Controls(at = at, count = steps.size, onMove = onMove)
+    }
+}
+
+/** A block of the panel; its text sits 20dp in from the screen, with the page's own margins. */
 @Composable
 private fun ReviewColumn(tag: String, live: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
     Column(
         Modifier
-            .widthIn(max = 640.dp)
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp)
-            // The note under the slider is read out as each move comes up.
+            .padding(horizontal = 8.dp, vertical = 8.dp)
+            // The note is read out as each move comes up.
             .then(if (live) Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier)
             .testTag(tag),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -214,7 +367,14 @@ private fun Controls(at: Int, count: Int, onMove: (Int) -> Unit) {
                     // One step per move, so accessibility swipes go a move at a time; the ticks
                     // themselves would crowd a long page, so they are not drawn.
                     steps = (count - 2).coerceAtLeast(0),
-                    colors = SliderDefaults.colors(activeTickColor = Color.Transparent, inactiveTickColor = Color.Transparent),
+                    // The player's pen blue: terracotta is the Coach's and the stamp's.
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.secondary,
+                        activeTrackColor = MaterialTheme.colorScheme.secondary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        activeTickColor = Color.Transparent,
+                        inactiveTickColor = Color.Transparent,
+                    ),
                     modifier = Modifier
                         .weight(1f)
                         .semantics {

@@ -17,7 +17,9 @@ import org.junit.runner.RunWith
  *     ./gradlew :benchmark:connectedBenchmarkAndroidTest -PpaperSudoku.benchmarkRules=BaselineProfile
  *
  * The profile (BaselineProfileGenerator_generate-baseline-prof.txt) lands under
- * benchmark/build/outputs/connected_android_test_additional_output/.
+ * benchmark/build/outputs/connected_android_test_additional_output/. CI (android.yml) runs it on
+ * every push, uploads it, and prints what it ran outside the committed profile
+ * (tools/ci/profile-coverage.py); the release always ships the committed file.
  */
 @RunWith(AndroidJUnit4::class)
 class BaselineProfileGenerator {

@@ -19,8 +19,8 @@ android {
         targetSdk = 36
         // versionCode = major × 10000 + minor × 100 + patch of versionName (checked by
         // tools/ci/release-preflight.sh), so every release has a larger one.
-        versionCode = 90000
-        versionName = "9.0.0"
+        versionCode = 100000
+        versionName = "10.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -98,6 +98,9 @@ android {
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
+
+    // Unit tests run against android.jar's stubs; trace sections (android.os.Trace) are no-ops there.
+    testOptions.unitTests.isReturnDefaultValues = true
 
     lint {
         abortOnError = true

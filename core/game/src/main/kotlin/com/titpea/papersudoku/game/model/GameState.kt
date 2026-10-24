@@ -2,8 +2,16 @@ package com.titpea.papersudoku.game.model
 
 import com.titpea.papersudoku.engine.DigitMask
 import com.titpea.papersudoku.engine.SudokuEngine
+import com.titpea.papersudoku.engine.Technique
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 data class Snapshot(
@@ -31,8 +39,13 @@ data class Move(val cell: Int, val digit: Int, val coach: Boolean = false)
 data class CoachUsage(
     val asks: Int = 0,
     val deepest: Int = 0,
+    /** How far the Coach went for each technique it taught on this page (10.0). */
+    val byTechnique: Map<Technique, Int> = emptyMap(),
 ) {
-    fun reached(level: Int): CoachUsage = copy(deepest = maxOf(deepest, level))
+    fun reached(level: Int, technique: Technique? = null): CoachUsage = copy(
+        deepest = maxOf(deepest, level),
+        byTechnique = if (technique == null) byTechnique else byTechnique + (technique to maxOf(byTechnique[technique] ?: 0, level)),
+    )
 }
 
 /**
@@ -157,6 +170,12 @@ data class GameState(
         )
     }
 
+    /** Gives back a pencil mark the Coach found missing (10.0); one undo takes it away again. */
+    fun restoreMark(index: Int, digit: Int): GameState {
+        if (!isEditable(index) || values[index] != 0 || digit !in 1..size || DigitMask.contains(notes[index], digit)) return this
+        return remember().copy(notes = notes.replace(index, notes[index] or (1 shl digit)), selected = index)
+    }
+
     /**
      * Pencils in every candidate (each digit not yet in the cell's row, column or box) in the
      * empty cells that have no marks yet. Cells already marked keep the player's own marks. Only
@@ -201,7 +220,7 @@ data class GameState(
 
     fun coachAsked(): GameState = copy(coach = coach.copy(asks = coach.asks + 1).reached(1))
 
-    fun coachReached(level: Int): GameState = copy(coach = coach.reached(level))
+    fun coachReached(level: Int, technique: Technique? = null): GameState = copy(coach = coach.reached(level, technique))
 
     /** Marks the game solved if the board matches the solution. */
     fun settle(now: Long): GameState =
@@ -211,7 +230,29 @@ data class GameState(
             this
         }
 
-    fun encode(): String = json.encodeToString(serializer(), this)
+    /**
+     * The save (10.0): only the last [SAVED_HISTORY] undo steps, and undo steps and moves packed
+     * ([Packing]) under fields of their own. 9.0 saves, with `history` and `moves` as lists of
+     * objects, still decode; a 9.0 app reading this save skips the packed fields it does not know.
+     */
+    fun encode(): String {
+        val kept = history.takeLast(SAVED_HISTORY)
+        val packedHistory = Packing.snapshots(kept)
+        val packedMoves = Packing.moves(moves)
+        val plain = copy(
+            history = if (packedHistory == null) kept else emptyList(),
+            moves = if (packedMoves == null) moves else emptyList(),
+        )
+        if (packedHistory.isNullOrEmpty() && packedMoves.isNullOrEmpty()) return json.encodeToString(serializer(), plain)
+        val tree = json.encodeToJsonElement(serializer(), plain).jsonObject
+        return JsonObject(
+            buildMap {
+                putAll(tree)
+                if (!packedHistory.isNullOrEmpty()) put(HISTORY_PACKED, JsonArray(packedHistory.map(::JsonPrimitive)))
+                if (!packedMoves.isNullOrEmpty()) put(MOVES_PACKED, JsonArray(packedMoves.map(::JsonPrimitive)))
+            },
+        ).toString()
+    }
 
     private fun place(index: Int, digit: Int, autoClearNotes: Boolean, coach: Boolean = false): GameState {
         var newNotes = notes.replace(index, 0)
@@ -242,7 +283,14 @@ data class GameState(
     }
 
     companion object {
+        /** Undo steps kept while a page is open. */
         const val MAX_HISTORY = 200
+
+        /** Undo steps kept in a save (10.0): reopening a page rarely needs more. */
+        const val SAVED_HISTORY = 30
+
+        private const val HISTORY_PACKED = "historyPacked"
+        private const val MOVES_PACKED = "movesPacked"
 
         private val json = Json { ignoreUnknownKeys = true }
 
@@ -254,9 +302,18 @@ data class GameState(
 
         /** Null if the text is not a game this version understands. */
         fun decode(text: String): GameState? = runCatching {
-            json.decodeFromString(serializer(), text).takeIf { it.isConsistent() }?.let { game ->
+            val game = if (!text.contains(HISTORY_PACKED) && !text.contains(MOVES_PACKED)) {
+                json.decodeFromString(serializer(), text)
+            } else {
+                val tree = json.parseToJsonElement(text).jsonObject
+                val history = tree[HISTORY_PACKED]?.jsonArray?.map { Packing.snapshot(it.jsonPrimitive.content) }
+                val moves = tree[MOVES_PACKED]?.jsonArray?.map { Packing.move(it.jsonPrimitive.int) }
+                val plain = json.decodeFromJsonElement(serializer(), JsonObject(tree - HISTORY_PACKED - MOVES_PACKED))
+                plain.copy(history = history ?: plain.history, moves = moves ?: plain.moves)
+            }
+            game.takeIf { it.isConsistent() }?.let { g ->
                 // Written on before the move log existed: its log starts from the board as it is.
-                if (game.moves.isEmpty() && game.logStart == null && game.values != game.spec.givens) game.copy(logStart = game.values) else game
+                if (g.moves.isEmpty() && g.logStart == null && g.values != g.spec.givens) g.copy(logStart = g.values) else g
             }
         }.getOrNull()
 
@@ -276,7 +333,7 @@ data class GameState(
                 values.indices.all { spec.givens[it] == 0 || values[it] == spec.givens[it] } &&
                 (lockedDigit == null || lockedDigit in 1..spec.size) &&
                 history.all { boardOk(it.values, it.notes, it.selected) } &&
-                coach.deepest in 0..3 && elapsedMillis >= 0 &&
+                coach.deepest in 0..3 && coach.byTechnique.values.all { it in 1..3 } && elapsedMillis >= 0 &&
                 struck.all { it.cell in 0 until cells && it.by in 0 until cells && it.digit in 1..spec.size } &&
                 moves.all { it.cell in 0 until cells && it.digit in digits } &&
                 (logStart == null || boardOk(logStart, notes, null)) &&
@@ -284,6 +341,56 @@ data class GameState(
                 (!solved || values == spec.solution)
         }
     }
+}
+
+/**
+ * How a save packs undo steps and moves (10.0). An undo step is one string: a base-36 character
+ * per cell for the digits, two per cell for the pencil marks (bit d = digit d), then the selected
+ * cell, "/"-separated. A move is one number: cell × 32 + digit × 2 + 1 if the Coach wrote it.
+ * Null when something does not fit (only a damaged state): the plain form is written instead.
+ */
+internal object Packing {
+    private const val RADIX = 36
+
+    fun snapshots(history: List<Snapshot>): List<String>? {
+        val out = ArrayList<String>(history.size)
+        for (s in history) {
+            if (s.values.any { it !in 0 until RADIX } || s.notes.any { it !in 0 until RADIX * RADIX }) return null
+            out += buildString(s.values.size * 3 + 4) {
+                for (v in s.values) append(Character.forDigit(v, RADIX))
+                append('/')
+                for (n in s.notes) {
+                    append(Character.forDigit(n / RADIX, RADIX))
+                    append(Character.forDigit(n % RADIX, RADIX))
+                }
+                append('/')
+                s.selected?.let { append(it) }
+            }
+        }
+        return out
+    }
+
+    fun snapshot(packed: String): Snapshot {
+        val (values, notes, selected) = packed.split('/')
+        require(notes.length % 2 == 0)
+        return Snapshot(
+            values = values.map { Character.digit(it, RADIX).also { d -> require(d >= 0) } },
+            notes = (0 until notes.length / 2).map { i ->
+                val hi = Character.digit(notes[2 * i], RADIX)
+                val lo = Character.digit(notes[2 * i + 1], RADIX)
+                require(hi >= 0 && lo >= 0)
+                hi * RADIX + lo
+            },
+            selected = selected.takeIf { it.isNotEmpty() }?.toInt(),
+        )
+    }
+
+    fun moves(moves: List<Move>): List<Int>? {
+        if (moves.any { it.cell !in 0 until 0x1000000 || it.digit !in 0..15 }) return null
+        return moves.map { (it.cell shl 5) or (it.digit shl 1) or (if (it.coach) 1 else 0) }
+    }
+
+    fun move(packed: Int): Move = Move(cell = packed ushr 5, digit = (packed ushr 1) and 0xF, coach = packed and 1 == 1)
 }
 
 private fun List<Int>.replace(index: Int, value: Int): List<Int> =

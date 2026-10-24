@@ -1,4 +1,4 @@
-# Android 开发规范 / Checklist — v9.0
+# Android 开发规范 / Checklist — v10.0
 
 > 基线：`targetSdk 36`、`compileSdk 37`、`minSdk 26`，Jetpack Compose + Material 3 Expressive
 > （`material3 1.5.0-beta01`）、Material 3 Adaptive 1.1、Navigation 3、Room 2.8、DataStore、Glance。
@@ -89,8 +89,11 @@
 - [x] CI：JVM 测试、debug/release 构建、lint（由 tools/ci/lint-summary.py 从 SARIF 汇总，按规则计数并逐条打印在日志里；报告每次都上传）、schema 已提交检查、API 36 模拟器仪器测试；Gradle 构建缓存与配置缓存
 - [x] 截图矩阵（Paper/Night × 页面状态 × 手册 × 单页宽屏；200% 字号仅 Paper）与已提交的基准图逐张比对；另有按 Play 尺寸生成的商店截图（不比对）
 - [x] 每日题与练习页固定样例、3.0 存档格式样例
-- [x] Macrobenchmark：冷启动到今日页（有/无 Baseline Profile 两组）、书写帧时间（每轮清空数据，只往空格写；CI 上开着动画跑，日志打印各项中位数；模拟器数据仅看趋势）；混淆构建冒烟测试（页面 → 本子 → 设置 → 开源许可 → 回到今天）
-- [x] Baseline Profile（手写规则覆盖 app、kotlinx.serialization 与协程 + profileinstaller），CI 检查已打进 release APK；`benchmark` 模块里有生成器可重新录制；`ReportDrawnWhen` 标记完全绘制
+- [x] Macrobenchmark：冷启动到今日页（有/无 Baseline Profile 两组）、书写帧时间（每轮清空数据，只往空格写；CI 上开着动画跑，日志打印各项中位数）；混淆构建冒烟测试（页面 → 本子 → 设置 → 开源许可 → 回到今天）
+- [x] 速度预算（10.0）：PR 的 CI 先测 PR，再在同一台模拟器上测 main，`tools/ci/speed-budget.py --against` 要求每项不超过 main 的 1.15 倍（不同 runner 之间能差 1.5 倍，远大于一次改动，所以只有同机对比有意义；`tools/ci/benchmark-compare.py` 和 `trace-compare.py` 并排列出两者的指标与 Perfetto 跟踪）。main 上没有可比的，退回 `tools/ci/speed-budget.json` 的固定预算，放宽到 1.6 倍（8.0 main：首帧中位 1430 ms、完全绘制 2525 ms、书写帧 CPU P50 102 / P90 123 ms、超时 P90 170 ms），不是真机目标。`check-apk.sh` 另要求 release APK 不超过 9.0 大小的 1.05 倍
+- [x] 出题表（10.0）：2026–2029 年每日题、各级练习 0–299 页、各级各技巧路径页 0–99 页在 `CatalogTable` 里记着命中的那一刻，一刀即成；`CatalogTableTest` 每 37 项抽查一次（及首尾）与搜索结果一致，并按刀数（不按时钟）断言每页一刀；生成器改动后用 `CatalogTableWriter` 重写
+- [x] Baseline Profile（手写规则覆盖 app、kotlinx.serialization、协程、Kotlin 标准库集合与文本、Room/SQLite/DataStore + profileinstaller），release 用已提交的文件，CI 检查已打进 release APK；CI 每次在模拟器上用 `BaselineProfileGenerator` 录制真实路径、上传，并由 `tools/ci/profile-coverage.py` 列出未被已提交文件覆盖的规则；`ReportDrawnWhen` 标记完全绘制
+- [ ] `androidx.baselineprofile` 插件与 Startup Profile（DEX 布局）：未接入，插件 1.3.4 与 AGP 9.4 的兼容性未在构建中验证
 - [ ] 真机冷启动 < 400ms 验证（模拟器数据不代表真机）
 
 ## 7. 隐私

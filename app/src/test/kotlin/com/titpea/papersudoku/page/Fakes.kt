@@ -26,7 +26,9 @@ class FakeGameStore : GameStore {
         saved[puzzleKey]?.first?.encode()?.let(GameState::decode)
 
     override suspend fun save(state: GameState, now: Long) {
-        savedFlow.update { it + (state.spec.key to (state to now)) }
+        // As RoomGameStore: a finished page keeps the time it was finished.
+        val at = if (state.solved) state.solvedAt ?: now else now
+        savedFlow.update { it + (state.spec.key to (state to at)) }
     }
 
     override suspend fun forget(puzzleKey: String) {
@@ -48,12 +50,12 @@ class FakeGameStore : GameStore {
 
     override suspend fun nextClassicNumber(difficulty: Difficulty): Int {
         val prefix = com.titpea.papersudoku.game.model.Catalog.classicPrefix(difficulty)
-        return (saved.keys.filter { it.startsWith(prefix) }.mapNotNull { it.removePrefix(prefix).toIntOrNull() }.maxOrNull() ?: -1) + 1
+        return (saved.keys.filter { it.startsWith(prefix) }.mapNotNull { it.removePrefix(prefix).takeWhile(Char::isDigit).toIntOrNull() }.maxOrNull() ?: -1) + 1
     }
 
     override suspend fun nextFocusNumber(technique: Technique): Int {
         val prefix = com.titpea.papersudoku.game.model.Catalog.focusPrefix(technique)
-        return (saved.keys.filter { it.startsWith(prefix) }.mapNotNull { it.removePrefix(prefix).toIntOrNull() }.maxOrNull() ?: -1) + 1
+        return (saved.keys.filter { it.startsWith(prefix) }.mapNotNull { it.removePrefix(prefix).takeWhile(Char::isDigit).toIntOrNull() }.maxOrNull() ?: -1) + 1
     }
 
     override suspend fun discardUnsolvedPractice(except: String) {
@@ -76,6 +78,18 @@ class FakeGameStore : GameStore {
 
     override val imported: Flow<List<PageSummary>> = savedFlow.map { map ->
         map.values.filter { (g, _) -> g.spec.kind == PuzzleKind.Imported }.sortedByDescending { it.second }.map { PageSummary.of(it.first) }
+    }
+
+    override val unfinishedOthers: Flow<List<PageSummary>> = savedFlow.map { map ->
+        map.values.filter { (g, _) ->
+            (g.spec.kind == PuzzleKind.Weekly || g.spec.kind == PuzzleKind.Focus) && !g.solved && g.values != g.spec.givens
+        }.sortedByDescending { it.second }.map { PageSummary.of(it.first) }
+    }
+
+    override val solvedNineByNine: Flow<List<PageSummary>> = savedFlow.map { map ->
+        map.values.filter { (g, _) -> g.spec.kind != PuzzleKind.Daily && g.solved }
+            .sortedByDescending { it.second }
+            .map { (g, at) -> PageSummary.of(g).copy(updatedAt = at) }
     }
 
     override val unfinishedPractice: Flow<PageSummary?> = savedFlow.map { map ->

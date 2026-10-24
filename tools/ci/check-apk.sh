@@ -2,7 +2,8 @@
 # Checks a release APK against what the app promises: exactly the permissions listed in
 # tools/ci/permissions.allowed (no network, no foreground service, nothing new from a library
 # update), a packaged Baseline Profile, and zip alignment (4-byte entries; uncompressed native
-# libraries, if any, on 16 KB pages). Prints the APK's size. Usage: check-apk.sh <apk>
+# libraries, if any, on 16 KB pages), and its size: at most apk.tolerance x apk.bytes of
+# tools/ci/speed-budget.json (10.0: 9.0's size + 5%). Usage: check-apk.sh <apk>
 set -eu
 apk="$1"
 aapt2="$ANDROID_HOME/build-tools/37.0.0/aapt2"
@@ -36,4 +37,10 @@ fi
 
 bytes=$(wc -c < "$apk" | tr -d ' ')
 echo "APK size: $bytes bytes ($(awk -v b="$bytes" 'BEGIN { printf "%.2f MiB", b / 1048576 }'))"
-echo "Permissions, Baseline Profile and alignment as promised."
+limit=$(python3 -c 'import json, sys; a = json.load(open(sys.argv[1]))["apk"]; print(int(a["bytes"] * a["tolerance"]))' "$here/speed-budget.json")
+if [ "$bytes" -gt "$limit" ]; then
+  echo "::error::The APK is $bytes bytes, above its budget of $limit (tools/ci/speed-budget.json)"
+  exit 1
+fi
+echo "APK budget: $limit bytes"
+echo "Permissions, Baseline Profile, alignment and size as promised."

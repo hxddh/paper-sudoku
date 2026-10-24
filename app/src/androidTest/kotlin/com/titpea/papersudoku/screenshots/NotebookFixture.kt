@@ -3,8 +3,11 @@ package com.titpea.papersudoku.screenshots
 import com.titpea.papersudoku.data.DayResult
 import com.titpea.papersudoku.data.PageSummary
 import com.titpea.papersudoku.engine.Difficulty
+import com.titpea.papersudoku.engine.Technique
 import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.GameState
+import com.titpea.papersudoku.notebook.JournalMonth
+import com.titpea.papersudoku.notebook.JournalRow
 import com.titpea.papersudoku.notebook.NotebookUiState
 import com.titpea.papersudoku.notebook.PageEntry
 import com.titpea.papersudoku.notebook.PracticeEntry
@@ -12,7 +15,10 @@ import com.titpea.papersudoku.page.Fixtures
 import java.time.LocalDate
 import java.time.YearMonth
 
-/** A notebook three weeks in: a few stamped days, one unfinished, today begun, practice under way. */
+/**
+ * A notebook three weeks in: a few stamped days, one unfinished, today begun, practice under way
+ * with naked pairs next, and two finished practice pages filed among the days.
+ */
 fun notebookState(): NotebookUiState {
     val today = Fixtures.DAY
     fun begun(day: Long): PageSummary = GameState.new(Catalog.daily(day)).let { g ->
@@ -31,6 +37,15 @@ fun notebookState(): NotebookUiState {
     )
     val days = (saved.keys + results.keys).distinct().sortedDescending()
     val pages = days.associateWith { day -> PageEntry(day, Catalog.dailyDifficulty(day), saved[day], results[day]) }
+    fun practicePage(number: Int) = PageSummary.of(Fixtures.solved(GameState.new(Catalog.classic(Difficulty.Steady, number))))
+    val date = { day: Long -> LocalDate.ofEpochDay(day) }
+    val journal = listOf(
+        JournalRow.Day(pages.getValue(today - 1)),
+        JournalRow.Page(practicePage(1), date(today - 2)),
+        JournalRow.Day(pages.getValue(today - 2)),
+        JournalRow.Page(practicePage(0), date(today - 3)),
+        JournalRow.Day(pages.getValue(today - 4)),
+    ).groupBy { YearMonth.from(it.date) }.map { (month, rows) -> JournalMonth(month, rows) }
     return NotebookUiState(
         today = today,
         todayPage = pages.getValue(today),
@@ -40,6 +55,8 @@ fun notebookState(): NotebookUiState {
         unfinished = listOf(today - 6),
         stampedDays = listOf(today - 1, today - 2, today - 4),
         pages = pages,
+        journal = journal,
+        nextTechnique = Technique.NakedPair,
         practiceByMonth = mapOf(YearMonth.from(LocalDate.ofEpochDay(today)) to 2),
         stamped = 5,
     )

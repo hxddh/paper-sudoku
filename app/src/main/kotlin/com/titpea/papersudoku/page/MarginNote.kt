@@ -35,6 +35,8 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
+import com.titpea.papersudoku.game.model.Mastery
+import com.titpea.papersudoku.game.model.Learner
 import com.titpea.papersudoku.designsystem.PaperTheme
 import com.titpea.papersudoku.engine.CoachHint
 import com.titpea.papersudoku.engine.Elimination
@@ -56,10 +58,12 @@ fun MarginNote(
     geometry: Geometry,
     onEvent: (PageEvent) -> Unit,
     modifier: Modifier = Modifier,
+    /** What the player has shown they know: the Coach is brief about it, and introduces the rest. */
+    learner: Learner = Learner(),
 ) {
     val colors = MaterialTheme.colorScheme
     val ink = PaperTheme.ink
-    val text = coachText(coach, geometry)
+    val text = coachText(coach, geometry, learner)
     // As tall as the note needs (at least what the caller asks), so large text is never hidden
     // behind the actions; the rule runs the note's full height.
     Row(modifier.fillMaxWidth().height(IntrinsicSize.Min).testTag("coach-panel")) {
@@ -104,13 +108,16 @@ fun MarginNote(
                     color = colors.onSurface,
                     modifier = Modifier.semantics { heading() },
                 )
-                Spacer(Modifier.height(2.dp))
-                // The Coach's own voice: upright and quiet, not the player's pen.
-                Text(
-                    text.body,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.onSurfaceVariant,
-                )
+                // The Coach's own voice: upright and quiet, not the player's pen. A known technique's
+                // Look has no body: the title is the whole note.
+                if (text.body.isNotEmpty()) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text.body,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.onSurfaceVariant,
+                    )
+                }
             }
             val hint = coach.hint
             // Asking for the answer costs the clean stamp: it is the quiet choice, and says so.
@@ -138,6 +145,7 @@ fun MarginNote(
                         coach.level == 2 && !coach.lastStep -> stringResource(R.string.coach_next_step)
                         coach.level == 2 -> stringResource(R.string.coach_show_answer)
                         hint is CoachHint.Next -> stringResource(R.string.coach_place, hint.placement.digit)
+                        hint is CoachHint.MissingMark -> stringResource(R.string.coach_add_mark)
                         else -> stringResource(R.string.coach_erase)
                     }
                     val onClick = { onEvent(if (coach.level < 3) PageEvent.CoachDeeper else PageEvent.CoachApply) }
@@ -230,7 +238,7 @@ private fun LevelSteps(coach: CoachUi) {
 private data class CoachText(val tag: String, val title: String, val body: String)
 
 @Composable
-private fun coachText(coach: CoachUi, geometry: Geometry): CoachText {
+private fun coachText(coach: CoachUi, geometry: Geometry, learner: Learner): CoachText {
     return when (val hint = coach.hint) {
         null -> CoachText(
             tag = stringResource(R.string.coach),
@@ -250,8 +258,26 @@ private fun coachText(coach: CoachUi, geometry: Geometry): CoachText {
                 },
             )
         }
+        is CoachHint.MissingMark -> {
+            val row = geometry.row(hint.index) + 1
+            val column = geometry.column(hint.index) + 1
+            CoachText(
+                tag = stringResource(R.string.coach),
+                title = stringResource(R.string.coach_missing_mark_title),
+                body = when (coach.level) {
+                    1 -> stringResource(R.string.coach_missing_mark_look, unitLabel(geometry, UnitRef(UnitKind.Row, row - 1)))
+                    2 -> stringResource(R.string.coach_missing_mark_why, row, column, hint.digit)
+                    else -> stringResource(R.string.coach_missing_mark_answer, row, column, hint.digit)
+                },
+            )
+        }
         is CoachHint.Next -> {
             val lesson = checkNotNull(coach.lesson)
+            val technique = lesson.technique
+            // Known (found on enough pages): the title and the tag say it all. Never found nor
+            // explained: Why starts with what the technique is, as the handbook does.
+            val known = learner.found(technique) >= Mastery.MASTERED
+            val first = technique.tier >= 2 && learner.found(technique) == 0 && (learner.helped[technique] ?: 0) == 0
             val placement = hint.placement
             // The technique of the step on the page; the Why pip counts the steps.
             val tag = techniqueName(lesson.technique)
@@ -263,11 +289,12 @@ private fun coachText(coach: CoachUi, geometry: Geometry): CoachText {
                 stringResource(R.string.coach_look_title, unitLabel(geometry, focusUnit(geometry, lesson)))
             }
             when (coach.level) {
-                1 -> CoachText(tag = tag, title = lookTitle, body = lookTip(lesson.technique))
+                1 -> CoachText(tag = tag, title = lookTitle, body = if (known) "" else lookTip(lesson.technique))
                 2 -> CoachText(
                     tag = tag,
                     title = lookTitle,
-                    body = whyText(geometry, lesson) + when {
+                    body = (if (first && coach.step == 0) techniqueSummary(technique) + stringResource(R.string.sentence_space) else "") +
+                        whyText(geometry, lesson) + when {
                         lesson !is Elimination -> ""
                         // After the last elimination, say what became single, the way it is single:
                         // the cell's last candidate, or the digit's last place in its unit.

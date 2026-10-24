@@ -1,5 +1,6 @@
 package com.titpea.papersudoku.data
 
+import android.os.Trace
 import android.util.Log
 import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.engine.Technique
@@ -41,13 +42,25 @@ class CachedPuzzleSource(
     override suspend fun focus(technique: Technique, number: Int): PuzzleSpec =
         cached(Catalog.focusPrefix(technique) + number) { Catalog.focus(technique, number) }
 
+    // Kept under the key asked for: a path page that falls back to the plain page is cached
+    // under the path key too, so it is never searched for again.
+    override suspend fun practice(difficulty: Difficulty, number: Int, target: Technique?): PuzzleSpec =
+        if (target == null) {
+            classic(difficulty, number)
+        } else {
+            cached(Catalog.practiceKey(difficulty, number, target)) { Catalog.practice(difficulty, number, target) }
+        }
+
     private suspend fun cached(key: String, generate: () -> PuzzleSpec): PuzzleSpec = withContext(dispatcher) {
         if (pruned.compareAndSet(false, true)) prune()
         // One generation per page at a time: a prefetch and an open of the same page share the
         // work, while different pages do not wait for each other.
         locks.getOrPut(key) { Mutex() }.withLock {
             val file = File(directory, "$key$SUFFIX")
-            read(file) ?: generate().also { write(file, it) }
+            read(file) ?: run {
+                Trace.beginSection("ps.deal")
+                try { generate() } finally { Trace.endSection() }
+            }.also { write(file, it) }
         }
     }
 

@@ -39,6 +39,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -155,11 +156,24 @@ fun ImportScreen(onBack: () -> Unit, onImported: (PuzzleSpec) -> Unit) {
     Scaffold(
         modifier = Modifier.testTag("import"),
         containerColor = Color.Transparent,
+        // A transparent container names no content colour: text and icons would fall back to black.
+        contentColor = MaterialTheme.colorScheme.onBackground,
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
             TopAppBar(
                 windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
-                title = { Text(stringResource(R.string.import_title)) },
+                // A page header, as on any page: where it comes from over what it is.
+                title = {
+                    Column {
+                        Text(
+                            stringResource(R.string.import_title),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                        Text(stringResource(R.string.imported), style = MaterialTheme.typography.titleLarge, maxLines = 1)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(painterResource(R.drawable.ic_back), contentDescription = stringResource(R.string.back))
@@ -181,6 +195,10 @@ fun ImportScreen(onBack: () -> Unit, onImported: (PuzzleSpec) -> Unit) {
                     ) { Text(stringResource(R.string.import_check)) }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                // Two lines of title: the bar grows at large text instead of clipping them.
+                expandedHeight = LocalDensity.current.fontScale.let { scale ->
+                    maxOf(TopAppBarDefaults.TopAppBarExpandedHeight, (24 * 2 * scale + 12).dp)
+                },
             )
         },
     ) { padding ->

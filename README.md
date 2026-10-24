@@ -22,23 +22,27 @@ signing secrets exist (see [docs/release.md](docs/release.md)).
 ## What it is
 
 - **A notebook, not a menu.** Today's 6×6 page on top (gentle on weekdays, steady at the
-  weekend), the practice stack, the month's contents (every day since you started, one tap away),
-  the handbook, then the pages you have written on: unfinished ones, then stamped ones with their
-  time. There is no streak.
-- **Practice that follows you.** One never-ending stack of 9×9 pages whose difficulty rises after
-  three pages solved without the Coach's answer — singles, then pointing and pairs, then hidden
-  pairs and X-Wings, then (Deep) triples, Swordfish and XY-Wing.
-- **A page for the week and pages of your own.** A 9×9 page each week, dealt on Sunday; type in a
-  puzzle from a book or newspaper and it is checked for one solution, graded and coached.
+  weekend), the practice card ("Next: X-Wing"), the month's contents (every day since you
+  started, one tap away), then the pages you have written on, 9×9 pages included. There is no
+  streak.
+- **One path that knows you.** One never-ending stack of 9×9 pages whose level rises after three
+  pages solved without the Coach's answer — singles, then pointing and pairs, then hidden pairs
+  and X-Wings, then (Deep) triples, Swordfish and XY-Wing. Each page is dealt to need what you are
+  about to learn, judged from the digits you wrote with each technique yourself, and every few
+  pages it goes back to one you found long ago. No scores: a solved page says what you found.
+- **Pages of your own.** Type in a puzzle from a book or newspaper; it is checked for one
+  solution, graded and coached.
 - **A Coach in the margin.** Look → Why → Answer, with an ink line to the part of the board it is
-  talking about; when a placement needs several eliminations, Why walks through each one. It fills
-  exactly the space of the tools, so the page never moves.
+  talking about; when a placement needs several eliminations, Why walks through each one. It reads
+  your page: a pencil mark that leaves out a cell's answer comes first, steps near your cell come
+  before others, and it is brief about what you already know. It fills exactly the space of the
+  tools, so the page never moves.
 - **Pen and paper.** Printed digits, your ink, pencil notes (hold the pencil on a 9×9 page to
   pencil in every candidate). Press and slide to aim at a cell (a loupe shows where you are);
   lift to write. Tap a digit with nothing selected to pick it up and write it across the page.
 - **A handbook that teaches.** Using the pen, then every technique with a worked example from a
-  real page, drawn the way the Coach draws it. Each technique shows how well you know it (met,
-  practised, known: from clean pages that needed it) and deals a page to practise it.
+  real page, drawn the way the Coach draws it, a page each. Each technique shows how well you know
+  it (seen, practised, known) from the digits you wrote with it yourself.
 - **Read a page back.** Every digit of a solved page in order, with the technique that justified
   it then, the slips, and where the Coach helped.
 - **Quiet.** The clock is hidden while you play and pauses itself when you leave. No ads,

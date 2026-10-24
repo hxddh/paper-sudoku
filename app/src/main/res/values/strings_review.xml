@@ -34,6 +34,9 @@
     <string name="review_previous">Previous move</string>
     <string name="review_next">Next move</string>
     <string name="review_slider">Move</string>
+    <!-- 10.0: the header's toggle between the moves and the page's counts. -->
+    <string name="review_this_page">This page</string>
+    <string name="review_show_moves">Moves</string>
 
     <!-- Bring your own page -->
     <string name="import_title">Type in a page</string>

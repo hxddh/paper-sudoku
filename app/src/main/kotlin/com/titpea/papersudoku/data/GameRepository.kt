@@ -1,5 +1,6 @@
 package com.titpea.papersudoku.data
 
+import android.os.Trace
 import android.util.Log
 import androidx.room.withTransaction
 import com.titpea.papersudoku.engine.Difficulty
@@ -10,6 +11,7 @@ import com.titpea.papersudoku.game.model.PuzzleKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -38,6 +40,8 @@ data class PageSummary(
     val solved: Boolean,
     val givens: String,
     val grid: String,
+    /** When the page was last written on (epoch millis); 0 where it is not known. */
+    val updatedAt: Long = 0,
 ) {
     val size: Int get() = if (grid.length == 36) 6 else 9
     val boxRows: Int get() = if (size == 6) 2 else 3
@@ -98,6 +102,15 @@ interface GameStore {
     /** Pages the player typed in, most recently touched first. */
     val imported: Flow<List<PageSummary>>
 
+    /** Finished pages other than dailies (all 9×9), most recently finished first. */
+    val solvedNineByNine: Flow<List<PageSummary>>
+
+    /**
+     * Weekly and technique pages begun and not finished, any week: 10.0 has no other way back to
+     * them (the weekly card and "Practise this" are gone).
+     */
+    val unfinishedOthers: Flow<List<PageSummary>>
+
     /** The practice page to continue, if one is unfinished. */
     val unfinishedPractice: Flow<PageSummary?>
 
@@ -121,7 +134,10 @@ class RoomGameStore(
 
     override suspend fun load(puzzleKey: String): GameState? {
         val json = savedGames.get(puzzleKey)?.json ?: return null
-        return withContext(Dispatchers.Default) { GameState.decode(json) } ?: null.also {
+        return withContext(Dispatchers.Default) {
+            Trace.beginSection("ps.decode")
+            try { GameState.decode(json) } finally { Trace.endSection() }
+        } ?: null.also {
             Log.w(TAG, "Unreadable saved page $puzzleKey; set aside, starting it afresh")
             // Its stamp goes with it: the day reads as not done, and finishing it again stamps it.
             database.withTransaction {
@@ -178,7 +194,7 @@ class RoomGameStore(
     override suspend fun discardUnsolvedPractice(except: String) =
         savedGames.discardUnsolvedPractice(except)
 
-    override suspend fun latestUnsolvedPracticeKey(): String? = savedGames.latestUnsolvedPracticeKey()
+    override suspend fun latestUnsolvedPracticeKey(): String? = savedGames.observeLatestUnsolvedPractice().first()?.puzzleKey
 
     override fun dailies(fromEpochDay: Long): Flow<List<PageSummary>> =
         savedGames.observeDailies(fromEpochDay)
@@ -191,6 +207,18 @@ class RoomGameStore(
 
     override val imported: Flow<List<PageSummary>> =
         savedGames.observeKind(PuzzleKind.Imported.name)
+            .map { rows -> rows.mapNotNull(::summary) }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
+
+    override val unfinishedOthers: Flow<List<PageSummary>> =
+        savedGames.observeUnfinishedOthers()
+            .map { rows -> rows.mapNotNull(::summary) }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
+
+    override val solvedNineByNine: Flow<List<PageSummary>> =
+        savedGames.observeSolvedNineByNine()
             .map { rows -> rows.mapNotNull(::summary) }
             .distinctUntilChanged()
             .flowOn(Dispatchers.Default)
@@ -219,7 +247,9 @@ class RoomGameStore(
             epochDay = spec.epochDay,
             solved = state.solved,
             json = json,
-            updatedAt = now,
+            // A finished page keeps the time it was finished: reading it again later does not move
+            // it in the journal, which files it under that day.
+            updatedAt = if (state.solved) state.solvedAt ?: now else now,
             givens = spec.givens.digits(),
             grid = state.values.digits(),
         )
@@ -229,7 +259,7 @@ class RoomGameStore(
         val kind = PuzzleKind.entries.firstOrNull { it.name == row.kind } ?: return null
         val difficulty = Difficulty.entries.firstOrNull { it.name == row.difficulty } ?: return null
         if (row.grid.length != 36 && row.grid.length != 81) return null
-        return PageSummary(row.puzzleKey, kind, difficulty, row.number, row.epochDay, row.solved, row.givens, row.grid)
+        return PageSummary(row.puzzleKey, kind, difficulty, row.number, row.epochDay, row.solved, row.givens, row.grid, row.updatedAt)
     }
 
     companion object {

@@ -61,6 +61,7 @@ class PageViewModelTest {
         puzzles = GeneratingPuzzleSource(generator),
         savedState = savedState,
         onDailySaved = { dailySaves++ },
+        compute = dispatcher,
     )
 
     private fun test(block: suspend TestScope.() -> Unit) = runTest(dispatcher) { block() }
@@ -672,44 +673,41 @@ class PageViewModelTest {
     }
 
     @Test
-    fun `a clean page counts once towards each technique it needed`() = test {
+    fun `a solved page records what the player wrote with themselves`() = test {
         val vm = viewModel()
         advanceUntilIdle()
-        val used = vm.game().spec.techniquesUsed
         vm.solveFully()
         advanceUntilIdle()
-        assertEquals(used.associateWith { 1 }, settings.flow.value.cleanPages)
+        val learner = settings.flow.value.learner
+        assertEquals(1, learner.pages)
+        assertTrue(learner.found(com.titpea.papersudoku.engine.Technique.HiddenSingle) + learner.found(com.titpea.papersudoku.engine.Technique.NakedSingle) > 0)
     }
 
     @Test
-    fun `practising a technique deals its own pages, outside practice`() = test {
+    fun `practice deals the next technique to learn`() = test {
+        // Gentle is passed: the next page is Steady, dealt to need pointing.
+        store.clean.value = mapOf(Difficulty.Gentle to 3)
         val vm = viewModel()
         advanceUntilIdle()
-        vm.onEvent(PageEvent.PractiseTechnique(com.titpea.papersudoku.engine.Technique.Pointing))
+        vm.onEvent(PageEvent.OpenPractice)
         advanceUntilIdle()
-        val page = vm.game().spec
-        assertEquals(com.titpea.papersudoku.game.model.PuzzleKind.Focus, page.kind)
-        assertEquals(Catalog.focusPrefix(com.titpea.papersudoku.engine.Technique.Pointing) + 0, page.key)
-        // Asked again while it is unfinished: the same page.
-        vm.onEvent(PageEvent.OpenToday)
-        advanceUntilIdle()
-        vm.onEvent(PageEvent.PractiseTechnique(com.titpea.papersudoku.engine.Technique.Pointing))
-        advanceUntilIdle()
-        assertEquals(page.key, vm.game().spec.key)
-        assertEquals(null, store.latestUnsolvedPracticeKey())
+        val spec = vm.game().spec
+        assertEquals(Difficulty.Steady, spec.difficulty)
+        assertEquals(com.titpea.papersudoku.engine.Technique.Pointing, Catalog.practiceTarget(spec.key))
+        assertTrue(com.titpea.papersudoku.engine.Technique.Pointing in spec.techniques)
     }
 
     @Test
-    fun `this week's page opens and comes back after process death`() = test {
-        val handle = SavedStateHandle()
+    fun `a page restored by its key opens from its save, and a dropped practice page gives way`() = test {
+        val weekly = GameState.new(Catalog.weekly(Catalog.weekOf(today.toEpochDay())))
+        store.save(weekly, 0)
+        val handle = SavedStateHandle(mapOf("open_page" to weekly.spec.key))
         val vm = viewModel(savedState = handle)
         advanceUntilIdle()
-        vm.onEvent(PageEvent.OpenWeekly)
+        assertEquals(weekly.spec.key, vm.game().spec.key)
+        val gone = viewModel(savedState = SavedStateHandle(mapOf("open_page" to Catalog.classicKey(Difficulty.Steady, 7))))
         advanceUntilIdle()
-        assertEquals(Catalog.weeklyKey(Catalog.weekOf(today.toEpochDay())), vm.game().spec.key)
-        val restored = viewModel(savedState = SavedStateHandle(handle.keys().associateWith { handle.get<Any>(it) }))
-        advanceUntilIdle()
-        assertEquals(Catalog.weeklyKey(Catalog.weekOf(today.toEpochDay())), restored.game().spec.key)
+        assertEquals(com.titpea.papersudoku.game.model.PuzzleKind.Classic, gone.game().spec.kind)
     }
 
     @Test

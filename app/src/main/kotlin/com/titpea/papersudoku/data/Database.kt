@@ -78,6 +78,8 @@ data class SavedPageRow(
     val solved: Boolean,
     val givens: String,
     val grid: String,
+    /** When the page was last written on (epoch millis): the date a finished page is filed under. */
+    val updatedAt: Long,
 )
 
 /** Per mode and difficulty. [bestSeconds] ignores games where the Coach gave the answer. */
@@ -129,9 +131,6 @@ interface GameResultDao {
     fun observeDays(): Flow<List<DayResult>>
 
     @Query("SELECT COUNT(*) FROM game_results")
-    suspend fun count(): Int
-
-    @Query("SELECT COUNT(*) FROM game_results")
     fun observeCount(): Flow<Int>
 
     /** When each practice (9×9) page was finished, for the contents' month counts. */
@@ -159,27 +158,31 @@ interface SavedGameDao {
     @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind = 'Classic' AND solved = 0 ORDER BY updatedAt DESC LIMIT 1")
     fun observeLatestUnsolvedPractice(): Flow<SavedPageRow?>
 
-    @Query("SELECT puzzleKey FROM saved_games WHERE kind = 'Classic' AND solved = 0 ORDER BY updatedAt DESC LIMIT 1")
-    suspend fun latestUnsolvedPracticeKey(): String?
-
     @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind = 'Daily' AND epochDay >= :fromEpochDay ORDER BY epochDay DESC")
     fun observeDailies(fromEpochDay: Long): Flow<List<SavedPageRow>>
 
     @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE puzzleKey = :puzzleKey")
     fun observePage(puzzleKey: String): Flow<SavedPageRow?>
 
-    /** Highest page number dealt under a key prefix such as "classic-steady-" (the requested level). */
-    @Query(
-        """
-        SELECT MAX(CAST(substr(puzzleKey, length(:prefix) + 1) AS INTEGER)) FROM saved_games
-        WHERE kind = :kind AND substr(puzzleKey, 1, length(:prefix)) = :prefix
-        """,
-    )
+    /**
+     * Highest page number dealt under a key prefix such as "classic-steady-" (the requested level).
+     * Read from the stored number, which is the one in the key, path pages included
+     * ("classic-steady-12-pointing" is number 12). The prefixes hold no `%` or `_`.
+     */
+    @Query("SELECT MAX(number) FROM saved_games WHERE kind = :kind AND puzzleKey LIKE :prefix || '%'")
     suspend fun maxNumber(kind: String, prefix: String): Int?
 
     /** Pages of one kind (the player's own), most recently touched first. */
     @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind = :kind ORDER BY updatedAt DESC")
     fun observeKind(kind: String): Flow<List<SavedPageRow>>
+
+    /** Begun and not finished weekly and technique pages (9.0's), most recently touched first. */
+    @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind IN ('Weekly', 'Focus') AND solved = 0 AND grid != givens ORDER BY updatedAt DESC")
+    fun observeUnfinishedOthers(): Flow<List<SavedPageRow>>
+
+    /** Finished 9×9 pages (practice, weekly, technique and typed-in), most recently finished first. */
+    @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind != 'Daily' AND kind != 'Damaged' AND solved = 1 ORDER BY updatedAt DESC")
+    fun observeSolvedNineByNine(): Flow<List<SavedPageRow>>
 
     @Query("DELETE FROM saved_games WHERE kind = 'Classic' AND solved = 0 AND puzzleKey != :except")
     suspend fun discardUnsolvedPractice(except: String)
@@ -190,8 +193,20 @@ interface SavedGameDao {
     @Query("DELETE FROM saved_games WHERE puzzleKey = :puzzleKey AND updatedAt = :updatedAt")
     suspend fun deleteIfUnchanged(puzzleKey: String, updatedAt: Long)
 
-    /** Unsolved dailies with no digit written: the only rows that may hold a page never begun. */
-    @Query("SELECT puzzleKey FROM saved_games WHERE kind = 'Daily' AND solved = 0 AND grid = givens")
+    /**
+     * Unsolved dailies with no digit written and no undo step or Coach use in their save: the only
+     * rows that may hold a page never begun. A save leaves out what is at its default, so a page
+     * with any undo step or Coach use names `historyPacked`, `history` or `coach`; those rows are
+     * skipped here instead of being decoded. Since 8.0 a page only looked at is not saved, so
+     * once the old ones are gone this finds nothing, and only the small columns are read for the
+     * rows with no digit written.
+     */
+    @Query(
+        """
+        SELECT puzzleKey FROM saved_games WHERE kind = 'Daily' AND solved = 0 AND grid = givens
+        AND instr(json, '"history') = 0 AND instr(json, '"coach"') = 0
+        """,
+    )
     suspend fun unwrittenDailyKeys(): List<String>
 
     /** Moves an unreadable row out of every query's way, under a key no page will ask for. */
@@ -199,7 +214,7 @@ interface SavedGameDao {
     suspend fun setAside(puzzleKey: String, newKey: String)
 }
 
-private const val PAGE_COLUMNS = "puzzleKey, kind, difficulty, number, epochDay, solved, givens, grid"
+private const val PAGE_COLUMNS = "puzzleKey, kind, difficulty, number, epochDay, solved, givens, grid, updatedAt"
 
 @Database(
     entities = [GameResultEntity::class, SavedGameEntity::class],

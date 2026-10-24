@@ -69,25 +69,33 @@ class LogicalSolver(val geometry: Geometry) {
             ?: (if (maxTier < 3) null else hiddenPair(board) ?: xWing(board))
             ?: (if (maxTier < 4) null else nakedTriple(board) ?: hiddenTriple(board) ?: swordfish(board) ?: xyWing(board))
 
-    /** Next placement only (no eliminations). */
-    fun nextSingle(board: Board): Placement? =
-        hiddenSingle(board, UnitKind.Box) ?: nakedSingle(board) ?: hiddenSingle(board, null)
+    /**
+     * Next placement only (no eliminations). With [near], a single in a cell it accepts comes
+     * first: every single is as easy as any other, so the one where the player is looking wins.
+     */
+    fun nextSingle(board: Board, near: ((Int) -> Boolean)? = null): Placement? {
+        if (near != null) {
+            (hiddenSingle(board, UnitKind.Box, near) ?: nakedSingle(board, near) ?: hiddenSingle(board, null, near))
+                ?.let { return it }
+        }
+        return hiddenSingle(board, UnitKind.Box) ?: nakedSingle(board) ?: hiddenSingle(board, null)
+    }
 
     fun nextElimination(board: Board): Elimination? =
         pointing(board) ?: claiming(board) ?: nakedPair(board) ?: hiddenPair(board) ?: xWing(board)
             ?: nakedTriple(board) ?: hiddenTriple(board) ?: swordfish(board) ?: xyWing(board)
 
-    private fun nakedSingle(board: Board): Placement? {
+    private fun nakedSingle(board: Board, accept: ((Int) -> Boolean)? = null): Placement? {
         for (i in board.values.indices) {
             val c = board.candidates[i]
-            if (board.values[i] == 0 && c.digitCount() == 1) {
+            if (board.values[i] == 0 && c.digitCount() == 1 && (accept == null || accept(i))) {
                 return Placement(i, c.firstDigit(), Technique.NakedSingle, null)
             }
         }
         return null
     }
 
-    private fun hiddenSingle(board: Board, only: UnitKind?): Placement? {
+    private fun hiddenSingle(board: Board, only: UnitKind?, accept: ((Int) -> Boolean)? = null): Placement? {
         for ((ref, cells) in geometry.units) {
             if (only != null && ref.kind != only) continue
             if (only == null && ref.kind == UnitKind.Box) continue
@@ -104,7 +112,7 @@ class LogicalSolver(val geometry: Geometry) {
                         spot = cell
                     }
                 }
-                if (count == 1) return Placement(spot, digit, Technique.HiddenSingle, ref)
+                if (count == 1 && (accept == null || accept(spot))) return Placement(spot, digit, Technique.HiddenSingle, ref)
             }
         }
         return null
@@ -217,59 +225,7 @@ class LogicalSolver(val geometry: Geometry) {
         return null
     }
 
-    private fun xWing(board: Board): Elimination? {
-        for (digit in 1..geometry.size) {
-            xWingOriented(board, digit, geometry.rows, UnitKind.Row, UnitKind.Column)?.let { return it }
-            xWingOriented(board, digit, geometry.columns, UnitKind.Column, UnitKind.Row)?.let { return it }
-        }
-        return null
-    }
-
-    private fun xWingOriented(
-        board: Board,
-        digit: Int,
-        bases: List<IntArray>,
-        baseKind: UnitKind,
-        coverKind: UnitKind,
-    ): Elimination? {
-        val positions = bases.map { cells ->
-            cells.indices.filter { k ->
-                val cell = cells[k]
-                board.values[cell] == 0 && board.candidates[cell].hasDigit(digit)
-            }
-        }
-        for (a in bases.indices) {
-            if (positions[a].size != 2) continue
-            for (b in a + 1 until bases.size) {
-                if (positions[b] != positions[a]) continue
-                val (k1, k2) = positions[a]
-                val covers = listOf(k1, k2).map { k ->
-                    if (coverKind == UnitKind.Column) geometry.columns[k] else geometry.rows[k]
-                }
-                val corners = listOf(bases[a][k1], bases[a][k2], bases[b][k1], bases[b][k2])
-                val removals = covers.flatMap { cover ->
-                    cover.filter { cell ->
-                        cell !in corners && board.values[cell] == 0 && board.candidates[cell].hasDigit(digit)
-                    }
-                }.map { Candidate(it, digit) }
-                if (removals.isNotEmpty()) {
-                    return Elimination(
-                        technique = Technique.XWing,
-                        digits = listOf(digit),
-                        patternCells = corners.sorted(),
-                        units = listOf(
-                            UnitRef(baseKind, a),
-                            UnitRef(baseKind, b),
-                            UnitRef(coverKind, k1),
-                            UnitRef(coverKind, k2),
-                        ),
-                        removals = removals,
-                    )
-                }
-            }
-        }
-        return null
-    }
+    private fun xWing(board: Board): Elimination? = fish(board, 2, Technique.XWing)
 
     /** Three cells of a unit whose candidates are three digits between them take those digits. */
     private fun nakedTriple(board: Board): Elimination? {
@@ -314,17 +270,27 @@ class LogicalSolver(val geometry: Geometry) {
     }
 
     /** An X-Wing across three lines: a digit confined to the same three cross lines in each. */
-    private fun swordfish(board: Board): Elimination? {
+    private fun swordfish(board: Board): Elimination? = fish(board, 3, Technique.Swordfish)
+
+    /**
+     * A fish of [size] lines (2: X-Wing, 3: Swordfish): in [size] base lines a digit fits only
+     * the same [size] cross lines between them, so the rest of those cross lines cannot hold it.
+     * Rows as bases first, then columns, digit by digit. Units: the base lines, then the cover
+     * lines.
+     */
+    private fun fish(board: Board, size: Int, technique: Technique): Elimination? {
         for (digit in 1..geometry.size) {
-            swordfishOriented(board, digit, geometry.rows, UnitKind.Row, UnitKind.Column)?.let { return it }
-            swordfishOriented(board, digit, geometry.columns, UnitKind.Column, UnitKind.Row)?.let { return it }
+            fishOriented(board, digit, size, technique, geometry.rows, UnitKind.Row, UnitKind.Column)?.let { return it }
+            fishOriented(board, digit, size, technique, geometry.columns, UnitKind.Column, UnitKind.Row)?.let { return it }
         }
         return null
     }
 
-    private fun swordfishOriented(
+    private fun fishOriented(
         board: Board,
         digit: Int,
+        size: Int,
+        technique: Technique,
         bases: List<IntArray>,
         baseKind: UnitKind,
         coverKind: UnitKind,
@@ -332,27 +298,34 @@ class LogicalSolver(val geometry: Geometry) {
         val positions = bases.map { cells ->
             cells.indices.filter { k -> board.values[cells[k]] == 0 && board.candidates[cells[k]].hasDigit(digit) }
         }
-        val lines = bases.indices.filter { positions[it].size in 2..3 }
-        for (a in lines.indices) for (b in a + 1 until lines.size) for (c in b + 1 until lines.size) {
-            val trio = listOf(lines[a], lines[b], lines[c])
-            val crosses = trio.flatMap { positions[it] }.distinct().sorted()
-            if (crosses.size != 3) continue
-            val pattern = trio.flatMap { base -> positions[base].map { k -> bases[base][k] } }
-            val covers = crosses.map { k -> if (coverKind == UnitKind.Column) geometry.columns[k] else geometry.rows[k] }
-            val removals = covers.flatMap { cover ->
-                cover.filter { it !in pattern && board.values[it] == 0 && board.candidates[it].hasDigit(digit) }
-            }.map { Candidate(it, digit) }
-            if (removals.isNotEmpty()) {
+        val lines = bases.indices.filter { positions[it].size in 2..size }
+        val chosen = IntArray(size)
+        fun search(depth: Int, from: Int): Elimination? {
+            if (depth == size) {
+                val set = chosen.toList()
+                val crosses = set.flatMap { positions[it] }.distinct().sorted()
+                if (crosses.size != size) return null
+                val pattern = set.flatMap { base -> positions[base].map { k -> bases[base][k] } }
+                val covers = crosses.map { k -> if (coverKind == UnitKind.Column) geometry.columns[k] else geometry.rows[k] }
+                val removals = covers.flatMap { cover ->
+                    cover.filter { it !in pattern && board.values[it] == 0 && board.candidates[it].hasDigit(digit) }
+                }.map { Candidate(it, digit) }
+                if (removals.isEmpty()) return null
                 return Elimination(
-                    technique = Technique.Swordfish,
+                    technique = technique,
                     digits = listOf(digit),
                     patternCells = pattern.sorted(),
-                    units = trio.map { UnitRef(baseKind, it) } + crosses.map { UnitRef(coverKind, it) },
+                    units = set.map { UnitRef(baseKind, it) } + crosses.map { UnitRef(coverKind, it) },
                     removals = removals,
                 )
             }
+            for (i in from until lines.size) {
+                chosen[depth] = lines[i]
+                search(depth + 1, i + 1)?.let { return it }
+            }
+            return null
         }
-        return null
+        return search(0, 0)
     }
 
     /**

@@ -6,6 +6,8 @@ Usage: python3 tools/store/feature_graphic.py  (writes docs/assets/feature-graph
 Paper, a faint 9x9 grid running off the right edge, the icon, and the name set in Fraunces at
 the weights the app uses. No screenshots and no claims: Play shows the graphic above them.
 """
+import io
+import subprocess
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -20,8 +22,16 @@ MUTED = (97, 89, 78)
 W, H = 1024, 500
 
 
+# The app ships static instances since 10.0 (the pen has digits only); the graphic is set from
+# the variable Latin subsets they were cut from (third_party/fraunces/make_instances.py).
+VARIABLE_FONTS = "b720564"
+
+
 def font(name: str, size: int, wght: int, opsz: int) -> ImageFont.FreeTypeFont:
-    f = ImageFont.truetype(str(ROOT / "app/src/main/res/font" / name), size)
+    data = subprocess.run(
+        ["git", "show", f"{VARIABLE_FONTS}:app/src/main/res/font/{name}"], cwd=ROOT, check=True, capture_output=True
+    ).stdout
+    f = ImageFont.truetype(io.BytesIO(data), size)
     axes = [a["name"].decode() if isinstance(a["name"], bytes) else a["name"] for a in f.get_variation_axes()]
     f.set_variation_by_axes([opsz if "optical" in a.lower() else wght for a in axes])
     return f

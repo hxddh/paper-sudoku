@@ -1,5 +1,33 @@
 # Changelog
 
+## 10.0.0
+
+A notebook that knows you: practice follows what you have shown you can do, the Coach reads your
+page, and every page opens at once.
+
+**Changed**
+- What you know is what you wrote. A technique counts as practised, then known, from the digits you
+  wrote with it yourself, read back when the page is finished; the Coach explaining it there does
+  not count. Pages that only needed a technique no longer do. Your 9.0 marks carry over as a start.
+- One path. Practice is the only 9×9 stack: each page is dealt to need what you are about to learn,
+  and every few pages it goes back to a technique you found long ago. The levels stay.
+- The Coach reads your page. It first points out a pencil mark that leaves out a cell's answer (and
+  puts it back if you ask), prefers a step near the cell you are on, says one line about
+  techniques you know, and opens with what a technique is the first time it explains it.
+- A solved page says one true thing about it: "X-Wing: you found it yourself."
+- One notebook: today, practice (with "Next: X-Wing"), the contents, and the pages you wrote, now
+  including every finished 9×9 page. The handbook is a page per technique, board first; read back
+  and type in are pages, not lists. "This week" and "Practise this" are gone as entries; pages
+  you began from them are still in the notebook.
+
+**Faster**
+- Every page, today's included, is dealt in one step from a precomputed table (the same puzzles
+  as before), so nothing waits on the generator.
+- Saves are about a seventh of their size; the board redraws only the cells that change; fonts are
+  static cuts, 80 KB smaller.
+- CI benchmarks every change against main on the same emulator and fails when start-up or writing
+  on the page is slower by more than 15%, or the app grows more than 5%.
+
 ## 9.0.0
 
 Room to grow: a fourth level, a handbook that shows what you know, a way to read a page back, and

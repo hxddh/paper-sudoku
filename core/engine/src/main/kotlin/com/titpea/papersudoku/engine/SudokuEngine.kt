@@ -7,6 +7,13 @@ sealed interface CoachHint {
     data class Mistake(val index: Int, val digit: Int) : CoachHint
 
     /**
+     * The player's pencil marks in [index] leave out [digit], which the cell still needs (10.0).
+     * Said before any step: a step worked out from candidates the player no longer has would not
+     * match their page.
+     */
+    data class MissingMark(val index: Int, val digit: Int) : CoachHint
+
+    /**
      * The next placement, plus the eliminations it needs first ([groundwork]), in order. Only
      * eliminations the placement depends on are kept, so each one is worth explaining.
      */
@@ -61,14 +68,27 @@ class SudokuEngine(private val puzzle: Puzzle) {
     fun isSolved(values: IntArray): Boolean =
         values.size == solution.size && values.indices.all { values[it] == solution[it] }
 
-    fun hint(values: IntArray): CoachHint? {
+    /**
+     * What the Coach says now. [notes] are the player's pencil marks (bit d = digit d): a cell
+     * whose marks leave out its own answer is pointed out first. [near] is the cell the player is
+     * on: among equally simple steps, one in its row, column or box comes first.
+     */
+    fun hint(values: IntArray, notes: IntArray? = null, near: Int? = null): CoachHint? {
         require(values.size == geometry.cellCount) { "values must contain size * size cells" }
         mistakes(values).firstOrNull()?.let { return CoachHint.Mistake(it, values[it]) }
+        if (notes != null) {
+            require(notes.size == values.size) { "notes must contain size * size cells" }
+            // Nearest the player first, then in reading order.
+            val order = values.indices.sortedBy { if (near != null && (it == near || geometry.sees(it, near))) 0 else 1 }
+            order.firstOrNull { values[it] == 0 && notes[it] != 0 && notes[it] and (1 shl solution[it]) == 0 }
+                ?.let { return CoachHint.MissingMark(it, solution[it]) }
+        }
         val board = Board.from(geometry, values)
         if (board.isSolved) return null
+        val prefer: ((Int) -> Boolean)? = near?.let { n -> { cell -> cell == n || geometry.sees(cell, n) } }
         val groundwork = mutableListOf<Elimination>()
         repeat(MAX_GROUNDWORK) {
-            solver.nextSingle(board)?.let { return CoachHint.Next(it, replayed(values, essential(groundwork, it))) }
+            solver.nextSingle(board, prefer.takeIf { groundwork.isEmpty() })?.let { return CoachHint.Next(it, replayed(values, essential(groundwork, it))) }
             val elimination = solver.nextElimination(board) ?: return null
             groundwork += elimination
             board.eliminate(elimination.removals)
@@ -127,13 +147,9 @@ class SudokuEngine(private val puzzle: Puzzle) {
         fun has(cell: Int, digit: Int) = board.values[cell] == 0 && (board.candidates[cell] shr digit) and 1 == 1
         val units = step.units.map { geometry.cells(it).toList() }
         return when (step.technique) {
-            // Units: the box, then the line the digit is confined to.
-            Technique.Pointing -> {
-                val d = step.digits[0]
-                units[1].filter { it !in units[0] && has(it, d) }.map { Candidate(it, d) }
-            }
-            // Units: the line, then the box the digit is confined to.
-            Technique.Claiming -> {
+            // Pointing: the box, then the line the digit is confined to. Claiming: the line, then
+            // the box. Either way the digit goes from the second unit outside the first.
+            Technique.Pointing, Technique.Claiming -> {
                 val d = step.digits[0]
                 units[1].filter { it !in units[0] && has(it, d) }.map { Candidate(it, d) }
             }
@@ -143,15 +159,10 @@ class SudokuEngine(private val puzzle: Puzzle) {
             Technique.HiddenPair, Technique.HiddenTriple -> step.patternCells.flatMap { cell ->
                 (1..geometry.size).filter { it !in step.digits && has(cell, it) }.map { Candidate(cell, it) }
             }
-            // Units: the two base lines, then the two cover lines.
-            Technique.XWing -> {
+            // Units: the base lines (two or three), then as many cover lines.
+            Technique.XWing, Technique.Swordfish -> {
                 val d = step.digits[0]
-                (units[2] + units[3]).filter { it !in step.patternCells && has(it, d) }.map { Candidate(it, d) }
-            }
-            // Units: the three base lines, then the three cover lines.
-            Technique.Swordfish -> {
-                val d = step.digits[0]
-                (units[3] + units[4] + units[5]).filter { it !in step.patternCells && has(it, d) }.map { Candidate(it, d) }
+                units.drop(units.size / 2).flatten().filter { it !in step.patternCells && has(it, d) }.map { Candidate(it, d) }
             }
             // Pattern: the pivot, then the two pincers; digits: z first.
             Technique.XYWing -> {

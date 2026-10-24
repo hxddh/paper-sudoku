@@ -2,19 +2,12 @@
 <resources>
     <string name="weekly">本週</string>
     <string name="weekly_title">%1$s起的一週</string>
-    <string name="weekly_card_new">開始本週這一頁</string>
-    <string name="weekly_card_continue">繼續本週這一頁</string>
-    <string name="weekly_card_done">本週這一頁已蓋章</string>
     <string name="focus">技巧專練</string>
-    <string name="focus_practise">練這一招</string>
     <string name="solved_focus">%1$s：%2$s</string>
     <string name="solved_weekly_close">週日會換上新的一頁。</string>
-    <string name="focus_another">再來一頁</string>
     <string name="imported">你的題目</string>
     <string name="imported_beyond_coach">超出教練的範圍</string>
-    <string name="imported_section">你的題目</string>
     <string name="imported_add">抄一頁題目</string>
-    <string name="menu_read_back">復盤</string>
     <string name="solved_read_back">復盤</string>
     <string name="mastery_met">見過</string>
     <string name="mastery_practised">練過</string>
@@ -23,4 +16,14 @@
         <item quantity="other">%1$d 頁乾淨完成</item>
     </plurals>
     <string name="mastery_next">下一個可以學：%1$s</string>
+    <string name="solved_found_yourself">這次的%1$s，是你自己找到的。</string>
+    <string name="coach_missing_mark_title">少了一個鉛筆記號。</string>
+    <string name="coach_missing_mark_look">看看%1$s裡的鉛筆記號。</string>
+    <string name="coach_missing_mark_why">第 %1$d 列第 %2$d 行還可能是 %3$d，但你的記號裡沒有它。</string>
+    <string name="coach_missing_mark_answer">把 %3$d 補回第 %1$d 列第 %2$d 行的記號裡。</string>
+    <string name="coach_add_mark">補上記號</string>
+    <string name="practice_next">下一個：%1$s</string>
+    <string name="handbook_position">第 %1$d 頁，共 %2$d 頁</string>
+    <string name="handbook_previous">上一頁</string>
+    <string name="handbook_next">下一頁</string>
 </resources>
