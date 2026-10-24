@@ -99,6 +99,9 @@ android {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
 
+    // Unit tests run against android.jar's stubs; trace sections (android.os.Trace) are no-ops there.
+    testOptions.unitTests.isReturnDefaultValues = true
+
     lint {
         abortOnError = true
         // Warnings don't fail the build. Lint always writes its HTML, XML, SARIF and text reports
