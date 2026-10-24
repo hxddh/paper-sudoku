@@ -147,13 +147,9 @@ class SudokuEngine(private val puzzle: Puzzle) {
         fun has(cell: Int, digit: Int) = board.values[cell] == 0 && (board.candidates[cell] shr digit) and 1 == 1
         val units = step.units.map { geometry.cells(it).toList() }
         return when (step.technique) {
-            // Units: the box, then the line the digit is confined to.
-            Technique.Pointing -> {
-                val d = step.digits[0]
-                units[1].filter { it !in units[0] && has(it, d) }.map { Candidate(it, d) }
-            }
-            // Units: the line, then the box the digit is confined to.
-            Technique.Claiming -> {
+            // Pointing: the box, then the line the digit is confined to. Claiming: the line, then
+            // the box. Either way the digit goes from the second unit outside the first.
+            Technique.Pointing, Technique.Claiming -> {
                 val d = step.digits[0]
                 units[1].filter { it !in units[0] && has(it, d) }.map { Candidate(it, d) }
             }
@@ -163,15 +159,10 @@ class SudokuEngine(private val puzzle: Puzzle) {
             Technique.HiddenPair, Technique.HiddenTriple -> step.patternCells.flatMap { cell ->
                 (1..geometry.size).filter { it !in step.digits && has(cell, it) }.map { Candidate(cell, it) }
             }
-            // Units: the two base lines, then the two cover lines.
-            Technique.XWing -> {
+            // Units: the base lines (two or three), then as many cover lines.
+            Technique.XWing, Technique.Swordfish -> {
                 val d = step.digits[0]
-                (units[2] + units[3]).filter { it !in step.patternCells && has(it, d) }.map { Candidate(it, d) }
-            }
-            // Units: the three base lines, then the three cover lines.
-            Technique.Swordfish -> {
-                val d = step.digits[0]
-                (units[3] + units[4] + units[5]).filter { it !in step.patternCells && has(it, d) }.map { Candidate(it, d) }
+                units.drop(units.size / 2).flatten().filter { it !in step.patternCells && has(it, d) }.map { Candidate(it, d) }
             }
             // Pattern: the pivot, then the two pincers; digits: z first.
             Technique.XYWing -> {
