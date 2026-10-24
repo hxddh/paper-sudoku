@@ -1,12 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The Sunday 9×9 page, open all week. -->
-    <string name="weekly">This week</string>
-    <string name="weekly_title">Week of %1$s</string>
-    <!-- A page for practising one technique, from the handbook. -->
-    <string name="focus">Technique practice</string>
-    <string name="solved_focus">%1$s: %2$s</string>
-    <string name="solved_weekly_close">A new weekly page on Sunday.</string>
     <!-- Pages the player typed in. -->
     <string name="imported">Your page</string>
     <string name="imported_beyond_coach">Beyond the Coach</string>
@@ -15,21 +8,18 @@
     <string name="mastery_met">Seen</string>
     <string name="mastery_practised">Practised</string>
     <string name="mastery_mastered">Known</string>
-    <plurals name="mastery_pages">
-        <item quantity="one">%1$d clean page</item>
-        <item quantity="other">%1$d clean pages</item>
-    </plurals>
-    <string name="mastery_next">Next to learn: %1$s</string>
     <string name="solved_found_yourself">%1$s: you found it yourself.</string>
     <string name="coach_missing_mark_title">A pencil mark is missing.</string>
     <string name="coach_missing_mark_look">Check your pencil marks in %1$s.</string>
     <string name="coach_missing_mark_why">Row %1$d, column %2$d can still be %3$d, but your marks there leave it out.</string>
     <string name="coach_missing_mark_answer">Add %3$d back to the marks at row %1$d, column %2$d.</string>
     <string name="coach_add_mark">Add the mark</string>
-    <!-- 10.0: the practice card's one line into the handbook, e.g. "Next: X-Wing". -->
+    <!-- After a practice page: where the technique path goes next, e.g. "Next: X-Wing". -->
     <string name="practice_next">Next: %1$s</string>
     <!-- Where a handbook page is: "8 of 14". -->
     <string name="handbook_position">%1$d of %2$d</string>
     <string name="handbook_previous">Previous page</string>
     <string name="handbook_next">Next page</string>
+    <!-- 9.0's weekly and technique pages, now plain pages. -->
+    <string name="nine_by_nine" translatable="false">9×9</string>
 </resources>

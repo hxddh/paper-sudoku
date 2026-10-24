@@ -44,4 +44,10 @@
     <string name="import_no_solution">這一頁無解。請對照原題檢查數字。</string>
     <string name="import_many_solutions">這一頁不止一個解，教練沒法講解。請對照原題檢查數字。</string>
     <string name="import_shape">這不是一張 9×9 的題。</string>
+    <string name="import_paste">貼上題目</string>
+    <string name="import_paste_none">剪貼簿裡沒有題目。需要 81 個數字，空格用 0 或 . 表示。</string>
+    <string name="import_leave_title">留著這一頁，下次接著抄？</string>
+    <string name="import_leave_body">你填的數字會留在這裡，等你回來。</string>
+    <string name="import_leave_keep">留著</string>
+    <string name="import_leave_discard">不要了</string>
 </resources>

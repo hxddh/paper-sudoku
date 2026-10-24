@@ -54,12 +54,12 @@ class DatabaseMigrationTest {
         }
         val database = SudokuDatabase.create(context, name)
         try {
-            assertEquals(2, database.resultDao().observeCount().first())
-            val stats = database.resultDao().observeStats().first()
-            assertEquals(listOf("classic", "mini"), stats.map { it.mode })
-            // The v1 mini used a hint (the old Coach revealed digits), so it is not a clean best.
-            assertEquals(null, stats.single { it.mode == "mini" }.bestSeconds)
-            assertEquals(600L, stats.single { it.mode == "classic" }.bestSeconds)
+            assertEquals(2, RoomGameStore(database).stampedCount.first())
+            val results = database.resultDao().all()
+            assertEquals(listOf("classic", "mini"), results.map { it.mode }.sorted())
+            // The v1 mini used a hint (the old Coach revealed digits), so it counts as answered.
+            assertEquals(3, results.single { it.mode == "mini" }.coachLevel)
+            assertEquals(0, results.single { it.mode == "classic" }.coachLevel)
         } finally {
             database.close()
         }
@@ -134,7 +134,7 @@ class DatabaseMigrationTest {
         val database = SudokuDatabase.create(context, name)
         try {
             val store = RoomGameStore(database)
-            assertEquals(1, database.resultDao().observeCount().first())
+            assertEquals(1, store.stampedCount.first())
             assertEquals(daily, store.load(daily.spec.key))
             assertEquals(practice, store.load(practice.spec.key))
             assertEquals(listOf(PageSummary.of(daily)), store.dailies(0).first().map { it.copy(updatedAt = 0) })
@@ -157,6 +157,53 @@ class DatabaseMigrationTest {
                 }
             }
             assertTrue(indices.containsAll(setOf("index_saved_games_kind_epochDay", "index_saved_games_kind_solved_updatedAt")))
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun migratesV4DroppingDailiesOnlyOpened() = runBlocking {
+        val opened = GameState.new(Catalog.daily(20_000))
+        val begun = GameState.new(Catalog.daily(20_001)).let { it.select(it.spec.givens.indexOfFirst { v -> v == 0 }).input(2, true) }
+        val noted = GameState.new(Catalog.daily(20_002)).let { it.select(it.spec.givens.indexOfFirst { v -> v == 0 }).toggleNotesMode().input(3, true) }
+        raw(version = 4) {
+            execSQL(
+                "CREATE TABLE IF NOT EXISTS `game_results` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`mode` TEXT NOT NULL, `durationSeconds` INTEGER NOT NULL, `hints` INTEGER NOT NULL, " +
+                    "`completedAt` INTEGER NOT NULL, `puzzleKey` TEXT NOT NULL DEFAULT '', " +
+                    "`difficulty` TEXT NOT NULL DEFAULT '', `coachLevel` INTEGER NOT NULL DEFAULT 0, `epochDay` INTEGER)",
+            )
+            execSQL("CREATE INDEX IF NOT EXISTS `index_game_results_puzzleKey` ON `game_results` (`puzzleKey`)")
+            execSQL(
+                "CREATE TABLE IF NOT EXISTS `saved_games` (`puzzleKey` TEXT NOT NULL, `kind` TEXT NOT NULL, " +
+                    "`difficulty` TEXT NOT NULL, `number` INTEGER, `epochDay` INTEGER, `solved` INTEGER NOT NULL, " +
+                    "`updatedAt` INTEGER NOT NULL, `givens` TEXT NOT NULL DEFAULT '', `grid` TEXT NOT NULL DEFAULT '', " +
+                    "`json` TEXT NOT NULL, PRIMARY KEY(`puzzleKey`))",
+            )
+            execSQL("CREATE INDEX IF NOT EXISTS `index_saved_games_kind_epochDay` ON `saved_games` (`kind`, `epochDay`)")
+            execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_saved_games_kind_solved_updatedAt` " +
+                    "ON `saved_games` (`kind`, `solved`, `updatedAt`)",
+            )
+            for (game in listOf(opened, begun, noted)) {
+                execSQL(
+                    "INSERT INTO saved_games VALUES (?, ?, ?, ?, ?, 0, 7, ?, ?, ?)",
+                    arrayOf<Any?>(
+                        game.spec.key, game.spec.kind.name, game.spec.difficulty.name, game.spec.number,
+                        game.spec.epochDay, game.spec.givens.digits(), game.values.digits(), game.encode(),
+                    ),
+                )
+            }
+        }
+        val database = SudokuDatabase.create(context, name)
+        try {
+            val store = RoomGameStore(database)
+            assertNull(store.load(opened.spec.key))
+            assertEquals(begun, store.load(begun.spec.key))
+            // Pencil marks alone are a begun page, though no digit is written.
+            assertEquals(noted, store.load(noted.spec.key))
+            assertEquals(listOf(noted.spec.key, begun.spec.key), store.dailies(0).first().map { it.key })
         } finally {
             database.close()
         }
@@ -192,7 +239,7 @@ class DatabaseMigrationTest {
             val result = GameResult(next.spec.key, PuzzleKind.Classic, Difficulty.Gentle, 300, 1, 3, 10, null)
             assertTrue(store.saveSolved(next, result, now = 9))
             assertFalse(store.saveSolved(next, result, now = 10))
-            assertEquals(1, database.resultDao().observeCount().first())
+            assertEquals(1, store.stampedCount.first())
             assertEquals(emptyMap<Difficulty, Int>(), store.cleanPractice.first())
             val daily = GameResult(kept.spec.key, PuzzleKind.Daily, Difficulty.Gentle, 50, 0, 0, 11, 101)
             assertTrue(store.saveSolved(kept, daily, now = 11))

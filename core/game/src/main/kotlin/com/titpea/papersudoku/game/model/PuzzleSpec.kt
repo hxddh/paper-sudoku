@@ -84,46 +84,19 @@ object Catalog {
     /** Every practice page dealt at [difficulty] has a key starting with this. */
     fun classicPrefix(difficulty: Difficulty): String = "classic-${difficulty.name.lowercase()}-"
 
-    /** The week's 9×9 page is dealt on Sunday and stays open until the next one. */
+    /**
+     * The week's 9×9 page (9.0) was dealt on Sunday and stayed open until the next one. No longer
+     * dealt; its key still names saved pages, which open and are shown as before.
+     */
     fun weekOf(epochDay: Long): Long = epochDay - Math.floorMod(epochDay + 4, 7L) // 1970-01-04 was a Sunday.
 
     fun weeklyKey(sunday: Long): String = "weekly-$sunday"
 
-    fun dayOfWeekly(key: String): Long? = key.takeIf { it.startsWith("weekly-") }?.removePrefix("weekly-")?.toLongOrNull()
-
-    /** The level the weekly page is dealt at. */
-    val WEEKLY_LEVEL: Difficulty = Difficulty.Steady
-
-    fun weekly(sunday: Long): PuzzleSpec {
-        val generated = PuzzleGenerator(Geometry.Classic).generate(seed(WEEKLY_STREAM, sunday), WEEKLY_LEVEL)
-        return spec(weeklyKey(sunday), PuzzleKind.Weekly, generated, epochDay = sunday)
-    }
-
-    /** Every practice page dealt to practise [technique] has a key starting with this. */
+    /** Every page dealt to practise [technique] (9.0) has a key starting with this. */
     fun focusPrefix(technique: Technique): String = "focus-${technique.name.lowercase()}-"
 
     /** The technique a focus page's key practises, or null for any other key. */
     fun focusTechnique(key: String): Technique? = Technique.entries.firstOrNull { key.startsWith(focusPrefix(it)) }
-
-    /** The level whose pages are graded up to [technique]: where it is taught. */
-    fun focusLevel(technique: Technique): Difficulty = Difficulty.forTier(technique.tier)
-
-    /**
-     * Practice for one technique: the next page at its level that needs it. Each carved page is
-     * checked as it comes, so a technique that is rare at its level (Swordfish needs about one
-     * Deep page in sixteen) costs carves, not whole pages. After [FOCUS_CARVES] without it, the
-     * hardest page carved is dealt anyway: still worth doing.
-     */
-    fun focus(technique: Technique, number: Int): PuzzleSpec {
-        val level = focusLevel(technique)
-        val generated = PuzzleGenerator(Geometry.Classic).generate(
-            seed(FOCUS_STREAM + technique.ordinal, number.toLong()),
-            level,
-            maxAttempts = FOCUS_CARVES,
-            accept = { it.difficulty == level && technique in it.techniques },
-        )
-        return spec(focusPrefix(technique) + number, PuzzleKind.Focus, generated, number = number)
-    }
 
     /**
      * A page typed in by the player: a 9×9 grid with one solution. Graded with the Coach's
@@ -267,12 +240,10 @@ object Catalog {
      * differ by a multiple of it (as `n * constant` did up to 2) replay each other's draws, and a
      * page whose generator retried could deal the same puzzle as a later page.
      */
-    private const val WEEKLY_STREAM = 10L
-    private const val FOCUS_STREAM = 20L
+    // Streams 10 (weekly) and 20 + technique (focus) dealt 9.0's pages: not to be reused.
     private const val PATH_STREAM = 40L
     /** Carves a path page may cost at most, the plain page it falls back to included. */
     internal const val PATH_CARVES = 600
-    private const val FOCUS_CARVES = 600
     /** Fewer than 17 clues never has a single solution. */
     private const val MIN_IMPORT_CLUES = 17
 

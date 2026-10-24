@@ -8,10 +8,15 @@ import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.PuzzleKind
 import androidx.lifecycle.SavedStateHandle
 import com.titpea.papersudoku.game.model.GeneratingPuzzleSource
+import com.titpea.papersudoku.engine.Technique
+import com.titpea.papersudoku.game.model.PuzzleSource
+import com.titpea.papersudoku.game.model.PuzzleSpec
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -699,7 +704,11 @@ class PageViewModelTest {
 
     @Test
     fun `a page restored by its key opens from its save, and a dropped practice page gives way`() = test {
-        val weekly = GameState.new(Catalog.weekly(Catalog.weekOf(today.toEpochDay())))
+        // A 9.0 weekly page: no longer dealt, still opened from its save.
+        val sunday = Catalog.weekOf(today.toEpochDay())
+        val weekly = GameState.new(
+            Catalog.classic(Difficulty.Steady, 0).copy(key = Catalog.weeklyKey(sunday), kind = PuzzleKind.Weekly, number = null, epochDay = sunday),
+        )
         store.save(weekly, 0)
         val handle = SavedStateHandle(mapOf("open_page" to weekly.spec.key))
         val vm = viewModel(savedState = handle)
@@ -711,16 +720,154 @@ class PageViewModelTest {
     }
 
     @Test
-    fun `pages saved only for being opened are forgotten`() = test {
-        store.save(GameState.new(Catalog.daily(today.toEpochDay() - 3)), 0)
-        val begun = GameState.new(Catalog.daily(today.toEpochDay() - 2)).let { g ->
+    fun `today's page read as the app started is the one opened, once`() = test {
+        val read = GameState.new(Catalog.daily(today.toEpochDay())).let { g ->
             val empty = g.spec.givens.indexOfFirst { it == 0 }
             g.select(empty).input(g.spec.solution[empty], true)
         }
-        store.save(begun, 0)
-        viewModel()
+        val vm = PageViewModel(
+            store, settings, clock,
+            ticker = { now },
+            puzzles = GeneratingPuzzleSource(dispatcher),
+            compute = dispatcher,
+            earlyDaily = CompletableDeferred(read),
+        )
         advanceUntilIdle()
-        assertFalse(store.saved.containsKey(Catalog.dailyKey(today.toEpochDay() - 3)))
-        assertTrue(store.saved.containsKey(begun.spec.key))
+        assertEquals(read.values, vm.game().values)
+        // A restored page is opened from its own key; the early read is not used for it.
+        val restored = PageViewModel(
+            store, settings, clock,
+            ticker = { now },
+            puzzles = GeneratingPuzzleSource(dispatcher),
+            savedState = SavedStateHandle(mapOf("open_page" to PageKeys.PRACTICE)),
+            compute = dispatcher,
+            earlyDaily = CompletableDeferred(read),
+        )
+        advanceUntilIdle()
+        assertEquals(PuzzleKind.Classic, restored.game().spec.kind)
+        restored.onEvent(PageEvent.OpenToday)
+        advanceUntilIdle()
+        assertEquals(store.saved.getValue(read.spec.key).first.values, restored.game().values)
+    }
+
+    @Test
+    fun `the loading indicator shows only for a slow page`() = test {
+        val gate = CompletableDeferred<Unit>()
+        val slow = object : PuzzleSource {
+            override suspend fun daily(epochDay: Long): PuzzleSpec {
+                gate.await()
+                return Catalog.daily(epochDay)
+            }
+            override suspend fun classic(difficulty: Difficulty, number: Int): PuzzleSpec = Catalog.classic(difficulty, number)
+            override suspend fun practice(difficulty: Difficulty, number: Int, target: Technique?): PuzzleSpec =
+                Catalog.practice(difficulty, number, target)
+        }
+        val vm = PageViewModel(store, settings, clock, ticker = { now }, puzzles = slow, compute = dispatcher)
+        advanceTimeBy(PageViewModel.LOADING_INDICATOR_DELAY_MILLIS - 100)
+        assertTrue(vm.state.value.loading)
+        assertFalse(vm.state.value.loadingIndicator)
+        advanceTimeBy(200)
+        assertTrue(vm.state.value.loadingIndicator)
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertFalse(vm.state.value.loading)
+        assertFalse(vm.state.value.loadingIndicator)
+    }
+
+    @Test
+    fun `a digit pressed on a printed digit shows where it is and picks nothing up`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        val spec = vm.game().spec
+        val given = spec.givens.indexOfFirst { it != 0 }
+        vm.onEvent(PageEvent.Tap(given))
+        vm.onEvent(PageEvent.Digit(3))
+        assertNull(vm.game().lockedDigit)
+        assertEquals(3, vm.state.value.peek)
+        // The same key again hides it; anything else the player does ends it too.
+        vm.onEvent(PageEvent.Digit(3))
+        assertNull(vm.state.value.peek)
+        vm.onEvent(PageEvent.Digit(4))
+        vm.onEvent(PageEvent.ToggleNotes)
+        assertNull(vm.state.value.peek)
+    }
+
+    @Test
+    fun `tapping the selected cell again lets go of it, and then a digit is picked up`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        val spec = vm.game().spec
+        val given = spec.givens.indexOfFirst { it != 0 }
+        vm.onEvent(PageEvent.Tap(given))
+        vm.onEvent(PageEvent.Tap(given))
+        assertNull(vm.game().selected)
+        vm.onEvent(PageEvent.Digit(2))
+        assertEquals(2, vm.game().lockedDigit)
+        assertEquals(com.titpea.papersudoku.data.FirstHint.PickUp, vm.state.value.firstHint)
+    }
+
+    @Test
+    fun `the Coach's note stays with the keys until its cell is written`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.Coach)
+        val hint = checkNotNull(vm.state.value.coach).hint as CoachHint.Next
+        val target = hint.placement.index
+        val spec = vm.game().spec
+        val other = spec.givens.indices.first { spec.givens[it] == 0 && it != target }
+        // Choosing cells, the pencil and a pencil mark leave the note and its marks on the board.
+        vm.onEvent(PageEvent.Tap(other))
+        vm.onEvent(PageEvent.ToggleNotes)
+        vm.onEvent(PageEvent.Digit(1))
+        vm.onEvent(PageEvent.ToggleNotes)
+        assertEquals(hint, vm.state.value.coach?.hint)
+        // The right digit in its cell is the step done: the note goes by itself, the page clean.
+        vm.onEvent(PageEvent.Tap(target))
+        vm.onEvent(PageEvent.Digit(hint.placement.digit))
+        assertEquals(hint.placement.digit, vm.game().values[target])
+        assertNull(vm.state.value.coach)
+        assertEquals(1, vm.game().coach.deepest)
+    }
+
+    @Test
+    fun `a digit written elsewhere ends the Coach's note`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.Coach)
+        val target = (checkNotNull(vm.state.value.coach).hint as CoachHint.Next).placement.index
+        val spec = vm.game().spec
+        val other = spec.givens.indices.first { spec.givens[it] == 0 && it != target }
+        vm.onEvent(PageEvent.Tap(other))
+        vm.onEvent(PageEvent.Digit(spec.solution[other]))
+        assertNull(vm.state.value.coach)
+    }
+
+    @Test
+    fun `asking again for the same step keeps the note as far as it went`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.Coach)
+        vm.onEvent(PageEvent.CoachDeeper)
+        assertEquals(2, vm.state.value.coach?.level)
+        vm.onEvent(PageEvent.Coach)
+        assertEquals(2, vm.state.value.coach?.level)
+        assertEquals(1, vm.game().coach.asks)
+    }
+
+    @Test
+    fun `each first-time hint is shown once`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.ToggleNotes)
+        assertEquals(com.titpea.papersudoku.data.FirstHint.Pencil, vm.state.value.firstHint)
+        assertTrue(com.titpea.papersudoku.data.FirstHint.Pencil in settings.flow.value.hintsSeen)
+        vm.onEvent(PageEvent.ToggleNotes)
+        assertNull(vm.state.value.firstHint)
+        vm.onEvent(PageEvent.ToggleNotes)
+        assertNull(vm.state.value.firstHint)
+        vm.onEvent(PageEvent.Coach)
+        assertEquals(com.titpea.papersudoku.data.FirstHint.Coach, vm.state.value.firstHint)
+        vm.onEvent(PageEvent.DismissCoach)
+        assertNull(vm.state.value.firstHint)
     }
 }

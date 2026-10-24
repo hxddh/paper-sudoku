@@ -1,121 +1,139 @@
 package com.titpea.papersudoku.page
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.customActions
-import androidx.compose.ui.semantics.toggleableState
-import androidx.compose.ui.state.ToggleableState
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ButtonGroup
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.HorizontalFloatingToolbar
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
+import com.titpea.papersudoku.designsystem.Alpha
 import com.titpea.papersudoku.designsystem.FrauncesPrinted
+import com.titpea.papersudoku.designsystem.PaperTheme
+import com.titpea.papersudoku.designsystem.SheetShape
+import com.titpea.papersudoku.designsystem.Space
 import com.titpea.papersudoku.game.model.GameState
 
 val KeyHeight: Dp = 56.dp
-val ToolbarHeight: Dp = 64.dp
 
-/** Height of the keypad for a board size: one row for 6×6, two rows for 9×9. */
-fun keypadHeight(size: Int): Dp = if (size == 6) KeyHeight else KeyHeight * 2 + 8.dp
+/** The quiet line over the keys: what the pen is doing, and the three tools. A 48dp target. */
+val StatusHeight: Dp = 48.dp
 
 /**
- * The three tools in a Material 3 Expressive floating toolbar: undo, the pencil (a toggle, in ink
- * blue when on; held on a 9×9 page, it pencils in every candidate) and the Coach. All three are
- * equally quiet: the page leads, and red stays for the Coach's own marks and the held digit.
+ * Room above the status line, at rest, for a one-line hint or the Coach's note. The board is sized
+ * with it reserved, so the note never moves the board; a longer note uses the spare height above
+ * it, and scrolls when even that is not enough.
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+val NoteSlotHeight: Dp = 64.dp
+
+/** The solved note and the read-back panel need at least this. */
+private val NoteMinHeight: Dp = 176.dp
+
+/** Height of the keypad for a board size: one row for 6×6, two rows for 9×9. */
+fun keypadHeight(size: Int): Dp = if (size == 6) KeyHeight else KeyHeight * 2 + Space.S
+
+/**
+ * The work area's height under the board (the note's room, the status line, the keys); the solved
+ * note and the read-back panel take the same. It grows with large text, up to 130%, rather than
+ * squeeze the words; the board takes the rest.
+ */
+fun workAreaHeight(size: Int, fontScale: Float): Dp {
+    val scale = fontScale.coerceIn(1f, 1.3f)
+    return maxOf(NoteMinHeight * scale, NoteSlotHeight * scale + StatusHeight + keypadHeight(size))
+}
+
+/**
+ * The three tools as bare icons at the end of the status line: undo, the pencil (a toggle: pen
+ * blue and underlined when on) and the Coach. All three are equally quiet: the page leads, and red
+ * stays for the Coach's own marks and the held digit.
+ */
 @Composable
-fun PageToolbar(
+fun PageTools(
     game: GameState,
     onEvent: (PageEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    HorizontalFloatingToolbar(
-        expanded = true,
-        modifier = modifier.testTag("toolbar"),
-    ) {
-        IconButton(
-            onClick = { onEvent(PageEvent.Undo) },
-            enabled = game.history.isNotEmpty(),
-            modifier = Modifier.testTag("tool-undo"),
-        ) { Icon(painterResource(R.drawable.ic_undo), contentDescription = stringResource(R.string.undo)) }
-        PencilButton(
-            on = game.notesMode,
-            // Pencilling in every candidate is for 9×9 pages; a 6×6 page is quick to mark by hand.
-            canFill = game.size == 9 && !game.solved,
-            onToggle = { onEvent(PageEvent.ToggleNotes) },
-            onFill = { onEvent(PageEvent.FillCandidates) },
-        )
-        IconButton(
-            onClick = { onEvent(PageEvent.Coach) },
-            modifier = Modifier.testTag("coach-action"),
-        ) { Icon(painterResource(R.drawable.ic_coach), contentDescription = stringResource(R.string.coach)) }
+    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
+        Row(modifier.testTag("toolbar"), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = { onEvent(PageEvent.Undo) },
+                enabled = game.history.isNotEmpty(),
+                modifier = Modifier.testTag("tool-undo"),
+            ) { Icon(painterResource(R.drawable.ic_undo), contentDescription = stringResource(R.string.undo)) }
+            PencilButton(
+                on = game.notesMode,
+                // Pencilling in every candidate is for 9×9 pages; a 6×6 page is quick to mark by hand.
+                canFill = game.size == 9 && !game.solved,
+                onToggle = { onEvent(PageEvent.ToggleNotes) },
+                onFill = { onEvent(PageEvent.FillCandidates) },
+            )
+            IconButton(
+                onClick = { onEvent(PageEvent.Coach) },
+                modifier = Modifier.testTag("coach-action"),
+            ) { Icon(painterResource(R.drawable.ic_coach), contentDescription = stringResource(R.string.coach)) }
+        }
     }
 }
 
 /**
- * The pencil: a tap switches it, a long press (or TalkBack's action) pencils in every candidate.
- * Drawn like an icon toggle button: ink-blue container when on.
+ * The pencil: a tap switches it. On a 9×9 page in pencil, "Fill every candidate" is a visible
+ * action on the status line; a long press here (and TalkBack's action) does the same.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PencilButton(on: Boolean, canFill: Boolean, onToggle: () -> Unit, onFill: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
     val haptics = LocalHapticFeedback.current
     val fillLabel = stringResource(R.string.fill_candidates)
     val interaction = remember { MutableInteractionSource() }
+    val tint = if (on) PaperTheme.ink.pen else MaterialTheme.colorScheme.onSurfaceVariant
     Box(
         Modifier
             .size(48.dp)
-            .padding(4.dp)
             .clip(CircleShape)
-            .background(if (on) colors.secondaryContainer else Color.Transparent)
             .combinedClickable(
                 interactionSource = interaction,
                 indication = ripple(),
@@ -139,18 +157,24 @@ private fun PencilButton(on: Boolean, canFill: Boolean, onToggle: () -> Unit, on
             .testTag("tool-notes"),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            painterResource(R.drawable.ic_pencil),
-            contentDescription = stringResource(R.string.notes),
-            tint = if (on) colors.onSecondaryContainer else colors.onSurfaceVariant,
-        )
+        Icon(painterResource(R.drawable.ic_pencil), contentDescription = stringResource(R.string.notes), tint = tint)
+        // On is said by shape as well as colour: a short pen-blue rule under the pencil.
+        if (on) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = Space.S)
+                    .size(width = 16.dp, height = 2.dp)
+                    .background(tint),
+            )
+        }
     }
 }
 
 /**
- * Digits as a connected expressive button group, with Erase as the last key: 5 + 5 for 9×9, one
- * row of seven for 6×6. With nothing to write into, a tap picks the digit up (digit-first);
- * finished digits shrink to a check but keep their place.
+ * Paper keys in one row (6×6: six digits and Erase) or two (9×9: 5 + 5, Erase last). With no
+ * cell chosen, a tap picks the digit up (digit-first); finished digits turn into a check but keep
+ * their place. A key keeps its shape: a press is a tint, nothing moves.
  */
 @Composable
 fun Keypad(
@@ -165,79 +189,36 @@ fun Keypad(
     val remaining = game.remaining
     // Digits run 1 → 9 left to right in every language, like the board.
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-    Column(
-        modifier = modifier.fillMaxWidth().testTag("keypad"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        for (row in rows) {
-            val digits = row
-            val sources = remember(row) { List(digits.size) { MutableInteractionSource() } }
-            ButtonGroup(
-                // Every key always fits; an overflow button would add an unlabeled node.
-                overflowIndicator = {},
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                val groupScope = this
-                digits.forEachIndexed { i, digit ->
-                    if (digit == 0) {
-                        customItem(
-                            buttonGroupContent = {
-                                EraseKey(
-                                    interactionSource = sources[i],
-                                    onClick = { onEvent(PageEvent.Erase) },
-                                    modifier = with(groupScope) { Modifier.weight(1f).animateWidth(sources[i]) },
-                                )
-                            },
-                            menuContent = { menuState ->
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.erase)) },
-                                    onClick = {
-                                        onEvent(PageEvent.Erase)
-                                        menuState.dismiss()
-                                    },
-                                )
-                            },
-                        )
-                        return@forEachIndexed
-                    }
-                    customItem(
-                        buttonGroupContent = {
-                            val done = counts && remaining[digit] <= 0
-                            val weight by animateFloatAsState(if (done && game.lockedDigit != digit) 0.55f else 1f, MaterialTheme.motionScheme.defaultSpatialSpec(), label = "key-weight")
+        Column(
+            modifier = modifier.fillMaxWidth().testTag("keypad"),
+            verticalArrangement = Arrangement.spacedBy(Space.S),
+        ) {
+            for (row in rows) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.XS)) {
+                    for (digit in row) {
+                        if (digit == 0) {
+                            EraseKey(onClick = { onEvent(PageEvent.Erase) }, modifier = Modifier.weight(1f))
+                        } else {
                             DigitKey(
                                 digit = digit,
                                 left = if (counts) remaining[digit] else null,
                                 held = game.lockedDigit == digit,
                                 pencil = game.notesMode,
-                                first = i == 0,
-                                // In a row that ends with Erase, the digits' outer edge is inside.
-                                last = i == digits.lastIndex,
-                                interactionSource = sources[i],
                                 onClick = { onEvent(PageEvent.Digit(digit)) },
-                                modifier = with(groupScope) {
-                                    Modifier
-                                        .weight(weight)
-                                        .animateWidth(sources[i])
-                                },
+                                modifier = Modifier.weight(1f),
                             )
-                        },
-                        menuContent = { menuState ->
-                            DropdownMenuItem(
-                                text = { Text(digit.toString()) },
-                                onClick = {
-                                    onEvent(PageEvent.Digit(digit))
-                                    menuState.dismiss()
-                                },
-                            )
-                        },
-                    )
+                        }
+                    }
                 }
             }
         }
     }
-    }
 }
+
+/** A key's paper, a wash of ink deeper while pressed: the press is a tint only. */
+@Composable
+private fun keyPaper(base: Color, pressed: Boolean): Color =
+    if (pressed) MaterialTheme.colorScheme.onSurface.copy(alpha = Alpha.Wash).compositeOver(base) else base
 
 @Composable
 private fun DigitKey(
@@ -246,33 +227,19 @@ private fun DigitKey(
     left: Int?,
     held: Boolean,
     pencil: Boolean,
-    first: Boolean,
-    last: Boolean,
-    interactionSource: MutableInteractionSource,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
+    val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    // Connected group: outer corners round, inner corners tight; pressing rounds a key fully.
-    val outer by animateDpAsState(if (pressed || held) 28.dp else 20.dp, MaterialTheme.motionScheme.fastSpatialSpec(), label = "key-outer")
-    val inner by animateDpAsState(if (pressed || held) 28.dp else 6.dp, MaterialTheme.motionScheme.fastSpatialSpec(), label = "key-inner")
-    val shape = RoundedCornerShape(
-        topStart = if (first) outer else inner,
-        bottomStart = if (first) outer else inner,
-        topEnd = if (last) outer else inner,
-        bottomEnd = if (last) outer else inner,
-    )
     val done = left != null && left <= 0
-    // Paper keys with printed ink; the held digit is the one red key. In pencil mode the digits
-    // are smaller and in the pencil's ink blue, so the mode reads as a mode, not as disabled keys.
-    val container = when {
-        held -> colors.primary
-        pencil -> colors.surfaceContainer
-        else -> colors.surfaceContainerHigh
-    }
+    // Paper keys with printed ink. The held digit is terracotta on its paper key, underlined; in
+    // pencil mode the digits are smaller and in the pen's blue, so the mode reads as a mode, not
+    // as disabled keys.
+    val paper = if (pencil && !held) colors.surfaceContainer else colors.surfaceContainerHigh
     val content = when {
-        held -> colors.onPrimary
+        held -> colors.primary
         pencil -> colors.secondary
         else -> colors.onSurface
     }
@@ -286,14 +253,11 @@ private fun DigitKey(
     Box(
         modifier = modifier
             .height(KeyHeight)
-            // Seven 6×6 keys share (width − 24dp margins − 18dp gaps): 45dp on a 360dp phone, 48dp
-            // from 378dp; they are 56dp tall.
-            .widthIn(min = 44.dp)
-            .clip(shape)
-            .background(container)
+            .clip(SheetShape)
+            .background(keyPaper(paper, pressed))
             .clickable(
                 interactionSource = interactionSource,
-                indication = ripple(),
+                indication = null,
                 role = Role.Button,
                 onClick = onClick,
             )
@@ -323,31 +287,33 @@ private fun DigitKey(
                 ),
             )
         }
+        if (held) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = Space.S)
+                    .width(20.dp)
+                    .height(2.dp)
+                    .background(colors.primary),
+            )
+        }
     }
 }
 
-/** The last key: erases the selected cell. Rounded on its outer edge like the group's end. */
+/** The last key: erases the selected cell. The same paper as the digits: one row of keys. */
 @Composable
-private fun EraseKey(
-    interactionSource: MutableInteractionSource,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun EraseKey(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
+    val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val outer by animateDpAsState(if (pressed) 28.dp else 20.dp, MaterialTheme.motionScheme.fastSpatialSpec(), label = "erase-outer")
-    val inner by animateDpAsState(if (pressed) 28.dp else 6.dp, MaterialTheme.motionScheme.fastSpatialSpec(), label = "erase-inner")
-    val shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer)
     Box(
         modifier = modifier
             .height(KeyHeight)
-            .widthIn(min = 44.dp)
-            .clip(shape)
-            // The same paper as the digit keys: one row of keys, not a disabled one at the end.
-            .background(colors.surfaceContainerHigh)
+            .clip(SheetShape)
+            .background(keyPaper(colors.surfaceContainerHigh, pressed))
             .clickable(
                 interactionSource = interactionSource,
-                indication = ripple(),
+                indication = null,
                 role = Role.Button,
                 onClick = onClick,
             )

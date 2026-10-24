@@ -36,8 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 
 /**
- * A rubber ink stamp: double ring, a dashed inner band, and two short lines of text. When
- * [animate] is true it lands with a short overshoot, like a hand pressing it onto the page.
+ * A rubber ink stamp: double ring, a dashed inner band, and its word ([caption] under it, if
+ * any). When [animate] is true it is pressed onto the page: from 1.06 to rest, without a bounce.
  *
  * It is ink on the page, not a sticker over it: it multiplies into the paper (screens on the night
  * page), so the digits beneath show through. [seed] (the page) sets its slight tilt and offset, so
@@ -46,8 +46,9 @@ import androidx.compose.ui.unit.em
 @Composable
 fun InkStamp(
     title: String,
-    caption: String,
     modifier: Modifier = Modifier,
+    /** A second, smaller line; the page's stamp has none (the note beside it says the time). */
+    caption: String? = null,
     color: Color = MaterialTheme.colorScheme.primary,
     size: Dp = 168.dp,
     animate: Boolean = true,
@@ -63,12 +64,13 @@ fun InkStamp(
     // Landed once, landed for good: the flag survives rotation, so a turned phone never stamps
     // the page a second time.
     var landed by rememberSaveable { mutableStateOf(!animate) }
-    val scale = remember { Animatable(if (landed) 1f else 1.6f) }
+    val scale = remember { Animatable(if (landed) 1f else 1.06f) }
     val alpha = remember { Animatable(if (landed) 1f else 0f) }
     LaunchedEffect(Unit) {
         if (landed) return@LaunchedEffect
         launch { alpha.animateTo(1f, spring(stiffness = Spring.StiffnessMedium)) }
-        scale.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow))
+        // Pressed, not dropped: critically damped, so it never springs back past the page.
+        scale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium))
         landed = true
         onLanded()
     }
@@ -78,7 +80,7 @@ fun InkStamp(
             .graphicsLayer {
                 scaleX = scale.value
                 scaleY = scale.value
-                this.alpha = alpha.value * 0.88f
+                this.alpha = alpha.value
                 rotationZ = tilt
                 translationX = nudgeX.dp.toPx()
                 translationY = nudgeY.dp.toPx()
@@ -122,14 +124,16 @@ fun InkStamp(
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )
-            Text(
-                text = caption,
-                color = color,
-                style = TextStyle(fontFamily = FrauncesDisplay, fontFeatureSettings = "lnum, tnum"),
-                fontSize = with(density) { (size / 12f).toSp() },
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-            )
+            if (caption != null) {
+                Text(
+                    text = caption,
+                    color = color,
+                    style = TextStyle(fontFamily = FrauncesDisplay, fontFeatureSettings = "lnum, tnum"),
+                    fontSize = with(density) { (size / 9f).toSp() },
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }

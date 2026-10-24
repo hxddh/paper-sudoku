@@ -1,14 +1,15 @@
 package com.titpea.papersudoku.page
 
 import androidx.activity.compose.PredictiveBackHandler
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.OutlinedButton
+import com.titpea.papersudoku.data.FirstHint
+import com.titpea.papersudoku.designsystem.Hairline
+import com.titpea.papersudoku.designsystem.SheetShape
+import com.titpea.papersudoku.designsystem.Space
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,7 +37,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -62,7 +62,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -100,19 +99,14 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
-import com.titpea.papersudoku.engine.Difficulty
-import com.titpea.papersudoku.designsystem.FrauncesPrinted
 import com.titpea.papersudoku.designsystem.InkStamp
 import com.titpea.papersudoku.designsystem.PaperTheme
 import com.titpea.papersudoku.game.model.GameState
+import com.titpea.papersudoku.game.model.Mastery
+import com.titpea.papersudoku.game.model.Path as TechniquePath
 import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.PuzzleKind
 import com.titpea.papersudoku.game.model.PuzzleSpec
@@ -124,21 +118,16 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.util.Locale
 
-private enum class WorkMode { Play, Coach, Solved }
-
-/** Minimum height of the work area under the board; the Coach and the solved note use the same. */
-private val NoteHeight: Dp = 176.dp
-
-/** The quiet line between the tools and the keys; a 48dp target when it is a button. */
-private val StatusHeight: Dp = 48.dp
-
 /** How long the stamp takes to land; then the page stops asking for it to land again. */
 private const val STAMP_LANDING_MILLIS = 1_200L
 
 /**
- * One page: a slim header, the board as large as the window allows, and the work area — tools,
- * the Coach's margin note, or the solved note — which always keeps the same size so the page never
- * jumps. On a window clearly wider than tall the work area sits beside the board.
+ * One page: a slim header, the board a fixed 16dp under it and as large as the window allows, and
+ * the work area: the status line with the tools, the keys, and above them the room for a hint or
+ * the Coach's note (or, once solved, the solved note). The board is sized with the work area
+ * reserved, so nothing the work area shows moves it; spare height goes between the board and the
+ * work area. On a window clearly wider than tall the work area sits beside the board, the keys'
+ * foot on the board's foot.
  *
  * [onBack] is null when the notebook is already visible next to the page.
  */
@@ -204,6 +193,7 @@ fun PageScreen(
         ) {
             val wide = maxWidth > maxHeight && maxWidth >= 560.dp
             val panel = (maxWidth * 0.4f).coerceIn(320.dp, 440.dp)
+            val work = workAreaHeight(game?.size ?: 9, LocalDensity.current.fontScale)
             val header = @Composable {
                 PageHeader(
                     state = state,
@@ -220,69 +210,67 @@ fun PageScreen(
                 )
             }
             val focusRing = if (pageFocused && keyboardMode) {
-                Modifier.border(2.dp, MaterialTheme.colorScheme.secondary, MaterialTheme.shapes.small)
+                Modifier.border(2.dp, MaterialTheme.colorScheme.secondary, SheetShape)
             } else {
                 Modifier
+            }
+            val board = boardModifier.then(focusRing).onGloballyPositioned { boardBounds = it.boundsInRoot() }
+            val workArea = @Composable { modifier: Modifier ->
+                WorkArea(
+                    state, onEvent, onBack, onPrint, onShare, coachBack,
+                    noteModifier = Modifier.onGloballyPositioned { noteBounds = it.boundsInRoot() },
+                    modifier = modifier,
+                    onReadBack = onReadBack,
+                )
             }
             if (wide) {
                 Row(
                     Modifier
                         .fillMaxSize()
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Space.XL),
                 ) {
-                    BoardArea(
-                        state, onEvent,
+                    // Against the panel, its foot on the keys' foot, so board and tools read as one spread.
+                    BoxWithConstraints(
                         Modifier
                             .weight(1f)
                             .fillMaxHeight()
                             .windowInsetsPadding(WindowInsets.statusBars)
-                            .padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
-                        boardModifier.then(focusRing).onGloballyPositioned { boardBounds = it.boundsInRoot() },
-                        // Against the panel, so board and tools read as one spread.
-                        alignment = Alignment.CenterEnd,
-                    )
+                            .padding(start = Space.L, top = Space.BoardTop, bottom = Space.L),
+                        contentAlignment = Alignment.BottomEnd,
+                    ) {
+                        val side = minOf(maxWidth, maxHeight).coerceAtMost(720.dp)
+                        BoardArea(state, onEvent, Modifier.size(side), board)
+                    }
                     // The keys keep clear of the screen edge and its back gesture.
-                    Column(Modifier.width(panel).fillMaxHeight().padding(end = 24.dp)) {
+                    Column(Modifier.width(panel).fillMaxHeight().padding(end = Space.S, bottom = Space.L)) {
                         header()
-                        Column(
-                            Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            WorkArea(
-                                state, onEvent, onBack, onPrint, onShare, coachBack,
-                                Modifier.onGloballyPositioned { noteBounds = it.boundsInRoot() },
-                                onReadBack = onReadBack,
-                            )
-                        }
+                        workArea(Modifier.weight(1f).fillMaxWidth())
                     }
                 }
             } else Column(Modifier.fillMaxSize()) {
                 header()
-                val content = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
-                // 9×9 cells need the width; the board itself keeps its edges from the back gesture.
-                val boardPadding = if (game?.size == 9) 8.dp else 12.dp
-                Column(content, horizontalAlignment = Alignment.CenterHorizontally) {
-                    BoardArea(
-                        state, onEvent,
-                        Modifier.weight(1f).fillMaxWidth().widthIn(max = 720.dp).padding(horizontal = boardPadding),
-                        boardModifier.then(focusRing).onGloballyPositioned { boardBounds = it.boundsInRoot() },
-                        // Most of the spare height above the board, so it sits near the hand.
-                        alignment = BiasAlignment(0f, 0.4f),
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    WorkArea(
-                        state, onEvent, onBack, onPrint, onShare, coachBack,
-                        Modifier
-                            .widthIn(max = 640.dp)
-                            .padding(horizontal = 12.dp)
-                            .padding(bottom = 12.dp)
-                            .onGloballyPositioned { noteBounds = it.boundsInRoot() },
-                        onReadBack = onReadBack,
-                    )
+                BoxWithConstraints(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)),
+                ) {
+                    // The board's edge is the page margin, where the text edge and the keys line up;
+                    // its size leaves the work area its room, whatever the work area shows.
+                    val side = minOf(maxWidth - Space.Margin * 2, maxHeight - Space.BoardTop - work - Space.L, 720.dp)
+                        .coerceAtLeast(0.dp)
+                    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Spacer(Modifier.height(Space.BoardTop))
+                        BoardArea(state, onEvent, Modifier.size(side), board)
+                        workArea(
+                            Modifier
+                                .weight(1f)
+                                .widthIn(max = 640.dp)
+                                .fillMaxWidth()
+                                .padding(bottom = Space.L),
+                        )
+                    }
                 }
             }
 
@@ -329,6 +317,7 @@ fun PageScreen(
     }
 }
 
+/** The board at its size, the stamp on it once solved. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun BoardArea(
@@ -336,60 +325,66 @@ private fun BoardArea(
     onEvent: (PageEvent) -> Unit,
     modifier: Modifier,
     boardModifier: Modifier,
-    alignment: Alignment,
 ) {
     val haptics = LocalHapticFeedback.current
-    BoxWithConstraints(modifier, contentAlignment = alignment) {
-        val side = minOf(maxWidth, maxHeight).coerceAtMost(720.dp)
-        Box(Modifier.size(side), contentAlignment = Alignment.Center) {
-            val game = state.game
-            if (game != null) {
-                val marks = remember(game.values, state.coach) {
-                    coachMarks(game.spec.geometry, game.values, state.coach)
+    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+        val side = minOf(maxWidth, maxHeight)
+        val game = state.game
+        if (game != null) {
+            val marks = remember(game.values, state.coach) {
+                coachMarks(game.spec.geometry, game.values, state.coach)
+            }
+            // A digit pressed on a printed digit shows where it is, as a held digit would, with
+            // nothing held: the board draws it as its highlighted digit.
+            val peek = state.peek
+            val shown = remember(game, peek) { if (peek != null && game.lockedDigit == null) game.copy(lockedDigit = peek) else game }
+            Board(
+                game = shown,
+                conflicts = state.conflicts,
+                marks = marks,
+                onTap = { onEvent(PageEvent.Tap(it)) },
+                onCellAction = { index, action ->
+                    onEvent(PageEvent.Select(index))
+                    onEvent(
+                        when (action) {
+                            BoardAction.Erase -> PageEvent.Erase
+                        },
+                    )
+                },
+                onAimMove = { haptics.performHapticFeedback(HapticFeedbackType.SegmentTick) },
+                modifier = Modifier.fillMaxSize().then(boardModifier),
+            )
+            if (game.solved) {
+                if (state.justSolved) {
+                    LaunchedEffect(game.spec.key) {
+                        delay(STAMP_LANDING_MILLIS)
+                        onEvent(PageEvent.StampLanded)
+                    }
                 }
-                Board(
-                    game = game,
-                    conflicts = state.conflicts,
-                    marks = marks,
-                    onTap = { onEvent(PageEvent.Tap(it)) },
-                    onCellAction = { index, action ->
-                        onEvent(PageEvent.Select(index))
-                        onEvent(
-                            when (action) {
-                                BoardAction.Erase -> PageEvent.Erase
-                            },
-                        )
-                    },
-                    onAimMove = { haptics.performHapticFeedback(HapticFeedbackType.SegmentTick) },
-                    modifier = Modifier.fillMaxSize().then(boardModifier),
-                )
-                if (game.solved) {
-                    if (state.justSolved) {
-                        LaunchedEffect(game.spec.key) {
-                            delay(STAMP_LANDING_MILLIS)
-                            onEvent(PageEvent.StampLanded)
-                        }
-                    }
-                    // One stamp per page: its landed state belongs to this page, not to the slot.
-                    key(game.spec.key) {
-                        InkStamp(
-                            title = stringResource(R.string.stamp_title),
-                            caption = formatElapsed(game.elapsedMillis / 1_000),
-                            animate = state.justSolved,
-                            size = (side * 0.5f).coerceAtMost(220.dp),
-                            seed = game.spec.key.hashCode(),
-                            // The hand feels the stamp land, not only the last digit.
-                            onLanded = { haptics.performHapticFeedback(HapticFeedbackType.Confirm) },
-                            modifier = Modifier.testTag("solved-stamp"),
-                        )
-                    }
+                // One stamp per page: its landed state belongs to this page, not to the slot. The
+                // time is on the solved note, in words; the stamp is the word alone.
+                key(game.spec.key) {
+                    InkStamp(
+                        title = stringResource(R.string.stamp_title),
+                        animate = state.justSolved,
+                        size = (side * 0.5f).coerceAtMost(220.dp),
+                        seed = game.spec.key.hashCode(),
+                        // The hand feels the stamp land, not only the last digit.
+                        onLanded = { haptics.performHapticFeedback(HapticFeedbackType.Confirm) },
+                        modifier = Modifier.testTag("solved-stamp"),
+                    )
                 }
             }
-            if (state.loading) LoadingIndicator(Modifier.testTag("loading"))
         }
+        if (state.loadingIndicator) LoadingIndicator(Modifier.testTag("loading"))
     }
 }
 
+/**
+ * Under the board: the room for a hint or the Coach's note, the status line with the tools, and
+ * the keys, which stay in use while the note is up; once solved, the solved note in their place.
+ * One height whatever it shows ([modifier] gives it), so the page never jumps.
+ */
 @Composable
 private fun WorkArea(
     state: PageUiState,
@@ -398,27 +393,17 @@ private fun WorkArea(
     onPrint: (GameState) -> Unit,
     onShare: (GameState) -> Unit,
     coachBack: Animatable<Float, AnimationVector1D>,
-    modifier: Modifier = Modifier,
+    noteModifier: Modifier,
+    modifier: Modifier,
     onReadBack: ((GameState) -> Unit)? = null,
 ) {
     val game = state.game ?: return
-    // The note leaving keeps its words while it fades, though the session has already ended.
-    var lastCoach by remember { mutableStateOf(state.coach) }
-    if (state.coach != null) lastCoach = state.coach
     val scope = rememberCoroutineScope()
-    val mode = when {
-        game.solved -> WorkMode.Solved
-        state.coach != null -> WorkMode.Coach
-        else -> WorkMode.Play
-    }
-    // The work area keeps one height so the page does not jump between tools, Coach and solved note.
-    // With large text it may grow, and the note scrolls, rather than squeezing the board.
-    val fontScale = LocalDensity.current.fontScale.coerceIn(1f, 1.3f)
-    val height = maxOf(NoteHeight * fontScale, ToolbarHeight + StatusHeight + keypadHeight(game.size))
+    val coach = state.coach
 
-    // Predictive back: the note shrinks with the gesture; on commit it fades from where the
-    // finger left it, and a cancelled gesture eases it back.
-    PredictiveBackHandler(enabled = mode == WorkMode.Coach) { progress ->
+    // Predictive back: the note shrinks with the gesture; on commit it goes from where the finger
+    // left it, and a cancelled gesture eases it back.
+    PredictiveBackHandler(enabled = coach != null && !game.solved) { progress ->
         try {
             progress.collect { coachBack.snapTo(it.progress) }
             onEvent(PageEvent.DismissCoach)
@@ -428,108 +413,135 @@ private fun WorkArea(
         }
     }
 
-    // Tools, note and solved note trade places along a short vertical axis, on the theme's motion.
-    val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val rise = with(LocalDensity.current) { 16.dp.roundToPx() }
-    AnimatedContent(
-        targetState = mode,
-        transitionSpec = { (fadeIn(effects) + slideInVertically(spatial) { rise }) togetherWith fadeOut(effects) },
-        modifier = modifier.fillMaxWidth().heightIn(min = height).testTag("work-area"),
-        label = "work-area",
-    ) { target ->
-        when (target) {
-            WorkMode.Play -> Column(
-                Modifier.fillMaxWidth().heightIn(min = height),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Bottom,
-            ) {
-                PageToolbar(game, onEvent)
-                StatusLine(game, onEvent, showHint = !state.settings.wroteFirstDigit)
-                Keypad(game, onEvent)
-            }
-            WorkMode.Coach -> (state.coach ?: lastCoach)?.let { coach ->
-                MarginNote(
-                    coach = coach,
-                    geometry = game.spec.geometry,
-                    onEvent = onEvent,
-                    learner = state.settings.learner,
-                    // The tools' height at normal sizes; with large text the note grows to show it all.
-                    modifier = Modifier.fillMaxWidth().heightIn(min = height).graphicsLayer {
-                        val s = 1f - 0.06f * coachBack.value
-                        scaleX = s
-                        scaleY = s
-                        alpha = 1f - 0.4f * coachBack.value
-                    },
-                )
-            } ?: Spacer(Modifier)
-            WorkMode.Solved -> {
-                SolvedNote(
-                    game = game,
-                    outlook = solvedOutlook(game, state),
-                    onShare = { onShare(game) },
-                    onPrint = { onPrint(game) },
-                    onReadBack = onReadBack?.takeIf { game.moves.isNotEmpty() }?.let { read -> { read(game) } },
-                    onNext = {
-                        when {
-                            game.spec.kind == PuzzleKind.Classic -> onEvent(PageEvent.NextPractice)
-                            onBack != null -> onBack()
-                            else -> onEvent(PageEvent.OpenPractice)
-                        }
-                    },
-                    nextLabel = when {
-                        game.spec.kind == PuzzleKind.Classic -> stringResource(R.string.solved_next_practice)
-                        onBack != null -> stringResource(R.string.solved_back_to_notebook)
-                        else -> stringResource(R.string.solved_open_practice)
-                    },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = height),
-                )
+    if (game.solved) {
+        SolvedNote(
+            game = game,
+            outlook = solvedOutlook(game, state),
+            onShare = { onShare(game) },
+            onPrint = { onPrint(game) },
+            onReadBack = onReadBack?.takeIf { game.moves.isNotEmpty() }?.let { read -> { read(game) } },
+            onNext = {
+                when {
+                    game.spec.kind == PuzzleKind.Classic -> onEvent(PageEvent.NextPractice)
+                    onBack != null -> onBack()
+                    else -> onEvent(PageEvent.OpenPractice)
+                }
+            },
+            nextLabel = when {
+                game.spec.kind == PuzzleKind.Classic -> stringResource(R.string.solved_next_practice)
+                onBack != null -> stringResource(R.string.solved_back_to_notebook)
+                else -> stringResource(R.string.solved_open_practice)
+            },
+            modifier = modifier.testTag("work-area"),
+        )
+        return
+    }
+    Column(modifier.testTag("work-area")) {
+        // The note's room: the spare height above the status line. A long note (or large text)
+        // scrolls here rather than push the keys away.
+        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.BottomStart) {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                if (coach != null) {
+                    MarginNote(
+                        coach = coach,
+                        geometry = game.spec.geometry,
+                        onEvent = onEvent,
+                        learner = state.settings.learner,
+                        firstTime = state.firstHint == FirstHint.Coach,
+                        modifier = noteModifier.graphicsLayer {
+                            val s = 1f - 0.06f * coachBack.value
+                            scaleX = s
+                            scaleY = s
+                            alpha = 1f - coachBack.value
+                        },
+                    )
+                } else {
+                    PageHint(state, game)
+                }
             }
         }
+        StatusLine(game, onEvent)
+        Keypad(game, onEvent, Modifier.padding(horizontal = Space.Margin))
     }
 }
 
 /**
- * One quiet line between the tools and the digits that says which mode the pen is in. Until the
- * first digit is ever written it carries the one how-to the app has.
+ * One quiet line above the status line, shown the first time something happens: the pencil, a
+ * digit in hand. Until the first digit is ever written, it is the page's how-to.
  */
 @Composable
-private fun StatusLine(game: GameState, onEvent: (PageEvent) -> Unit, showHint: Boolean) {
+private fun PageHint(state: PageUiState, game: GameState) {
     val held = game.lockedDigit
     val text = when {
-        held != null -> stringResource(R.string.status_holding, held)
-        game.notesMode -> stringResource(R.string.status_pencil)
-        showHint -> stringResource(R.string.status_hint)
-        else -> ""
+        state.firstHint == FirstHint.Pencil && game.notesMode -> stringResource(R.string.first_hint_pencil)
+        state.firstHint == FirstHint.PickUp && held != null -> stringResource(R.string.first_hint_pick_up, held)
+        !state.settings.wroteFirstDigit -> stringResource(R.string.status_hint)
+        else -> return
     }
-    Box(
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .padding(horizontal = Space.TextEdge, vertical = Space.S)
+            .semantics { liveRegion = LiveRegionMode.Polite }
+            .testTag("page-hint"),
+    )
+}
+
+/**
+ * The quiet line over the keys: what the pen is doing (a digit in hand, to put down; the pencil,
+ * with "Fill every candidate" on a 9×9 page), and at its end the three tools.
+ */
+@Composable
+private fun StatusLine(game: GameState, onEvent: (PageEvent) -> Unit) {
+    val held = game.lockedDigit
+    val quiet = MaterialTheme.colorScheme.onSurfaceVariant
+    // The words start on the text edge; the tools' glyphs end on the board's edge.
+    Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = StatusHeight)
-            .semantics { liveRegion = LiveRegionMode.Polite },
-        contentAlignment = Alignment.Center,
+            .padding(start = Space.L, end = Space.XS),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (held != null) {
-            TextButton(
-                onClick = { onEvent(PageEvent.ClearLock) },
-                colors = ButtonDefaults.textButtonColors(contentColor = PaperTheme.ink.pencil),
-                contentPadding = PaddingValues(horizontal = 12.dp),
-                modifier = Modifier.heightIn(min = StatusHeight).testTag("status-holding"),
-            ) {
-                Text(text, style = MaterialTheme.typography.labelLarge)
+        Box(Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite }, contentAlignment = Alignment.CenterStart) {
+            when {
+                held != null -> TextButton(
+                    onClick = { onEvent(PageEvent.ClearLock) },
+                    colors = ButtonDefaults.textButtonColors(contentColor = quiet),
+                    shape = SheetShape,
+                    contentPadding = PaddingValues(horizontal = Space.XS),
+                    modifier = Modifier.heightIn(min = StatusHeight).testTag("status-holding"),
+                ) {
+                    Text(stringResource(R.string.status_holding, held), style = MaterialTheme.typography.bodyMedium)
+                }
+                // In pencil on a 9×9 page, filling in every candidate is said, not hidden in a long press.
+                game.notesMode && game.size == 9 -> TextButton(
+                    onClick = { onEvent(PageEvent.FillCandidates) },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                    shape = SheetShape,
+                    contentPadding = PaddingValues(horizontal = Space.XS),
+                    modifier = Modifier.heightIn(min = StatusHeight).testTag("fill-candidates"),
+                ) {
+                    Text(stringResource(R.string.fill_candidates), style = MaterialTheme.typography.bodyMedium)
+                }
+                game.notesMode -> Text(
+                    stringResource(R.string.status_pencil),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = quiet,
+                    modifier = Modifier.padding(start = Space.XS),
+                )
             }
-        } else if (text.isNotEmpty()) {
-            Text(
-                text,
-                style = MaterialTheme.typography.labelMedium,
-                color = PaperTheme.ink.pencil,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 8.dp),
-            )
         }
+        PageTools(game, onEvent)
     }
 }
 
+/**
+ * After the last digit: how the page was done, its time, one line about what comes next, and the
+ * ways on: share, print and read back as icons, and the way on as one ink-outlined button.
+ */
 @Composable
 private fun SolvedNote(
     game: GameState,
@@ -541,112 +553,125 @@ private fun SolvedNote(
     nextLabel: String,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .testTag("solved-panel")
-            .semantics { liveRegion = LiveRegionMode.Polite },
-        verticalArrangement = Arrangement.Center,
-    ) {
-        // The stamp carries the time; the note says how the page was done, then the time again
-        // for anyone not looking at the stamp (TalkBack reads this note, not the stamp).
-        Text(
-            coachUsageLine(game.coach.deepest),
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.semantics { heading() },
-        )
-        // Numerals are Fraunces everywhere: the time is set in its text cut within the sentence.
-        val time = formatElapsed(game.elapsedMillis / 1_000)
-        val line = stringResource(R.string.solved_time, time)
-        val at = line.indexOf(time)
-        Text(
-            buildAnnotatedString {
-                append(line)
-                if (at >= 0) addStyle(SpanStyle(fontFamily = FrauncesPrinted, fontFeatureSettings = "lnum, tnum"), at, at + time.length)
-            },
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (outlook != null) {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                outlook.text,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (outlook.news) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag("solved-outlook"),
-            )
-        }
-        Spacer(Modifier.height(16.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            // Quiet tools: blue is the player's pen, not a button colour.
-            val tools = MaterialTheme.colorScheme.onSurfaceVariant
-            IconButton(onClick = onShare) {
-                Icon(painterResource(R.drawable.ic_share), contentDescription = stringResource(R.string.action_share), tint = tools)
-            }
-            IconButton(onClick = onPrint) {
-                Icon(painterResource(R.drawable.ic_print), contentDescription = stringResource(R.string.action_print), tint = tools)
-            }
-            // An icon beside the others, not a line of its own: the note never grows on a solve.
-            if (onReadBack != null) {
-                IconButton(onClick = onReadBack, modifier = Modifier.testTag("solved-read-back")) {
-                    Icon(painterResource(R.drawable.ic_read_back), contentDescription = stringResource(R.string.solved_read_back), tint = tools)
+    val colors = MaterialTheme.colorScheme
+    Column(modifier, verticalArrangement = Arrangement.Bottom) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .semantics { liveRegion = LiveRegionMode.Polite }
+                .testTag("solved-panel"),
+        ) {
+            Column(Modifier.padding(horizontal = Space.TextEdge)) {
+                // The note says how the page was done, then the time (TalkBack reads this note, not
+                // the stamp). One voice: the time is set in the sentence's own sans.
+                Text(
+                    coachUsageLine(game.coach.deepest),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.semantics { heading() },
+                )
+                Text(
+                    stringResource(R.string.solved_time, formatElapsed(game.elapsedMillis / 1_000)),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = colors.onSurfaceVariant,
+                )
+                if (outlook != null) {
+                    // News (a level, a technique found) is said in ink, a step louder; red is the stamp's.
+                    Text(
+                        outlook.text,
+                        style = if (outlook.news) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                        color = if (outlook.news) colors.onSurface else colors.onSurfaceVariant,
+                        modifier = Modifier.padding(top = Space.XS).testTag("solved-outlook"),
+                    )
                 }
             }
-            Spacer(Modifier.weight(1f))
-            // Ink, not the stamp's red: going back is a way on, not a reward.
-            FilledTonalButton(onClick = onNext, modifier = Modifier.heightIn(min = 48.dp).testTag("solved-next")) { Text(nextLabel) }
+            Spacer(Modifier.height(Space.L))
+            val tools = @Composable {
+                CompositionLocalProvider(LocalContentColor provides colors.onSurfaceVariant) {
+                    IconButton(onClick = onShare) {
+                        Icon(painterResource(R.drawable.ic_share), contentDescription = stringResource(R.string.action_share))
+                    }
+                    IconButton(onClick = onPrint) {
+                        Icon(painterResource(R.drawable.ic_print), contentDescription = stringResource(R.string.action_print))
+                    }
+                    // An icon beside the others, not a line of its own: the note never grows on a solve.
+                    if (onReadBack != null) {
+                        IconButton(onClick = onReadBack, modifier = Modifier.testTag("solved-read-back")) {
+                            Icon(painterResource(R.drawable.ic_read_back), contentDescription = stringResource(R.string.solved_read_back))
+                        }
+                    }
+                }
+            }
+            // Ink, not the stamp's red, and no fill: going on is a way, not a reward.
+            val next = @Composable {
+                OutlinedButton(
+                    onClick = onNext,
+                    shape = SheetShape,
+                    border = BorderStroke(Hairline.Width, colors.onSurface),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.onSurface),
+                    modifier = Modifier.heightIn(min = 48.dp).testTag("solved-next"),
+                ) { Text(nextLabel) }
+            }
+            // Icons' glyphs on the text edge; the way on ends on the board's edge. In a narrow
+            // panel or at large text the way on takes its own line.
+            BoxWithConstraints(Modifier.fillMaxWidth().padding(start = Space.S, end = Space.L)) {
+                if (maxWidth < 360.dp || LocalDensity.current.fontScale > 1.3f) {
+                    Column {
+                        Row { tools() }
+                        Box(Modifier.padding(start = Space.M)) { next() }
+                    }
+                } else {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        tools()
+                        Spacer(Modifier.weight(1f))
+                        next()
+                    }
+                }
+            }
         }
     }
 }
 
-/** One line after a solve about what comes next; [news] when the level just moved up. */
+/** One line after a solve about what comes next; [news] when it is about the player's own progress. */
 private data class Outlook(val text: String, val news: Boolean = false)
 
 @Composable
-private fun solvedOutlook(game: GameState, state: PageUiState): Outlook? = when {
-    // A level up is news; next to it, the one true sentence about this page: what the player found.
-    state.practiceAfter?.leveledUp != true && state.foundYourself != null ->
-        Outlook(stringResource(R.string.solved_found_yourself, techniqueName(state.foundYourself)), news = true)
-    game.spec.kind == PuzzleKind.Classic -> state.practiceAfter?.let { after ->
-        val remaining = after.remaining
-        when {
-            after.leveledUp -> Outlook(stringResource(R.string.solved_level_up, difficultyName(after.level)), news = true)
-            remaining != null -> {
-                val nextLevel = Difficulty.entries.getOrElse(after.level.ordinal + 1) { after.level }
-                Outlook(pluralStringResource(R.plurals.practice_to_next, remaining, remaining, difficultyName(nextLevel)))
+private fun solvedOutlook(game: GameState, state: PageUiState): Outlook? {
+    val learner = state.settings.learner
+    val found = state.foundYourself
+    return when {
+        // The one true sentence about this page: what the player found themselves, and on the
+        // page that makes it known (11.0: progress is the technique path, never a level), that.
+        found != null && learner.found(found) == Mastery.MASTERED ->
+            Outlook(stringResource(R.string.solved_known_now, techniqueName(found)), news = true)
+        found != null -> Outlook(stringResource(R.string.solved_found_yourself, techniqueName(found)), news = true)
+        // Practice says where the path goes next; news when it has moved on to a new level's techniques.
+        game.spec.kind == PuzzleKind.Classic -> state.practiceAfter?.let { after ->
+            TechniquePath.learning(learner, after.level)?.let { next ->
+                Outlook(stringResource(R.string.practice_next, techniqueName(next)), news = after.leveledUp)
             }
-            else -> Outlook(stringResource(R.string.practice_top_level))
         }
+        // 9.0's weekly and technique pages, and pages typed in, are plain 9×9 pages now.
+        game.spec.kind != PuzzleKind.Daily -> null
+        // Today's page closes with tomorrow's: a reason to come back, without a streak.
+        game.spec.epochDay == state.today -> Outlook(stringResource(R.string.solved_daily_close))
+        // Finished a day late, just now, with today's page still to do.
+        state.todayWaiting -> Outlook(stringResource(R.string.solved_daily_waiting))
+        else -> null
     }
-    // A technique page says how far that technique is known now (counted once the solve is recorded).
-    game.spec.kind == PuzzleKind.Focus -> Catalog.focusTechnique(game.spec.key)?.let { technique ->
-        val clean = state.settings.learner.found(technique)
-        if (clean > 0) {
-            Outlook(stringResource(R.string.solved_focus, techniqueName(technique), pluralStringResource(R.plurals.mastery_pages, clean, clean)))
-        } else {
-            null
-        }
-    }
-    game.spec.kind == PuzzleKind.Weekly -> Outlook(stringResource(R.string.solved_weekly_close))
-    game.spec.kind == PuzzleKind.Imported -> null
-    // Today's page closes with tomorrow's: a reason to come back, without a streak.
-    game.spec.epochDay == state.today -> Outlook(stringResource(R.string.solved_daily_close))
-    // Finished a day late, just now, with today's page still to do.
-    state.todayWaiting -> Outlook(stringResource(R.string.solved_daily_waiting))
-    else -> null
 }
 
-/** The small line above a page's title: where it comes from and how hard it is. */
+/**
+ * The small line above a page's title: where it comes from. Levels stay inside (11.0): progress
+ * is the technique path, never a level name.
+ */
 @Composable
 fun pageOverline(spec: PuzzleSpec, locale: Locale): String {
-    val level = difficultyName(spec.difficulty)
     val day = spec.epochDay
     return when (spec.kind) {
-        PuzzleKind.Daily -> if (day != null) weekday(LocalDate.ofEpochDay(day), locale) + DOT + level else level
-        PuzzleKind.Classic -> stringResource(R.string.practice) + DOT + level
-        PuzzleKind.Weekly -> stringResource(R.string.weekly) + DOT + level
-        PuzzleKind.Focus -> stringResource(R.string.focus) + DOT + level
-        PuzzleKind.Imported -> stringResource(R.string.imported) + DOT +
-            if (spec.beyondCoach) stringResource(R.string.imported_beyond_coach) else level
+        PuzzleKind.Daily -> day?.let { weekday(LocalDate.ofEpochDay(it), locale) }.orEmpty()
+        PuzzleKind.Classic, PuzzleKind.Focus -> stringResource(R.string.practice)
+        PuzzleKind.Weekly -> stringResource(R.string.nine_by_nine)
+        PuzzleKind.Imported -> if (spec.beyondCoach) stringResource(R.string.imported) + DOT + stringResource(R.string.imported_beyond_coach) else stringResource(R.string.imported)
     }
 }
 
@@ -657,8 +682,8 @@ fun pageTitle(spec: PuzzleSpec, locale: Locale): String {
     return when (spec.kind) {
         PuzzleKind.Daily -> day?.let { monthDay(LocalDate.ofEpochDay(it), locale) }.orEmpty()
         PuzzleKind.Classic -> stringResource(R.string.practice_page, (spec.number ?: 0) + 1)
-        PuzzleKind.Weekly -> stringResource(R.string.weekly_title, day?.let { monthDay(LocalDate.ofEpochDay(it), locale) }.orEmpty())
-        PuzzleKind.Focus -> Catalog.focusTechnique(spec.key)?.let { techniqueName(it) } ?: stringResource(R.string.focus)
+        PuzzleKind.Weekly -> day?.let { monthDay(LocalDate.ofEpochDay(it), locale) } ?: stringResource(R.string.nine_by_nine)
+        PuzzleKind.Focus -> stringResource(R.string.nine_by_nine)
         PuzzleKind.Imported -> stringResource(R.string.imported)
     }
 }
@@ -696,7 +721,8 @@ private fun PageHeader(
         title = {
             if (game != null) {
                 val spec = game.spec
-                Column {
+                // Without a back button the title starts on the page's text edge.
+                Column(Modifier.padding(start = if (onBack == null) Space.XS else 0.dp)) {
                     Text(
                         text = (
                             pageOverline(spec, locale)
@@ -827,18 +853,20 @@ private fun InkConnector(
             bracketTo = Offset(x, board.top + (rows.max() + 1) * cell - cell * 0.2f)
         }
         val end = Offset((bracketFrom.x + bracketTo.x) / 2f, (bracketFrom.y + bracketTo.y) / 2f)
+        // The note's pen rule hangs 8dp into the margin; the line leaves from it.
+        val rule = (Space.S + 1.dp).toPx()
         if (wide) {
-            val start = Offset(if (rtl) note.right else note.left, note.top + 24.dp.toPx())
+            val start = Offset(if (rtl) note.right - rule else note.left + rule, note.top + 24.dp.toPx())
             path.moveTo(start.x, start.y)
             path.cubicTo((start.x + end.x) / 2f, start.y, (start.x + end.x) / 2f, end.y, end.x, end.y)
         } else if (column) {
-            val start = Offset(if (rtl) note.right - 1.dp.toPx() else note.left + 1.dp.toPx(), note.top)
+            val start = Offset(if (rtl) note.right - rule else note.left + rule, note.top)
             path.moveTo(start.x, start.y)
             path.cubicTo(start.x, (start.y + end.y) / 2f, end.x, (start.y + end.y) / 2f, end.x, end.y)
         } else {
             // From the top of the note, up the margin on the bracket's own side, into its middle:
             // starting on the far side would cross the grid to get there.
-            val start = Offset(if (nearSide) note.right - 1.dp.toPx() else note.left + 1.dp.toPx(), note.top)
+            val start = Offset(if (nearSide) note.right - Space.S.toPx() else note.left + rule, note.top)
             val reach = if (nearSide) 12.dp.toPx() else -12.dp.toPx()
             path.moveTo(start.x, start.y)
             path.cubicTo(start.x, (start.y + end.y) / 2f, end.x + reach, end.y, end.x, end.y)
@@ -846,7 +874,7 @@ private fun InkConnector(
         val measure = PathMeasure().apply { setPath(path, false) }
         val partial = Path()
         measure.getSegment(0f, measure.length * progress.value, partial, true)
-        drawPath(partial, color.copy(alpha = 0.8f), style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round))
+        drawPath(partial, color, style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round))
         if (progress.value >= 1f) {
             drawLine(color, bracketFrom, bracketTo, strokeWidth = 2.5.dp.toPx(), cap = StrokeCap.Round)
         }

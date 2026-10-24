@@ -83,9 +83,7 @@ class PuzzleGenerator(private val geometry: Geometry) {
         seed: Long,
         difficulty: Difficulty,
         maxAttempts: Int = 3000,
-        /** What a page must be to be dealt: by default, exactly [difficulty]. */
-        accept: (Grade) -> Boolean = { it.difficulty == difficulty },
-    ): GeneratedPuzzle = search(seed, difficulty, maxAttempts, accept).generated
+    ): GeneratedPuzzle = search(seed, difficulty, maxAttempts).generated
 
     /**
      * [generate], also saying where in the stream the page was carved: carves are drawn one after
@@ -95,14 +93,13 @@ class PuzzleGenerator(private val geometry: Geometry) {
         seed: Long,
         difficulty: Difficulty,
         maxAttempts: Int = 3000,
-        accept: (Grade) -> Boolean = { it.difficulty == difficulty },
     ): Carving {
         val random = SplitMix64(seed)
         var best: Carving? = null
         for (n in 1..maxAttempts) {
             val start = random.draws
             val candidate = carve(random, difficulty)
-            if (accept(candidate.grade)) return Carving(candidate, start, n)
+            if (candidate.grade.difficulty == difficulty) return Carving(candidate, start, n)
             if (best == null || candidate.grade.hardest.tier > best.generated.grade.hardest.tier) {
                 best = Carving(candidate, start, n)
             }

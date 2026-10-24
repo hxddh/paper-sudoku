@@ -36,12 +36,6 @@ class CachedPuzzleSource(
     override suspend fun classic(difficulty: Difficulty, number: Int): PuzzleSpec =
         cached(Catalog.classicKey(difficulty, number)) { Catalog.classic(difficulty, number) }
 
-    override suspend fun weekly(sunday: Long): PuzzleSpec =
-        cached(Catalog.weeklyKey(sunday)) { Catalog.weekly(sunday) }
-
-    override suspend fun focus(technique: Technique, number: Int): PuzzleSpec =
-        cached(Catalog.focusPrefix(technique) + number) { Catalog.focus(technique, number) }
-
     // Kept under the key asked for: a path page that falls back to the plain page is cached
     // under the path key too, so it is never searched for again.
     override suspend fun practice(difficulty: Difficulty, number: Int, target: Technique?): PuzzleSpec =
@@ -64,14 +58,14 @@ class CachedPuzzleSource(
         }
     }
 
-    /** Drops pages from older generators and dailies already in the past. */
+    /** Drops pages from older generators, dailies already in the past, and 9.0's weekly and focus pages. */
     private fun prune() {
         val yesterday = LocalDate.now().toEpochDay() - 1
         directory.listFiles()?.forEach { file ->
             val name = file.name
             val stale = !name.endsWith(SUFFIX) ||
                 (Catalog.dayOf(name.removeSuffix(SUFFIX))?.let { it < yesterday } ?: false) ||
-                (Catalog.dayOfWeekly(name.removeSuffix(SUFFIX))?.let { it < yesterday - 7 } ?: false)
+                name.startsWith("weekly-") || name.startsWith("focus-")
             if (stale) file.delete()
         }
     }

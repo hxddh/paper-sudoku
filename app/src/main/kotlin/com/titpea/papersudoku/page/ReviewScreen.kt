@@ -1,5 +1,7 @@
 package com.titpea.papersudoku.page
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,12 +32,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SliderState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -43,8 +47,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -58,9 +62,10 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
+import com.titpea.papersudoku.designsystem.Space
 import com.titpea.papersudoku.engine.Technique
 import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.Move
@@ -70,10 +75,6 @@ import com.titpea.papersudoku.game.model.ReviewStep
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
-
-/** The page's work area: at least this tall, as tall as tools, status line and keys (see PageScreen). */
-private val WorkAreaMinHeight: Dp = 176.dp
-private val StatusLineHeight: Dp = 48.dp
 
 /**
  * Reads a page back from its move record, as the page itself: the same header, the board at the
@@ -157,8 +158,7 @@ fun ReviewScreen(
         // Blank while the reading is worked out; a page with no record shows its printed digits.
         val showBoard = step != null || moves.isEmpty()
         val conflicts = if (step != null && step.kind == ReviewStep.Kind.Mistake) setOf(step.move.cell) else emptySet()
-        val fontScale = LocalDensity.current.fontScale.coerceIn(1f, 1.3f)
-        val workHeight = maxOf(WorkAreaMinHeight * fontScale, ToolbarHeight + StatusLineHeight + keypadHeight(spec.size))
+        val workHeight = workAreaHeight(spec.size, LocalDensity.current.fontScale)
         val panel = @Composable { modifier: Modifier ->
             ReviewPanel(
                 from = from,
@@ -172,39 +172,32 @@ fun ReviewScreen(
             )
         }
         BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
-            // As the page lays itself out: beside the board on a wide window, under it otherwise.
+            // As the page lays itself out: the board 16dp under the header; beside it on a wide
+            // window (the panel's foot on the board's foot), under it otherwise, with the spare
+            // height between them.
             if (maxWidth > maxHeight && maxWidth >= 560.dp) {
-                val side = (maxWidth * 0.4f).coerceIn(320.dp, 440.dp)
-                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    ReviewBoard(
-                        game, conflicts, showBoard,
-                        Modifier.weight(1f).fillMaxHeight().padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
-                        Alignment.CenterEnd,
-                    )
-                    Column(
-                        Modifier.width(side).fillMaxHeight().padding(end = 24.dp),
-                        verticalArrangement = Arrangement.Center,
-                    ) { panel(Modifier.fillMaxWidth().height(workHeight)) }
+                val panelWidth = (maxWidth * 0.4f).coerceIn(320.dp, 440.dp)
+                val side = minOf(maxHeight - Space.BoardTop - Space.L, maxWidth - panelWidth - Space.XL - Space.L * 2, 720.dp)
+                    .coerceAtLeast(0.dp)
+                Row(
+                    Modifier.align(Alignment.TopCenter).padding(top = Space.BoardTop).height(side),
+                    horizontalArrangement = Arrangement.spacedBy(Space.XL),
+                ) {
+                    ReviewBoard(game, conflicts, showBoard, Modifier.size(side))
+                    panel(Modifier.width(panelWidth).fillMaxHeight())
                 }
             } else {
+                val side = minOf(maxWidth - Space.Margin * 2, maxHeight - Space.BoardTop - workHeight - Space.L, 720.dp)
+                    .coerceAtLeast(0.dp)
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    ReviewBoard(
-                        game, conflicts, showBoard,
-                        Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .widthIn(max = 720.dp)
-                            .padding(horizontal = if (spec.size == 9) 8.dp else 12.dp),
-                        BiasAlignment(0f, 0.4f),
-                    )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(Space.BoardTop))
+                    ReviewBoard(game, conflicts, showBoard, Modifier.size(side))
                     panel(
                         Modifier
+                            .weight(1f)
                             .widthIn(max = 640.dp)
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp)
-                            .padding(bottom = 12.dp)
-                            .height(workHeight),
+                            .padding(bottom = Space.L),
                     )
                 }
             }
@@ -212,23 +205,20 @@ fun ReviewScreen(
     }
 }
 
-/** The board at the page's size: as large as the space allows, square, at most 720dp. */
+/** The board at the page's size ([modifier] gives it). */
 @Composable
-private fun ReviewBoard(game: GameState, conflicts: Set<Int>, show: Boolean, modifier: Modifier, alignment: Alignment) {
-    BoxWithConstraints(modifier, contentAlignment = alignment) {
-        val side = minOf(maxWidth, maxHeight).coerceAtMost(720.dp)
-        Box(Modifier.size(side).testTag("review-board"), contentAlignment = Alignment.Center) {
-            if (show) {
-                Board(
-                    game = game,
-                    conflicts = conflicts,
-                    marks = CoachMarks.None,
-                    onTap = {},
-                    onCellAction = { _, _ -> },
-                    interactive = false,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
+private fun ReviewBoard(game: GameState, conflicts: Set<Int>, show: Boolean, modifier: Modifier) {
+    Box(modifier.testTag("review-board"), contentAlignment = Alignment.Center) {
+        if (show) {
+            Board(
+                game = game,
+                conflicts = conflicts,
+                marks = CoachMarks.None,
+                onTap = {},
+                onCellAction = { _, _ -> },
+                interactive = false,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
@@ -265,24 +255,24 @@ private fun ReviewPanel(
     }
 }
 
-/** A block of the panel; its text sits 20dp in from the screen, with the page's own margins. */
+/** A block of the panel; its text sits on the page's one text edge. */
 @Composable
 private fun ReviewColumn(tag: String, live: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 8.dp)
+            .padding(horizontal = Space.TextEdge, vertical = Space.S)
             // The note is read out as each move comes up.
             .then(if (live) Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier)
             .testTag(tag),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(Space.XS),
         content = content,
     )
 }
 
 @Composable
 private fun Body(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(text, modifier, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
 }
 
 /** Counts, in calm words: which techniques placed the player's digits, the slips, the Coach. */
@@ -339,19 +329,27 @@ private class SummaryCounts(
     }
 }
 
-/** "Move 12 of 54", then previous, a slider over every move, next. */
+/**
+ * "Move 12 of 54", then previous, a slider over every move, next. The slider is drawn as a 2dp
+ * ink rule (inked as far as the reading has gone) with a 12dp dot; it is still a slider to
+ * TalkBack, a move per step.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Controls(at: Int, count: Int, onMove: (Int) -> Unit) {
     val position = stringResource(R.string.review_position, at + 1, count)
     val sliderLabel = stringResource(R.string.review_slider)
-    ReviewColumn("review-controls") {
+    val ink = MaterialTheme.colorScheme.onSurface
+    val faint = MaterialTheme.colorScheme.outlineVariant
+    Column(Modifier.fillMaxWidth().padding(vertical = Space.S).testTag("review-controls")) {
         Text(
             position,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.align(Alignment.CenterHorizontally).testTag("review-position"),
         )
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        // The chevrons' glyphs end on the board's edges.
+        Row(Modifier.fillMaxWidth().padding(horizontal = Space.XS), verticalAlignment = Alignment.CenterVertically) {
             IconButton(
                 onClick = { onMove(at - 1) },
                 enabled = at > 0,
@@ -360,21 +358,34 @@ private fun Controls(at: Int, count: Int, onMove: (Int) -> Unit) {
                 Icon(painterResource(R.drawable.ic_chevron_left), contentDescription = stringResource(R.string.review_previous))
             }
             if (count > 1) {
+                // One step per move, so accessibility swipes go a move at a time; the ticks
+                // themselves would crowd a long page, so they are not drawn.
+                // The slider runs 0..1; move i of count sits at i / (count - 1).
+                val last = (count - 1).toFloat()
+                val slider = remember(count) { SliderState(value = at / last, steps = (count - 2).coerceAtLeast(0)) }
+                // The move shown is the source of truth: the arrows move it as well as the slider.
+                SideEffect { if ((slider.value * last).roundToInt() != at) slider.value = at / last }
                 Slider(
-                    value = at.toFloat(),
-                    onValueChange = { onMove(it.roundToInt().coerceIn(0, count - 1)) },
-                    valueRange = 0f..(count - 1).toFloat(),
-                    // One step per move, so accessibility swipes go a move at a time; the ticks
-                    // themselves would crowd a long page, so they are not drawn.
-                    steps = (count - 2).coerceAtLeast(0),
-                    // The player's pen blue: terracotta is the Coach's and the stamp's.
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.secondary,
-                        activeTrackColor = MaterialTheme.colorScheme.secondary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
-                        activeTickColor = Color.Transparent,
-                        inactiveTickColor = Color.Transparent,
-                    ),
+                    state = slider,
+                    onValueChange = { onMove((it * last).roundToInt().coerceIn(0, count - 1)) },
+                    // Ink, not a control's colour: terracotta is the Coach's, blue the player's pen.
+                    thumb = {
+                        Box(Modifier.size(12.dp).background(ink, CircleShape))
+                    },
+                    track = { state ->
+                        val fraction = state.value.coerceIn(0f, 1f)
+                        Canvas(Modifier.fillMaxWidth().height(2.dp)) {
+                            val y = size.height / 2f
+                            val x = if (layoutDirection == LayoutDirection.Rtl) size.width * (1f - fraction) else size.width * fraction
+                            val (inked, rest) = if (layoutDirection == LayoutDirection.Rtl) {
+                                (x to size.width) to (0f to x)
+                            } else {
+                                (0f to x) to (x to size.width)
+                            }
+                            drawLine(faint, Offset(rest.first, y), Offset(rest.second, y), strokeWidth = size.height)
+                            drawLine(ink, Offset(inked.first, y), Offset(inked.second, y), strokeWidth = size.height)
+                        }
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .semantics {

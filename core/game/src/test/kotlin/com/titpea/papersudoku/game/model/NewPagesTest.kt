@@ -4,7 +4,7 @@ import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.engine.Technique
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.DayOfWeek
@@ -13,32 +13,15 @@ import java.time.LocalDate
 class NewPagesTest {
 
     @Test
-    fun `the weekly page is dealt on Sunday and open all week`() {
+    fun `pages no longer dealt are still named by their keys`() {
         val wednesday = LocalDate.of(2026, 10, 21).toEpochDay()
         val sunday = Catalog.weekOf(wednesday)
         assertEquals(DayOfWeek.SUNDAY, LocalDate.ofEpochDay(sunday).dayOfWeek)
         assertTrue(sunday <= wednesday && wednesday - sunday < 7)
         assertEquals(sunday, Catalog.weekOf(sunday))
-        val page = Catalog.weekly(sunday)
-        assertEquals(9, page.size)
-        assertEquals(Difficulty.Steady, page.difficulty)
-        assertEquals(PuzzleKind.Weekly, page.kind)
-        assertEquals(page, Catalog.weekly(sunday))
-        assertNotEquals(page.givens, Catalog.weekly(sunday + 7).givens)
-        // A stream of its own: not the practice pages.
-        assertNotEquals(page.givens, Catalog.classic(Difficulty.Steady, 0).givens)
-    }
-
-    @Test
-    fun `focus practice deals pages that need the technique`() {
-        for (technique in listOf(Technique.XWing, Technique.Pointing, Technique.XYWing)) {
-            val page = Catalog.focus(technique, 0)
-            assertTrue("$technique", technique in page.techniques)
-            assertEquals(Catalog.focusLevel(technique), page.difficulty)
-            assertTrue(page.key.startsWith(Catalog.focusPrefix(technique)))
-            assertEquals(PuzzleKind.Focus, page.kind)
-            assertEquals(technique, Catalog.focusTechnique(page.key))
-        }
+        assertEquals("weekly-$sunday", Catalog.weeklyKey(sunday))
+        assertEquals(Technique.XWing, Catalog.focusTechnique(Catalog.focusPrefix(Technique.XWing) + 3))
+        assertNull(Catalog.focusTechnique(Catalog.classicKey(Difficulty.Steady, 3)))
     }
 
     @Test

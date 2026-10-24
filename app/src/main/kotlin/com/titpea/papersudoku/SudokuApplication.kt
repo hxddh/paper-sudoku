@@ -11,17 +11,24 @@ import com.titpea.papersudoku.data.GameStore
 import com.titpea.papersudoku.data.RoomGameStore
 import com.titpea.papersudoku.data.SettingsStore
 import com.titpea.papersudoku.data.SudokuDatabase
+import com.titpea.papersudoku.game.model.Catalog
+import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.PuzzleSource
 import com.titpea.papersudoku.widget.TodayWidget
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.io.File
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
+import java.util.concurrent.atomic.AtomicReference
 
 interface AppContainer {
     val settingsStore: SettingsStore
@@ -37,6 +44,13 @@ interface AppContainer {
 
     /** Called when today's daily is solved or put away, so the home-screen widget can redraw. */
     val onDailySaved: () -> Unit
+
+    /**
+     * Today's daily (its save, else the page dealt), read as the process starts so the first page
+     * does not wait for the first frame to begin loading. Handed out once and only for the day it
+     * was read for; null after that, or where nothing was read early.
+     */
+    fun takeEarlyDaily(epochDay: Long): Deferred<GameState?>? = null
 }
 
 class DefaultAppContainer(private val context: Context) : AppContainer {
@@ -54,11 +68,17 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     override val ticker: () -> Long = { SystemClock.elapsedRealtime() }
     override val onDailySaved: () -> Unit = { TodayWidget.requestUpdate(context) }
 
+    private val earlyDaily = AtomicReference<Pair<Long, Deferred<GameState?>>?>(null)
+
+    override fun takeEarlyDaily(epochDay: Long): Deferred<GameState?>? =
+        earlyDaily.getAndSet(null)?.takeIf { it.first == epochDay }?.second
+
     /**
-     * Starts the first DataStore read and opens Room (running any migration) off the main thread,
-     * so both overlap the Activity's start instead of following it: the splash waits for the
-     * settings, and the first page for the database. Later reads share the open database and
-     * DataStore's cached data; a failure here is only logged, and the real read retries it.
+     * Starts the first DataStore read, opens Room (running any migration) and reads today's page
+     * off the main thread, so all three overlap the Activity's start instead of following it: the
+     * splash waits for the settings, and the first page for the database and its save. Later
+     * reads share the open database and DataStore's cached data; a failure here is only logged,
+     * and the real read retries it.
      */
     fun warmUp(scope: CoroutineScope) {
         scope.launch {
@@ -69,6 +89,18 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             runCatching { database.openHelper.writableDatabase }
                 .onFailure { Log.w(TAG, "Database warm-up failed", it) }
         }
+        val today = LocalDate.now(clock).toEpochDay()
+        val daily = scope.async {
+            try {
+                gameStore.load(Catalog.dailyKey(today)) ?: GameState.new(puzzles.daily(today))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Early read of today's page failed", e)
+                null
+            }
+        }
+        earlyDaily.set(today to daily)
     }
 
     private companion object {

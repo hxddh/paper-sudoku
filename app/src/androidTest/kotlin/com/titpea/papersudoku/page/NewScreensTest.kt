@@ -1,6 +1,9 @@
 package com.titpea.papersudoku.page
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.accessibility.disableAccessibilityChecks
@@ -22,6 +25,7 @@ import com.titpea.papersudoku.game.model.Move
 import com.titpea.papersudoku.game.model.PuzzleSpec
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -37,6 +41,28 @@ class NewScreensTest {
     @Before
     fun enableAccessibilityChecks() {
         composeRule.enableAccessibilityChecks()
+    }
+
+    // The page being typed in is kept on disk: each test starts from a blank one and leaves none.
+    @Before
+    @After
+    fun clearImportDraft() {
+        ImportDraft.of(context).clear()
+    }
+
+    /**
+     * A 9×9 board's cells are 43dp on a 411dp phone, as on every 9×9 page: precise input there
+     * is press-and-slide aiming with the loupe, or the keyboard. Every other check still runs;
+     * touch-target size is checked on the 6×6 page and the keys.
+     */
+    private fun checkAllButCellSize() {
+        composeRule.disableAccessibilityChecks()
+        composeRule.enableAccessibilityChecks(
+            AccessibilityValidator()
+                .setRunChecksFromRootView(true)
+                .setThrowExceptionFor(AccessibilityCheckResultType.ERROR)
+                .setSuppressingResultMatcher(matchesCheckNames(`is`("TouchTargetSizeCheck"))),
+        )
     }
 
     /** Two right digits, a slip, its erasure, one more right digit: five moves. */
@@ -108,16 +134,7 @@ class NewScreensTest {
 
     @Test
     fun importRefusesTooFewDigits() {
-        // A 9×9 board's cells are 43dp on a 411dp phone, as on every 9×9 page: precise input
-        // there is press-and-slide aiming with the loupe, or the keyboard. Every other check
-        // still runs; touch-target size is checked on the 6×6 page and the keys.
-        composeRule.disableAccessibilityChecks()
-        composeRule.enableAccessibilityChecks(
-            AccessibilityValidator()
-                .setRunChecksFromRootView(true)
-                .setThrowExceptionFor(AccessibilityCheckResultType.ERROR)
-                .setSuppressingResultMatcher(matchesCheckNames(`is`("TouchTargetSizeCheck"))),
-        )
+        checkAllButCellSize()
         var imported: PuzzleSpec? = null
         composeRule.setContent {
             SudokuTheme(darkTheme = false) { ImportScreen(onBack = {}, onImported = { imported = it }) }
@@ -135,5 +152,37 @@ class NewScreensTest {
         }
         composeRule.onNodeWithTag("import-message").assertTextEquals(context.getString(R.string.import_too_few))
         assertNull(imported)
+    }
+
+    @Test
+    fun typingMovesOnAndLeavingKeepsTheDraft() {
+        checkAllButCellSize()
+        var left = false
+        composeRule.setContent {
+            SudokuTheme(darkTheme = false) { ImportScreen(onBack = { left = true }, onImported = {}) }
+        }
+        composeRule.onNodeWithTag("cell-0").performClick()
+        composeRule.onNodeWithTag("keypad-5").performClick()
+        // The cursor moves on, so a row is typed in digit after digit.
+        composeRule.onNodeWithTag("cell-1").assertIsSelected()
+        composeRule.onNodeWithTag("keypad-3").performClick()
+        composeRule.onNodeWithTag("cell-2").assertIsSelected()
+
+        // Back with digits on the page asks first; keeping them leaves, and they wait on disk.
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        composeRule.onNodeWithTag("import-leave-keep").assertIsDisplayed().performClick()
+        composeRule.waitUntil(5_000) { left && ImportDraft.of(context).read()?.take(2) == listOf(5, 3) }
+    }
+
+    @Test
+    fun aKeptDraftComesBack() {
+        checkAllButCellSize()
+        ImportDraft.of(context).write(listOf(7) + List(80) { 0 })
+        composeRule.setContent {
+            SudokuTheme(darkTheme = false) { ImportScreen(onBack = {}, onImported = {}) }
+        }
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodes(hasTestTag("cell-0") and hasContentDescription("written 7", substring = true)).fetchSemanticsNodes().isNotEmpty()
+        }
     }
 }

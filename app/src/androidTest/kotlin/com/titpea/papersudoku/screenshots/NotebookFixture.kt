@@ -6,18 +6,16 @@ import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.engine.Technique
 import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.GameState
-import com.titpea.papersudoku.notebook.JournalMonth
-import com.titpea.papersudoku.notebook.JournalRow
+import com.titpea.papersudoku.notebook.FiledPage
 import com.titpea.papersudoku.notebook.NotebookUiState
 import com.titpea.papersudoku.notebook.PageEntry
 import com.titpea.papersudoku.notebook.PracticeEntry
 import com.titpea.papersudoku.page.Fixtures
-import java.time.LocalDate
-import java.time.YearMonth
 
 /**
- * A notebook three weeks in: a few stamped days, one unfinished, today begun, practice under way
- * with naked pairs next, and two finished practice pages filed among the days.
+ * A notebook three weeks in: a few stamped days, one begun and left (the page to continue),
+ * today begun, practice learning naked pairs, and two finished practice pages filed on their days
+ * (one beside a stamped day, so that day holds two pages).
  */
 fun notebookState(): NotebookUiState {
     val today = Fixtures.DAY
@@ -35,29 +33,19 @@ fun notebookState(): NotebookUiState {
         today - 2 to PageSummary.of(Fixtures.solved(GameState.new(Catalog.daily(today - 2)))),
         today - 6 to begun(today - 6),
     )
-    val days = (saved.keys + results.keys).distinct().sortedDescending()
-    val pages = days.associateWith { day -> PageEntry(day, Catalog.dailyDifficulty(day), saved[day], results[day]) }
     fun practicePage(number: Int) = PageSummary.of(Fixtures.solved(GameState.new(Catalog.classic(Difficulty.Steady, number))))
-    val date = { day: Long -> LocalDate.ofEpochDay(day) }
-    val journal = listOf(
-        JournalRow.Day(pages.getValue(today - 1)),
-        JournalRow.Page(practicePage(1), date(today - 2)),
-        JournalRow.Day(pages.getValue(today - 2)),
-        JournalRow.Page(practicePage(0), date(today - 3)),
-        JournalRow.Day(pages.getValue(today - 4)),
-    ).groupBy { YearMonth.from(it.date) }.map { (month, rows) -> JournalMonth(month, rows) }
+    val others = mapOf(
+        today - 2 to listOf(practicePage(1)),
+        today - 3 to listOf(practicePage(0)),
+    )
+    val days = (saved.keys + results.keys + others.keys).distinct().sortedDescending()
+    val pages = days.associateWith { day -> PageEntry(day, saved[day], results[day], others[day].orEmpty()) }
     return NotebookUiState(
         today = today,
         todayPage = pages.getValue(today),
-        practice = PracticeEntry(Difficulty.Steady, 2, PageSummary.of(Fixtures.practice())),
+        practice = PracticeEntry(learning = Technique.NakedPair, known = 4, saved = PageSummary.of(Fixtures.practice())),
         firstDay = today - 20,
-        weekOf = Catalog.weekOf(today),
-        unfinished = listOf(today - 6),
-        stampedDays = listOf(today - 1, today - 2, today - 4),
         pages = pages,
-        journal = journal,
-        nextTechnique = Technique.NakedPair,
-        practiceByMonth = mapOf(YearMonth.from(LocalDate.ofEpochDay(today)) to 2),
-        stamped = 5,
+        resume = FiledPage(saved.getValue(today - 6), today - 6),
     )
 }

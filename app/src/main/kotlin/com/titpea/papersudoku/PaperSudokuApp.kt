@@ -14,7 +14,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -37,10 +36,8 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.listSaver
@@ -60,8 +57,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import com.titpea.papersudoku.designsystem.PaperTheme
-import com.titpea.papersudoku.designsystem.paperGrain
-import com.titpea.papersudoku.designsystem.rememberPaperGrain
+import com.titpea.papersudoku.designsystem.paper
 import com.titpea.papersudoku.notebook.NotebookScreen
 import com.titpea.papersudoku.notebook.NotebookViewModel
 import com.titpea.papersudoku.page.PageEvent
@@ -72,8 +68,9 @@ import com.titpea.papersudoku.page.PageScreen
 import com.titpea.papersudoku.page.PageViewModel
 import com.titpea.papersudoku.settings.LicencesScreen
 import com.titpea.papersudoku.notebook.HandbookScreen
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import com.titpea.papersudoku.settings.SettingsScreen
+import androidx.compose.runtime.setValue
 import com.titpea.papersudoku.share.printPuzzle
 import com.titpea.papersudoku.share.sharePage
 import androidx.window.core.layout.WindowSizeClass
@@ -81,12 +78,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
-enum class Screen { Home, Settings, Licences, Handbook, Review, Import }
+enum class Screen { Home, Licences, Handbook, Review, Import }
 
 /**
- * Destinations on a Navigation 3 back stack: the notebook (home), the handbook, Settings and the
- * licences. The notebook
- * itself is a Material 3 adaptive list-detail scaffold — the list of pages and the open page —
+ * Destinations on a Navigation 3 back stack: the notebook (home), the handbook, read back, typing
+ * a page in and the licences. There are no settings (11.0). The notebook itself is a Material 3 adaptive list-detail scaffold — the list of pages and the open page —
  * which shows one pane on phones and both side by side on wide windows.
  */
 @OptIn(ExperimentalComposeUiApi::class)
@@ -98,17 +94,22 @@ fun PaperSudokuApp(
     openTodayRequests: Flow<Unit> = emptyFlow(),
 ) {
     val backStack: SnapshotStateList<Screen> = rememberSaveable(
-        saver = listSaver(save = { stack -> stack.map { it.name } }, restore = { names -> names.map(Screen::valueOf).toMutableStateList() }),
+        // A screen saved by an older version that no longer exists (Settings, before 11.0) is dropped.
+        saver = listSaver(
+            save = { stack -> stack.map { it.name } },
+            restore = { names ->
+                val screens = names.mapNotNull { name -> Screen.entries.firstOrNull { it.name == name } }
+                (listOf(Screen.Home) + screens.filter { it != Screen.Home }).toMutableStateList()
+            },
+        ),
     ) { mutableStateListOf(Screen.Home) }
     val pageViewModel: PageViewModel = viewModel(factory = PageViewModel.factory(container))
     val notebookViewModel: NotebookViewModel = viewModel(factory = NotebookViewModel.factory(container))
-    val scope = rememberCoroutineScope()
-    val grain = rememberPaperGrain(PaperTheme.ink)
     // The handbook topic to open at; saved with the back stack.
     var handbookStart by rememberSaveable { mutableIntStateOf(0) }
 
-    // The widget asks for today's page: leave Settings if it is open, open today, and let the
-    // notebook move its detail pane once it is on screen.
+    // The widget asks for today's page: leave whatever is open over the notebook, open today, and
+    // let the notebook move its detail pane once it is on screen.
     var showToday by rememberSaveable { mutableStateOf(false) }
     // A page opened from another screen (the handbook, typing one in): the notebook shows it.
     var showKey by rememberSaveable { mutableStateOf<String?>(null) }
@@ -132,10 +133,10 @@ fun PaperSudokuApp(
     val gesture = tween<Float>(durationMillis = BACK_PREVIEW_MILLIS, easing = LinearEasing)
     val gestureOffset = tween<IntOffset>(durationMillis = BACK_PREVIEW_MILLIS, easing = LinearEasing)
 
+    // No paper here: every page below draws its own sheet, so the paper is drawn once.
     Box(
         Modifier
             .fillMaxSize()
-            .background(PaperTheme.colors.background)
             // Test tags double as resource ids for UI Automator (Macrobenchmark).
             .semantics { testTagsAsResourceId = true },
     ) {
@@ -163,13 +164,13 @@ fun PaperSudokuApp(
                     NavEntry(screen) {
                         // Every page is its own sheet of paper, so a page leaving never shows
                         // the one beneath through it.
-                        PaperPage(grain) {
+                        PaperPage {
                         when (screen) {
                             Screen.Home -> NotebookHome(
                                 pageViewModel = pageViewModel,
                                 notebookViewModel = notebookViewModel,
-                                // Guarded: a double tap during the transition must not stack Settings twice.
-                                onOpenSettings = { if (backStack.lastOrNull() == Screen.Home) backStack.add(Screen.Settings) },
+                                // Guarded: a double tap during the transition must not stack the licences twice.
+                                onOpenLicences = { if (backStack.lastOrNull() == Screen.Home) backStack.add(Screen.Licences) },
                                 onOpenHandbook = { topic ->
                                     if (backStack.lastOrNull() == Screen.Home) {
                                         handbookStart = topic
@@ -183,18 +184,9 @@ fun PaperSudokuApp(
                                 onReadBack = { if (backStack.lastOrNull() == Screen.Home) backStack.add(Screen.Review) },
                                 onTypeIn = { if (backStack.lastOrNull() == Screen.Home) backStack.add(Screen.Import) },
                             )
-                            Screen.Settings -> {
-                                val state by pageViewModel.state.collectAsStateWithLifecycle()
-                                SettingsScreen(
-                                    settings = state.settings,
-                                    versionName = versionName,
-                                    onUpdate = { transform -> scope.launch { container.settingsStore.update(transform) } },
-                                    onOpenLicences = { if (backStack.lastOrNull() == Screen.Settings) backStack.add(Screen.Licences) },
-                                    // Guarded: the leaving screen stays tappable while it animates out.
-                                    onBack = { if (backStack.lastOrNull() == Screen.Settings) backStack.removeAt(backStack.lastIndex) },
-                                )
-                            }
                             Screen.Licences -> LicencesScreen(
+                                versionName = versionName,
+                                // Guarded: the leaving screen stays tappable while it animates out.
                                 onBack = { if (backStack.lastOrNull() == Screen.Licences) backStack.removeAt(backStack.lastIndex) },
                             )
                             Screen.Handbook -> {
@@ -239,7 +231,7 @@ fun PaperSudokuApp(
  * tap), its corners round and it lifts, so it reads as a sheet over the page beneath.
  */
 @Composable
-private fun PaperPage(grain: ShaderBrush?, content: @Composable () -> Unit) {
+private fun PaperPage(content: @Composable () -> Unit) {
     val leaving = LocalNavAnimatedContentScope.current.transition
         .animateFloat(label = "leaving") { if (it == EnterExitState.PostExit) 1f else 0f }
     val background = PaperTheme.colors.background
@@ -254,8 +246,7 @@ private fun PaperPage(grain: ShaderBrush?, content: @Composable () -> Unit) {
                     shadowElevation = LEAVING_ELEVATION.toPx() * f
                 }
             }
-            .background(background)
-            .paperGrain(grain),
+            .paper(background),
     ) { content() }
 }
 
@@ -268,7 +259,7 @@ private val LEAVING_ELEVATION = 6.dp
 private fun NotebookHome(
     pageViewModel: PageViewModel,
     notebookViewModel: NotebookViewModel,
-    onOpenSettings: () -> Unit,
+    onOpenLicences: () -> Unit,
     onOpenHandbook: (Int) -> Unit,
     showToday: Boolean,
     onTodayShown: () -> Unit,
@@ -342,7 +333,7 @@ private fun NotebookHome(
                             pageViewModel.onEvent(PageEvent.OpenPractice)
                             scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, PageKeys.PRACTICE) }
                         },
-                        onOpenSettings = onOpenSettings,
+                        onOpenLicences = onOpenLicences,
                         onOpenHandbook = onOpenHandbook,
                         onOpenSaved = { key ->
                             pageViewModel.onEvent(PageEvent.OpenSaved(key))

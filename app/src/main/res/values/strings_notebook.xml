@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 11.0: practice described only by the technique path, e.g. "Learning: Naked pair". -->
+    <string name="practice_learning">Learning: %1$s</string>
+    <!-- How many techniques are known, of all of them: "Known: 6 of 11". -->
+    <string name="practice_known">Known: %1$d of %2$d</string>
+    <!-- The one row under today: the most recent page left unfinished. -->
+    <string name="notebook_continue">Continue</string>
+    <!-- The notebook's footer. -->
+    <string name="notebook_version">Version %1$s</string>
+    <string name="notebook_privacy">No account, no ads, no network access.</string>
+    <string name="notebook_licences">Licences</string>
+    <!-- After a solve, on the page that makes a technique known: "Naked pair is known now." -->
+    <string name="solved_known_now">%1$s is known now.</string>
+</resources>
