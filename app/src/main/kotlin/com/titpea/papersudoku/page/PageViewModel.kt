@@ -539,6 +539,10 @@ class PageViewModel(
             puzzles.daily(today() + 1)
             val (level, number) = nextPracticeSpec()
             puzzles.classic(level, number)
+            // On a technique page, its next page too: a rare technique can take seconds to deal.
+            _state.value.game?.spec?.key?.let(Catalog::focusTechnique)?.let { technique ->
+                puzzles.focus(technique, store.nextFocusNumber(technique))
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

@@ -21,7 +21,7 @@ class Grader(private val geometry: Geometry) {
         var hardest = Technique.HiddenSingle
         var steps = 0
         while (!board.isSolved) {
-            val step = solver.nextStep(board) ?: return null
+            val step = solver.nextStep(board, maxTier) ?: return null
             if (step.technique.tier > maxTier) return null
             used += step.technique
             if (step.technique.tier > hardest.tier) hardest = step.technique

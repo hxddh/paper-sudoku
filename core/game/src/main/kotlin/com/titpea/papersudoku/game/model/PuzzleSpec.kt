@@ -109,20 +109,19 @@ object Catalog {
     fun focusLevel(technique: Technique): Difficulty = Difficulty.forTier(technique.tier)
 
     /**
-     * Practice for one technique: the next page at its level that needs it. Pages are drawn from
-     * their own stream and checked; a technique that is rare at its level (Swordfish needs about
-     * one Deep page in sixteen) takes longer to deal. After [FOCUS_TRIES] pages without it, the
-     * last one is dealt anyway: still at the technique's level, so still worth doing.
+     * Practice for one technique: the next page at its level that needs it. Each carved page is
+     * checked as it comes, so a technique that is rare at its level (Swordfish needs about one
+     * Deep page in sixteen) costs carves, not whole pages. After [FOCUS_CARVES] without it, the
+     * hardest page carved is dealt anyway: still worth doing.
      */
     fun focus(technique: Technique, number: Int): PuzzleSpec {
         val level = focusLevel(technique)
-        val generator = PuzzleGenerator(Geometry.Classic)
-        var generated = generator.generate(seed(FOCUS_STREAM + technique.ordinal, number.toLong() * FOCUS_TRIES), level)
-        var attempt = 1
-        while (technique !in generated.grade.techniques && attempt < FOCUS_TRIES) {
-            generated = generator.generate(seed(FOCUS_STREAM + technique.ordinal, number.toLong() * FOCUS_TRIES + attempt), level)
-            attempt++
-        }
+        val generated = PuzzleGenerator(Geometry.Classic).generate(
+            seed(FOCUS_STREAM + technique.ordinal, number.toLong()),
+            level,
+            maxAttempts = FOCUS_CARVES,
+            accept = { it.difficulty == level && technique in it.techniques },
+        )
         return spec(focusPrefix(technique) + number, PuzzleKind.Focus, generated, number = number)
     }
 
@@ -192,7 +191,7 @@ object Catalog {
      */
     private const val WEEKLY_STREAM = 10L
     private const val FOCUS_STREAM = 20L
-    private const val FOCUS_TRIES = 40
+    private const val FOCUS_CARVES = 600
     /** Fewer than 17 clues never has a single solution. */
     private const val MIN_IMPORT_CLUES = 17
 

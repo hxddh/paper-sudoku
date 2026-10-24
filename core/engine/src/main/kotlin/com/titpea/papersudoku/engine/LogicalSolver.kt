@@ -57,19 +57,17 @@ class Board private constructor(
  */
 class LogicalSolver(val geometry: Geometry) {
 
-    fun nextStep(board: Board): Step? =
+    /**
+     * The simplest step, using techniques up to [maxTier] only: grading against a level never
+     * searches for the harder patterns it would reject anyway (the step found is the same).
+     */
+    fun nextStep(board: Board, maxTier: Int = Int.MAX_VALUE): Step? =
         hiddenSingle(board, UnitKind.Box)
             ?: nakedSingle(board)
             ?: hiddenSingle(board, null)
-            ?: pointing(board)
-            ?: claiming(board)
-            ?: nakedPair(board)
-            ?: hiddenPair(board)
-            ?: xWing(board)
-            ?: nakedTriple(board)
-            ?: hiddenTriple(board)
-            ?: swordfish(board)
-            ?: xyWing(board)
+            ?: (if (maxTier < 2) null else pointing(board) ?: claiming(board) ?: nakedPair(board))
+            ?: (if (maxTier < 3) null else hiddenPair(board) ?: xWing(board))
+            ?: (if (maxTier < 4) null else nakedTriple(board) ?: hiddenTriple(board) ?: swordfish(board) ?: xyWing(board))
 
     /** Next placement only (no eliminations). */
     fun nextSingle(board: Board): Placement? =
