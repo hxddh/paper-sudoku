@@ -13,6 +13,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -69,15 +73,17 @@ fun ReviewScreen(spec: PuzzleSpec, moves: List<Move>, onBack: () -> Unit) {
             return@SettingsScaffold
         }
         if (ready.isNullOrEmpty()) return@SettingsScaffold
-        item(key = "summary") { Summary(ready) }
+        // The board first, with the move under it: the page, the slider and the note are seen together.
         item(key = "board") {
             val step = ready[at]
-            val game = remember(spec, step) { GameState.new(spec).copy(values = step.values) }
+            // The moved cell is selected, in the player's blue; a slip shows as a clash would.
+            // Terracotta is the Coach's, so it is not used for the player's own moves.
+            val game = remember(spec, step) { GameState.new(spec).copy(values = step.values, selected = step.move.cell) }
             ReviewColumn("review-board") {
                 Board(
                     game = game,
-                    conflicts = emptySet(),
-                    marks = CoachMarks(target = step.move.cell),
+                    conflicts = if (step.kind == ReviewStep.Kind.Mistake) setOf(step.move.cell) else emptySet(),
+                    marks = CoachMarks.None,
                     onTap = {},
                     onCellAction = { _, _ -> },
                     interactive = false,
@@ -96,16 +102,19 @@ fun ReviewScreen(spec: PuzzleSpec, moves: List<Move>, onBack: () -> Unit) {
             val before = if (at > 0) ready[at - 1].values else spec.givens
             StepNote(spec, ready[at], before[ready[at].move.cell])
         }
+        item(key = "summary") { Summary(ready) }
     }
 }
 
 @Composable
-private fun ReviewColumn(tag: String, content: @Composable ColumnScope.() -> Unit) {
+private fun ReviewColumn(tag: String, live: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
     Column(
         Modifier
             .widthIn(max = 640.dp)
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 8.dp)
+            // The note under the slider is read out as each move comes up.
+            .then(if (live) Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier)
             .testTag(tag),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         content = content,
@@ -196,6 +205,10 @@ private fun Controls(at: Int, count: Int, onMove: (Int) -> Unit) {
                     value = at.toFloat(),
                     onValueChange = { onMove(it.roundToInt().coerceIn(0, count - 1)) },
                     valueRange = 0f..(count - 1).toFloat(),
+                    // One step per move, so accessibility swipes go a move at a time; the ticks
+                    // themselves would crowd a long page, so they are not drawn.
+                    steps = (count - 2).coerceAtLeast(0),
+                    colors = SliderDefaults.colors(activeTickColor = Color.Transparent, inactiveTickColor = Color.Transparent),
                     modifier = Modifier
                         .weight(1f)
                         .semantics {
@@ -246,7 +259,7 @@ private fun StepNote(spec: PuzzleSpec, step: ReviewStep, previousDigit: Int) {
         step.kind == ReviewStep.Kind.Erased -> stringResource(R.string.review_coach_took_back)
         else -> stringResource(R.string.review_coach_answer)
     }
-    ReviewColumn("review-step") {
+    ReviewColumn("review-step", live = true) {
         Text(what, style = MaterialTheme.typography.titleMedium)
         Body(reason, Modifier.testTag("review-why"))
         if (coachNote != null) Body(coachNote, Modifier.testTag("review-coach"))

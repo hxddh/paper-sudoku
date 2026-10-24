@@ -3,7 +3,7 @@
 <resources>
     <!-- Read back -->
     <string name="review_title">Read back</string>
-    <string name="review_empty">This page was written before 9.0 kept a record of its moves.</string>
+    <string name="review_empty">This page was written before the notebook kept its moves.</string>
     <string name="review_summary_title">On this page</string>
     <!-- A technique and how many digits it placed, e.g. "Hidden single: 12". -->
     <string name="review_summary_technique">%1$s: %2$d</string>
@@ -36,10 +36,9 @@
     <string name="review_slider">Move</string>
 
     <!-- Bring your own page -->
-    <string name="import_title">Bring your own page</string>
+    <string name="import_title">Type in a page</string>
     <string name="import_intro">Copy a puzzle from a newspaper or a book. The Coach can help with it like any page.</string>
     <string name="import_check">Check and add</string>
-    <string name="import_checking">Checking…</string>
     <string name="import_clear">Clear</string>
     <string name="import_clear_title">Clear this page?</string>
     <string name="import_clear_body">Every digit you typed will be erased.</string>

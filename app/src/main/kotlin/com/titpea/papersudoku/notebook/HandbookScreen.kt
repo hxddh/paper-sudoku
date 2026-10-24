@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -157,8 +158,10 @@ private fun TechniqueSection(technique: Technique, mastery: Mastery, cleanPages:
         )
         workedExample(geometry, hint).forEach { Body(it) }
         if (onPractise != null) {
+            // Ink, not the Coach's red.
             OutlinedButton(
                 onClick = { onPractise(technique) },
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
                 modifier = Modifier.heightIn(min = 48.dp).testTag("practise-${technique.name}"),
             ) { Text(stringResource(R.string.focus_practise)) }
         }

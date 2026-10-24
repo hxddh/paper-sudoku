@@ -1,8 +1,23 @@
 package com.titpea.papersudoku.page
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -10,7 +25,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,7 +54,6 @@ import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.Import
 import com.titpea.papersudoku.game.model.PuzzleKind
 import com.titpea.papersudoku.game.model.PuzzleSpec
-import com.titpea.papersudoku.settings.SettingsScaffold
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -87,6 +100,7 @@ private val DraftSaver: Saver<GameState, Any> = listSaver(
  * clashing digits outlined) so it can be checked against the original.
  */
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun ImportScreen(onBack: () -> Unit, onImported: (PuzzleSpec) -> Unit) {
     var game by rememberSaveable(stateSaver = DraftSaver) { mutableStateOf(blankDraft()) }
     var checking by remember { mutableStateOf(false) }
@@ -137,22 +151,30 @@ fun ImportScreen(onBack: () -> Unit, onImported: (PuzzleSpec) -> Unit) {
         }
     }
 
-    SettingsScaffold(
-        title = stringResource(R.string.import_title),
-        onBack = onBack,
-        tag = "import",
-    ) {
-        item(key = "intro") {
-            ImportColumn {
-                Text(
-                    stringResource(R.string.import_intro),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        item(key = "board") {
-            ImportColumn {
+    // A page, not a list: the board fills what the keys leave, and one line under it carries the
+    // how-to or, after a check, why the page was refused, so nothing below it ever moves.
+    Scaffold(
+        modifier = Modifier.testTag("import"),
+        containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets.safeDrawing,
+        topBar = {
+            TopAppBar(
+                windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
+                title = { Text(stringResource(R.string.import_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(painterResource(R.drawable.ic_back), contentDescription = stringResource(R.string.back))
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+            )
+        },
+    ) { padding ->
+        Column(
+            Modifier.fillMaxSize().padding(padding).padding(horizontal = 12.dp).padding(bottom = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Board(
                     game = game,
                     conflicts = conflicts,
@@ -161,55 +183,43 @@ fun ImportScreen(onBack: () -> Unit, onImported: (PuzzleSpec) -> Unit) {
                     onCellAction = { index, action ->
                         if (action == BoardAction.Erase) game = game.select(index).erase()
                     },
-                    modifier = Modifier
-                        .widthIn(max = 480.dp)
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .align(Alignment.CenterHorizontally),
+                    modifier = Modifier.widthIn(max = 480.dp).aspectRatio(1f, matchHeightConstraintsFirst = true),
                 )
             }
-        }
-        item(key = "message") {
             val message = shown?.let { messageFor(it.reason) }
-            if (message != null) {
-                ImportColumn {
-                    Text(
-                        message,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .semantics { liveRegion = LiveRegionMode.Polite }
-                            .testTag("import-message"),
-                    )
-                }
-            }
-        }
-        item(key = "keypad") {
-            ImportColumn {
-                Keypad(
-                    game = game,
-                    onEvent = { handle(it) },
-                    modifier = Modifier.widthIn(max = 480.dp).align(Alignment.CenterHorizontally),
-                )
-            }
-        }
-        item(key = "actions") {
-            ImportColumn {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(
-                        onClick = { confirmClear = true },
-                        enabled = !checking && values.any { it != 0 },
-                        modifier = Modifier.testTag("import-clear"),
-                    ) { Text(stringResource(R.string.import_clear)) }
-                    Spacer(Modifier.weight(1f))
-                    Button(
-                        onClick = { check() },
-                        enabled = !checking,
-                        modifier = Modifier.testTag("import-check"),
-                    ) {
-                        Text(stringResource(if (checking) R.string.import_checking else R.string.import_check))
-                    }
-                }
+            Text(
+                message ?: stringResource(R.string.import_intro),
+                style = MaterialTheme.typography.bodyMedium,
+                // A clash is the board's own mistake; anything else is plain information.
+                color = if (shown?.reason == Import.Reason.Clash) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                minLines = 2,
+                modifier = Modifier
+                    .widthIn(max = 480.dp)
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .semantics { liveRegion = LiveRegionMode.Polite }
+                    .then(if (message != null) Modifier.testTag("import-message") else Modifier),
+            )
+            Keypad(
+                game = game,
+                onEvent = { handle(it) },
+                counts = false,
+                modifier = Modifier.widthIn(max = 480.dp),
+            )
+            Row(Modifier.widthIn(max = 480.dp).fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(
+                    onClick = { confirmClear = true },
+                    enabled = !checking && values.any { it != 0 },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                    modifier = Modifier.heightIn(min = 48.dp).testTag("import-clear"),
+                ) { Text(stringResource(R.string.import_clear)) }
+                Spacer(Modifier.weight(1f))
+                // Ink, not the stamp's red: adding a page is a way on, as "Back to the notebook" is.
+                FilledTonalButton(
+                    onClick = { check() },
+                    enabled = !checking,
+                    modifier = Modifier.heightIn(min = 48.dp).testTag("import-check"),
+                ) { Text(stringResource(R.string.import_check)) }
             }
         }
     }
@@ -234,18 +244,6 @@ fun ImportScreen(onBack: () -> Unit, onImported: (PuzzleSpec) -> Unit) {
             },
         )
     }
-}
-
-@Composable
-private fun ImportColumn(content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        Modifier
-            .widthIn(max = 640.dp)
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        content = content,
-    )
 }
 
 @Composable

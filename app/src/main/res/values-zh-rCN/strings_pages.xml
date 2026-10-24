@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="weekly">本周</string>
-    <string name="weekly_title">%1$s 起的一周</string>
-    <string name="weekly_card_new">这周的一页 9×9</string>
-    <string name="weekly_card_continue">继续这周的一页</string>
-    <string name="weekly_card_done">这周的一页已盖章</string>
+    <string name="weekly_title">%1$s起的一周</string>
+    <string name="weekly_card_new">开始本周这一页</string>
+    <string name="weekly_card_continue">继续本周这一页</string>
+    <string name="weekly_card_done">本周这一页已盖章</string>
     <string name="focus">技巧专练</string>
     <string name="focus_practise">练这一招</string>
+    <string name="solved_focus">%1$s：%2$s</string>
+    <string name="solved_weekly_close">周日会换上新的一页。</string>
     <string name="focus_another">再来一页</string>
     <string name="imported">你的题目</string>
     <string name="imported_beyond_coach">超出教练的范围</string>
@@ -16,7 +18,7 @@
     <string name="solved_read_back">复盘</string>
     <string name="mastery_met">见过</string>
     <string name="mastery_practised">练过</string>
-    <string name="mastery_mastered">掌握</string>
+    <string name="mastery_mastered">已掌握</string>
     <plurals name="mastery_pages">
         <item quantity="other">%1$d 页干净完成</item>
     </plurals>

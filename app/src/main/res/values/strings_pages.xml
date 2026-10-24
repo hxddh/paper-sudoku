@@ -3,12 +3,14 @@
     <!-- The Sunday 9×9 page, open all week. -->
     <string name="weekly">This week</string>
     <string name="weekly_title">Week of %1$s</string>
-    <string name="weekly_card_new">A 9×9 page for the week</string>
+    <string name="weekly_card_new">Start this week’s page</string>
     <string name="weekly_card_continue">Continue this week’s page</string>
     <string name="weekly_card_done">Stamped this week</string>
     <!-- A page for practising one technique, from the handbook. -->
     <string name="focus">Technique practice</string>
     <string name="focus_practise">Practise this</string>
+    <string name="solved_focus">%1$s: %2$s</string>
+    <string name="solved_weekly_close">A new weekly page on Sunday.</string>
     <string name="focus_another">Another page</string>
     <!-- Pages the player typed in. -->
     <string name="imported">Your page</string>
@@ -17,7 +19,7 @@
     <string name="imported_add">Type in a page</string>
     <string name="menu_read_back">Read back</string>
     <string name="solved_read_back">Read back</string>
-    <string name="mastery_met">Met</string>
+    <string name="mastery_met">Seen</string>
     <string name="mastery_practised">Practised</string>
     <string name="mastery_mastered">Known</string>
     <plurals name="mastery_pages">

@@ -579,11 +579,6 @@ private fun SolvedNote(
                 modifier = Modifier.testTag("solved-outlook"),
             )
         }
-        if (onReadBack != null) {
-            TextButton(onClick = onReadBack, modifier = Modifier.heightIn(min = 48.dp).testTag("solved-read-back")) {
-                Text(stringResource(R.string.solved_read_back))
-            }
-        }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             // Quiet tools: blue is the player's pen, not a button colour.
@@ -593,6 +588,12 @@ private fun SolvedNote(
             }
             IconButton(onClick = onPrint) {
                 Icon(painterResource(R.drawable.ic_print), contentDescription = stringResource(R.string.action_print), tint = tools)
+            }
+            // An icon beside the others, not a line of its own: the note never grows on a solve.
+            if (onReadBack != null) {
+                IconButton(onClick = onReadBack, modifier = Modifier.testTag("solved-read-back")) {
+                    Icon(painterResource(R.drawable.ic_read_back), contentDescription = stringResource(R.string.solved_read_back), tint = tools)
+                }
             }
             Spacer(Modifier.weight(1f))
             // Ink, not the stamp's red: going back is a way on, not a reward.
@@ -617,6 +618,17 @@ private fun solvedOutlook(game: GameState, state: PageUiState): Outlook? = when 
             else -> Outlook(stringResource(R.string.practice_top_level))
         }
     }
+    // A technique page says how far that technique is known now (counted once the solve is recorded).
+    game.spec.kind == PuzzleKind.Focus -> Catalog.focusTechnique(game.spec.key)?.let { technique ->
+        val clean = state.settings.cleanPages[technique] ?: 0
+        if (clean > 0) {
+            Outlook(stringResource(R.string.solved_focus, techniqueName(technique), pluralStringResource(R.plurals.mastery_pages, clean, clean)))
+        } else {
+            null
+        }
+    }
+    game.spec.kind == PuzzleKind.Weekly -> Outlook(stringResource(R.string.solved_weekly_close))
+    game.spec.kind == PuzzleKind.Imported -> null
     // Today's page closes with tomorrow's: a reason to come back, without a streak.
     game.spec.epochDay == state.today -> Outlook(stringResource(R.string.solved_daily_close))
     // Finished a day late, just now, with today's page still to do.

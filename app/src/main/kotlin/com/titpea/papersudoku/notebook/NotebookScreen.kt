@@ -65,6 +65,7 @@ import com.titpea.papersudoku.R
 import com.titpea.papersudoku.data.PageSummary
 import com.titpea.papersudoku.game.model.Catalog
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.TextButton
 import com.titpea.papersudoku.page.spoken
 import com.titpea.papersudoku.page.month
@@ -178,6 +179,11 @@ fun NotebookScreen(
                     thumbnailModifier = boardTransition(key),
                 )
             }
+            // Pages begun and not finished come straight after the cards: they are the next thing to do.
+            if (state.unfinished.isNotEmpty()) {
+                item(key = "unfinished") { SectionTitle(stringResource(R.string.notebook_unfinished)) }
+                items(state.unfinished, key = { it }, contentType = { "row" }) { day -> DayRow(state, day, selectedKey, onOpenDay, boardTransition) }
+            }
             if (state.stamped == 0) {
                 item(key = "summary") {
                     Text(
@@ -203,21 +209,24 @@ fun NotebookScreen(
             item(key = "techniques") { SectionTitle(stringResource(R.string.notebook_techniques)) }
             item(key = "handbook") { Handbook(state.techniquesMet, state.cleanPages, onOpenHandbook) }
             // The player's own pages, and the way to type one in.
-            item(key = "imported-title") { SectionTitle(stringResource(R.string.imported_section)) }
+            if (state.imported.isNotEmpty()) {
+                item(key = "imported-title") { SectionTitle(stringResource(R.string.imported_section)) }
+            }
             items(state.imported, key = { it.key }, contentType = { "row" }) { page ->
                 ImportedRow(page, selected = selectedKey == page.key, onClick = { onOpenSaved(page.key) }, thumbnailModifier = boardTransition(page.key))
             }
             item(key = "imported-add") {
-                TextButton(
-                    onClick = onTypeIn,
-                    modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth().heightIn(min = 48.dp).testTag("notebook-type-in"),
-                ) { Text(stringResource(R.string.imported_add)) }
+                // A quiet row in ink at the notebook's text edge, not a red button.
+                Box(Modifier.widthIn(max = 640.dp).fillMaxWidth()) {
+                    TextButton(
+                        onClick = onTypeIn,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                        contentPadding = PaddingValues(horizontal = TextInset - 4.dp),
+                        modifier = Modifier.heightIn(min = 48.dp).testTag("notebook-type-in"),
+                    ) { Text(stringResource(R.string.imported_add)) }
+                }
             }
             // Only pages with something on them: blank days are reached through the contents.
-            if (state.unfinished.isNotEmpty()) {
-                item(key = "unfinished") { SectionTitle(stringResource(R.string.notebook_unfinished)) }
-                items(state.unfinished, key = { it }, contentType = { "row" }) { day -> DayRow(state, day, selectedKey, onOpenDay, boardTransition) }
-            }
             if (state.stampedDays.isNotEmpty()) {
                 item(key = "earlier") { SectionTitle(stringResource(R.string.notebook_earlier)) }
             }
@@ -438,8 +447,8 @@ private fun WeeklyCard(
         Row(Modifier.padding(TextInset), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).clearAndSetSemantics {}) {
                 CardLabel(stringResource(R.string.weekly))
-                Text(title, style = MaterialTheme.typography.headlineSmall)
-                CardSupport(level)
+                Text(level, style = MaterialTheme.typography.headlineMedium)
+                CardSupport(title)
                 Spacer(Modifier.height(8.dp))
                 CardAction(status)
             }

@@ -6,7 +6,6 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
@@ -92,22 +91,17 @@ class NewScreensTest {
         composeRule.setContent {
             SudokuTheme(darkTheme = false) { ImportScreen(onBack = {}, onImported = { imported = it }) }
         }
-        val list = composeRule.onNodeWithTag("import")
-        fun tap(tag: String) {
-            list.performScrollToNode(hasTestTag(tag))
-            composeRule.onNodeWithTag(tag).performClick()
-        }
+        // One page, no scrolling: everything is on screen at once.
+        fun tap(tag: String) = composeRule.onNodeWithTag(tag).performClick()
         tap("cell-0")
         tap("keypad-5")
         tap("cell-40")
         tap("keypad-3")
         tap("import-check")
 
-        val check = context.getString(R.string.import_check)
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithText(check).fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithTag("import-message").fetchSemanticsNodes().isNotEmpty()
         }
-        list.performScrollToNode(hasTestTag("import-message"))
         composeRule.onNodeWithTag("import-message").assertTextEquals(context.getString(R.string.import_too_few))
         assertNull(imported)
     }

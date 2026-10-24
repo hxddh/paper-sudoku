@@ -16,5 +16,5 @@
     <string name="why_naked_triple">In %1$s, three cells can only be %2$d, %3$d or %4$d. They take all three, so no other cell there can.</string>
     <string name="why_hidden_triple">The digits %2$d, %3$d and %4$d fit only the same three cells in %1$s, so those cells hold nothing else.</string>
     <string name="why_swordfish">In %1$s, %2$s and %3$s, a %7$d fits only where they cross %4$s, %5$s and %6$s. Each line takes one of those spots, each in a different crossing line, so no other cell of %4$s, %5$s or %6$s can be %7$d.</string>
-    <string name="why_xy_wing">%1$s can only be %4$d or %5$d. %2$s and %3$s each pair one of those with %6$d. Whichever %1$s turns out to be, one of them is %6$d, so no cell that sees both can be %6$d.</string>
+    <string name="why_xy_wing">The cell at %1$s can only be %4$d or %5$d. The cells at %2$s and %3$s each pair one of those with %6$d. Whichever it turns out to be, one of them is %6$d, so no cell that sees both can be %6$d.</string>
 </resources>

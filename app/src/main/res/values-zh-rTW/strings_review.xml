@@ -3,7 +3,7 @@
 <resources>
     <!-- 復盤 -->
     <string name="review_title">復盤</string>
-    <string name="review_empty">這一頁寫於 9.0 之前，那時還不會記錄每一步。</string>
+    <string name="review_empty">這一頁寫下時，筆記本還不會記下每一步。</string>
     <string name="review_summary_title">這一頁</string>
     <string name="review_summary_technique">%1$s：%2$d</string>
     <plurals name="review_summary_beyond">
@@ -31,10 +31,9 @@
     <string name="review_slider">步數</string>
 
     <!-- 抄題 -->
-    <string name="import_title">抄一頁自己的題</string>
+    <string name="import_title">抄一頁題目</string>
     <string name="import_intro">把報紙或書上的題目抄進來。教練會像對待其他頁一樣幫你。</string>
     <string name="import_check">檢查並加入</string>
-    <string name="import_checking">正在檢查…</string>
     <string name="import_clear">清空</string>
     <string name="import_clear_title">清空這一頁？</string>
     <string name="import_clear_body">你填進去的數字都會被擦掉。</string>

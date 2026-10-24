@@ -157,6 +157,8 @@ fun Keypad(
     game: GameState,
     onEvent: (PageEvent) -> Unit,
     modifier: Modifier = Modifier,
+    /** False while typing a page in: keys say no count and never turn into a check. */
+    counts: Boolean = true,
 ) {
     // Zero stands for the Erase key.
     val rows = if (game.size == 6) listOf((1..6) + 0) else listOf((1..5).toList(), (6..9) + 0)
@@ -201,11 +203,11 @@ fun Keypad(
                     }
                     customItem(
                         buttonGroupContent = {
-                            val done = remaining[digit] <= 0
+                            val done = counts && remaining[digit] <= 0
                             val weight by animateFloatAsState(if (done && game.lockedDigit != digit) 0.55f else 1f, MaterialTheme.motionScheme.defaultSpatialSpec(), label = "key-weight")
                             DigitKey(
                                 digit = digit,
-                                left = remaining[digit],
+                                left = if (counts) remaining[digit] else null,
                                 held = game.lockedDigit == digit,
                                 pencil = game.notesMode,
                                 first = i == 0,
@@ -240,7 +242,8 @@ fun Keypad(
 @Composable
 private fun DigitKey(
     digit: Int,
-    left: Int,
+    /** Copies still to place, or null where the keypad does not count. */
+    left: Int?,
     held: Boolean,
     pencil: Boolean,
     first: Boolean,
@@ -260,7 +263,7 @@ private fun DigitKey(
         topEnd = if (last) outer else inner,
         bottomEnd = if (last) outer else inner,
     )
-    val done = left <= 0
+    val done = left != null && left <= 0
     // Paper keys with printed ink; the held digit is the one red key. In pencil mode the digits
     // are smaller and in the pencil's ink blue, so the mode reads as a mode, not as disabled keys.
     val container = when {
@@ -277,6 +280,7 @@ private fun DigitKey(
         held -> stringResource(R.string.keypad_held, digit)
         done -> stringResource(R.string.keypad_done, digit)
         pencil -> stringResource(R.string.keypad_pencil, digit)
+        left == null -> digit.toString()
         else -> stringResource(R.string.keypad_digit, digit, left)
     }
     Box(
