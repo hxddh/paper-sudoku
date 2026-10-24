@@ -186,17 +186,8 @@ jobs:
             # Record the Baseline Profile of the real journey on this emulator. The release ships
             # the committed app/src/main/baseline-prof.txt; this prints what the journey ran
             # outside it, to extend it from (the generated file is uploaded below).
-            ./gradlew --no-daemon :benchmark:connectedBenchmarkAndroidTest -PpaperSudoku.benchmarkRules=BaselineProfile || touch app/build/profile-failed
-            generated=$(find benchmark/build/outputs -name "*generate-baseline-prof.txt" | head -n 1)
-            if [ -n "$generated" ]; then
-              cp "$generated" app/build/outputs/generated-baseline-prof.txt
-              find benchmark/build/outputs -name "*generate-startup-prof.txt" -exec cp {} app/build/outputs/generated-startup-prof.txt \; || true
-              python3 tools/ci/profile-coverage.py "$generated" app/src/main/baseline-prof.txt
-            else
-              echo "::error::The emulator recorded no Baseline Profile"
-              touch app/build/profile-failed
-            fi
-            test ! -e app/build/ui-tests-failed && test ! -e app/build/benchmark-failed && test ! -e app/build/over-budget && test ! -e app/build/profile-failed
+            sh tools/ci/record-profile.sh
+            test ! -e app/build/ui-tests-failed && test ! -e app/build/benchmark-failed && test ! -e app/build/over-budget
 
       # Gradle only links the report; name each failed test and its message in the log.
       - name: Failed device tests
