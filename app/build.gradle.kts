@@ -29,8 +29,24 @@ android {
     val releaseStorePassword = providers.environmentVariable("PAPER_SUDOKU_STORE_PASSWORD").orNull
     val releaseKeyAlias = providers.environmentVariable("PAPER_SUDOKU_KEY_ALIAS").orNull
     val releaseKeyPassword = providers.environmentVariable("PAPER_SUDOKU_KEY_PASSWORD").orNull
+    // The fixed key for the GitHub "-sideload" APKs (not the Play upload key), so one sideload
+    // build updates the next. Without it, sideload builds fall back to the debug key.
+    val sideloadKeystore = providers.environmentVariable("PAPER_SUDOKU_SIDELOAD_KEYSTORE").orNull
+    val sideloadStorePassword = providers.environmentVariable("PAPER_SUDOKU_SIDELOAD_STORE_PASSWORD").orNull
+    val sideloadKeyAlias = providers.environmentVariable("PAPER_SUDOKU_SIDELOAD_KEY_ALIAS").orNull
+    val sideloadKeyPassword = providers.environmentVariable("PAPER_SUDOKU_SIDELOAD_KEY_PASSWORD").orNull
 
     signingConfigs {
+        if (sideloadKeystore != null && sideloadStorePassword != null &&
+            sideloadKeyAlias != null && sideloadKeyPassword != null
+        ) {
+            create("sideload") {
+                storeFile = file(sideloadKeystore)
+                storePassword = sideloadStorePassword
+                keyAlias = sideloadKeyAlias
+                keyPassword = sideloadKeyPassword
+            }
+        }
         if (releaseKeystore != null && releaseStorePassword != null &&
             releaseKeyAlias != null && releaseKeyPassword != null
         ) {
@@ -47,10 +63,11 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            // -PpaperSudoku.sideload=true signs with the build machine's debug key, for the
-            // GitHub "-sideload" releases. Play builds use the private upload key above.
+            // -PpaperSudoku.sideload=true signs for the GitHub "-sideload" releases: with the
+            // sideload key above when its four PAPER_SUDOKU_SIDELOAD_* variables are set, else
+            // with the build machine's debug key. Play builds use the private upload key above.
             signingConfig = if (sideload) {
-                signingConfigs.getByName("debug")
+                signingConfigs.findByName("sideload") ?: signingConfigs.getByName("debug")
             } else {
                 signingConfigs.findByName("release")
             }
