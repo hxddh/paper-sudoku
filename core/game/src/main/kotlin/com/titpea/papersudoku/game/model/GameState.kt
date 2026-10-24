@@ -2,6 +2,7 @@ package com.titpea.papersudoku.game.model
 
 import com.titpea.papersudoku.engine.DigitMask
 import com.titpea.papersudoku.engine.SudokuEngine
+import com.titpea.papersudoku.engine.Technique
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -31,8 +32,13 @@ data class Move(val cell: Int, val digit: Int, val coach: Boolean = false)
 data class CoachUsage(
     val asks: Int = 0,
     val deepest: Int = 0,
+    /** How far the Coach went for each technique it taught on this page (10.0). */
+    val byTechnique: Map<Technique, Int> = emptyMap(),
 ) {
-    fun reached(level: Int): CoachUsage = copy(deepest = maxOf(deepest, level))
+    fun reached(level: Int, technique: Technique? = null): CoachUsage = copy(
+        deepest = maxOf(deepest, level),
+        byTechnique = if (technique == null) byTechnique else byTechnique + (technique to maxOf(byTechnique[technique] ?: 0, level)),
+    )
 }
 
 /**
@@ -149,6 +155,12 @@ data class GameState(
         )
     }
 
+    /** Gives back a pencil mark the Coach found missing (10.0); one undo takes it away again. */
+    fun restoreMark(index: Int, digit: Int): GameState {
+        if (!isEditable(index) || values[index] != 0 || digit !in 1..size || DigitMask.contains(notes[index], digit)) return this
+        return remember().copy(notes = notes.replace(index, notes[index] or (1 shl digit)), selected = index)
+    }
+
     /**
      * Pencils in every candidate (each digit not yet in the cell's row, column or box) in the
      * empty cells that have no marks yet. Cells already marked keep the player's own marks. Only
@@ -193,7 +205,7 @@ data class GameState(
 
     fun coachAsked(): GameState = copy(coach = coach.copy(asks = coach.asks + 1).reached(1))
 
-    fun coachReached(level: Int): GameState = copy(coach = coach.reached(level))
+    fun coachReached(level: Int, technique: Technique? = null): GameState = copy(coach = coach.reached(level, technique))
 
     /** Marks the game solved if the board matches the solution. */
     fun settle(now: Long): GameState =
@@ -265,7 +277,7 @@ data class GameState(
                 values.indices.all { spec.givens[it] == 0 || values[it] == spec.givens[it] } &&
                 (lockedDigit == null || lockedDigit in 1..spec.size) &&
                 history.all { boardOk(it.values, it.notes, it.selected) } &&
-                coach.deepest in 0..3 && elapsedMillis >= 0 &&
+                coach.deepest in 0..3 && coach.byTechnique.values.all { it in 1..3 } && elapsedMillis >= 0 &&
                 struck.all { it.cell in 0 until cells && it.by in 0 until cells && it.digit in 1..spec.size } &&
                 moves.all { it.cell in 0 until cells && it.digit in digits } &&
                 // "Solved" with a wrong board would lock it for good.

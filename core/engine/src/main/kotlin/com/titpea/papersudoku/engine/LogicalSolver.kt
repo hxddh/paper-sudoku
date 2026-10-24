@@ -69,25 +69,33 @@ class LogicalSolver(val geometry: Geometry) {
             ?: (if (maxTier < 3) null else hiddenPair(board) ?: xWing(board))
             ?: (if (maxTier < 4) null else nakedTriple(board) ?: hiddenTriple(board) ?: swordfish(board) ?: xyWing(board))
 
-    /** Next placement only (no eliminations). */
-    fun nextSingle(board: Board): Placement? =
-        hiddenSingle(board, UnitKind.Box) ?: nakedSingle(board) ?: hiddenSingle(board, null)
+    /**
+     * Next placement only (no eliminations). With [near], a single in a cell it accepts comes
+     * first: every single is as easy as any other, so the one where the player is looking wins.
+     */
+    fun nextSingle(board: Board, near: ((Int) -> Boolean)? = null): Placement? {
+        if (near != null) {
+            (hiddenSingle(board, UnitKind.Box, near) ?: nakedSingle(board, near) ?: hiddenSingle(board, null, near))
+                ?.let { return it }
+        }
+        return hiddenSingle(board, UnitKind.Box) ?: nakedSingle(board) ?: hiddenSingle(board, null)
+    }
 
     fun nextElimination(board: Board): Elimination? =
         pointing(board) ?: claiming(board) ?: nakedPair(board) ?: hiddenPair(board) ?: xWing(board)
             ?: nakedTriple(board) ?: hiddenTriple(board) ?: swordfish(board) ?: xyWing(board)
 
-    private fun nakedSingle(board: Board): Placement? {
+    private fun nakedSingle(board: Board, accept: ((Int) -> Boolean)? = null): Placement? {
         for (i in board.values.indices) {
             val c = board.candidates[i]
-            if (board.values[i] == 0 && c.digitCount() == 1) {
+            if (board.values[i] == 0 && c.digitCount() == 1 && (accept == null || accept(i))) {
                 return Placement(i, c.firstDigit(), Technique.NakedSingle, null)
             }
         }
         return null
     }
 
-    private fun hiddenSingle(board: Board, only: UnitKind?): Placement? {
+    private fun hiddenSingle(board: Board, only: UnitKind?, accept: ((Int) -> Boolean)? = null): Placement? {
         for ((ref, cells) in geometry.units) {
             if (only != null && ref.kind != only) continue
             if (only == null && ref.kind == UnitKind.Box) continue
@@ -104,7 +112,7 @@ class LogicalSolver(val geometry: Geometry) {
                         spot = cell
                     }
                 }
-                if (count == 1) return Placement(spot, digit, Technique.HiddenSingle, ref)
+                if (count == 1 && (accept == null || accept(spot))) return Placement(spot, digit, Technique.HiddenSingle, ref)
             }
         }
         return null

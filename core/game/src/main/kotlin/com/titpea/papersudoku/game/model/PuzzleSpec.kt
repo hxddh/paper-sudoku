@@ -185,12 +185,40 @@ object Catalog {
     }
 
     /**
+     * Practice page [number] at [difficulty], dealt to need [target] when there is one (10.0: the
+     * path, see [Path]). Without a target it is exactly [classic]. With one, it comes from that
+     * technique's own stream and carries it in its key ("classic-steady-12-pointing"), so the same
+     * page is dealt again for the same key; if no page at the level needs the technique within
+     * [PATH_CARVES], the plain page is dealt instead.
+     */
+    fun practice(difficulty: Difficulty, number: Int, target: Technique?): PuzzleSpec {
+        if (target == null) return classic(difficulty, number)
+        val generated = PuzzleGenerator(Geometry.Classic).generate(
+            seed(PATH_STREAM + target.ordinal, difficulty.ordinal * 1_000_000L + number),
+            difficulty,
+            maxAttempts = PATH_CARVES,
+            accept = { it.difficulty == difficulty && target in it.techniques },
+        )
+        if (generated.grade.difficulty != difficulty || target !in generated.grade.techniques) return classic(difficulty, number)
+        return spec(practiceKey(difficulty, number, target), PuzzleKind.Classic, generated, number = number)
+    }
+
+    fun practiceKey(difficulty: Difficulty, number: Int, target: Technique?): String =
+        classicKey(difficulty, number) + (target?.let { "-" + it.name.lowercase() } ?: "")
+
+    /** The technique a practice page was dealt to need, from its key; null for a plain page. */
+    fun practiceTarget(key: String): Technique? =
+        Technique.entries.firstOrNull { key.startsWith("classic-") && key.endsWith("-" + it.name.lowercase()) }
+
+    /**
      * Hashed, not stepped: SplitMix64 itself steps its state by a fixed constant, so seeds that
      * differ by a multiple of it (as `n * constant` did up to 2) replay each other's draws, and a
      * page whose generator retried could deal the same puzzle as a later page.
      */
     private const val WEEKLY_STREAM = 10L
     private const val FOCUS_STREAM = 20L
+    private const val PATH_STREAM = 40L
+    private const val PATH_CARVES = 600
     private const val FOCUS_CARVES = 600
     /** Fewer than 17 clues never has a single solution. */
     private const val MIN_IMPORT_CLUES = 17

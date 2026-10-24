@@ -7,6 +7,13 @@ sealed interface CoachHint {
     data class Mistake(val index: Int, val digit: Int) : CoachHint
 
     /**
+     * The player's pencil marks in [index] leave out [digit], which the cell still needs (10.0).
+     * Said before any step: a step worked out from candidates the player no longer has would not
+     * match their page.
+     */
+    data class MissingMark(val index: Int, val digit: Int) : CoachHint
+
+    /**
      * The next placement, plus the eliminations it needs first ([groundwork]), in order. Only
      * eliminations the placement depends on are kept, so each one is worth explaining.
      */
@@ -61,14 +68,27 @@ class SudokuEngine(private val puzzle: Puzzle) {
     fun isSolved(values: IntArray): Boolean =
         values.size == solution.size && values.indices.all { values[it] == solution[it] }
 
-    fun hint(values: IntArray): CoachHint? {
+    /**
+     * What the Coach says now. [notes] are the player's pencil marks (bit d = digit d): a cell
+     * whose marks leave out its own answer is pointed out first. [near] is the cell the player is
+     * on: among equally simple steps, one in its row, column or box comes first.
+     */
+    fun hint(values: IntArray, notes: IntArray? = null, near: Int? = null): CoachHint? {
         require(values.size == geometry.cellCount) { "values must contain size * size cells" }
         mistakes(values).firstOrNull()?.let { return CoachHint.Mistake(it, values[it]) }
+        if (notes != null) {
+            require(notes.size == values.size) { "notes must contain size * size cells" }
+            // Nearest the player first, then in reading order.
+            val order = values.indices.sortedBy { if (near != null && (it == near || geometry.sees(it, near))) 0 else 1 }
+            order.firstOrNull { values[it] == 0 && notes[it] != 0 && notes[it] and (1 shl solution[it]) == 0 }
+                ?.let { return CoachHint.MissingMark(it, solution[it]) }
+        }
         val board = Board.from(geometry, values)
         if (board.isSolved) return null
+        val prefer: ((Int) -> Boolean)? = near?.let { n -> { cell -> cell == n || geometry.sees(cell, n) } }
         val groundwork = mutableListOf<Elimination>()
         repeat(MAX_GROUNDWORK) {
-            solver.nextSingle(board)?.let { return CoachHint.Next(it, replayed(values, essential(groundwork, it))) }
+            solver.nextSingle(board, prefer.takeIf { groundwork.isEmpty() })?.let { return CoachHint.Next(it, replayed(values, essential(groundwork, it))) }
             val elimination = solver.nextElimination(board) ?: return null
             groundwork += elimination
             board.eliminate(elimination.removals)
