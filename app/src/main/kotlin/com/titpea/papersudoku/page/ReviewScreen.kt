@@ -365,7 +365,14 @@ private fun Controls(at: Int, count: Int, onMove: (Int) -> Unit) {
                     // One step per move, so accessibility swipes go a move at a time; the ticks
                     // themselves would crowd a long page, so they are not drawn.
                     steps = (count - 2).coerceAtLeast(0),
-                    colors = SliderDefaults.colors(activeTickColor = Color.Transparent, inactiveTickColor = Color.Transparent),
+                    // The player's pen blue: terracotta is the Coach's and the stamp's.
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.secondary,
+                        activeTrackColor = MaterialTheme.colorScheme.secondary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        activeTickColor = Color.Transparent,
+                        inactiveTickColor = Color.Transparent,
+                    ),
                     modifier = Modifier
                         .weight(1f)
                         .semantics {
