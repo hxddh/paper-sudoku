@@ -853,8 +853,9 @@ private fun InkConnector(
             path.moveTo(start.x, start.y)
             path.cubicTo(start.x, (start.y + end.y) / 2f, end.x, (start.y + end.y) / 2f, end.x, end.y)
         } else {
-            // From the top of the note's margin rule, up the margin, into the bracket's middle.
-            val start = Offset(if (rtl) note.right - 1.dp.toPx() else note.left + 1.dp.toPx(), note.top)
+            // From the top of the note, up the margin on the bracket's own side, into its middle:
+            // starting on the far side would cross the grid to get there.
+            val start = Offset(if (nearSide) note.right - 1.dp.toPx() else note.left + 1.dp.toPx(), note.top)
             val reach = if (nearSide) 12.dp.toPx() else -12.dp.toPx()
             path.moveTo(start.x, start.y)
             path.cubicTo(start.x, (start.y + end.y) / 2f, end.x + reach, end.y, end.x, end.y)

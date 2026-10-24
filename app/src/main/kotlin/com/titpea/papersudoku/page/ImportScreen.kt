@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -166,6 +165,21 @@ fun ImportScreen(onBack: () -> Unit, onImported: (PuzzleSpec) -> Unit) {
                         Icon(painterResource(R.drawable.ic_back), contentDescription = stringResource(R.string.back))
                     }
                 },
+                // The actions sit in the bar, so the board keeps the height its cells need.
+                actions = {
+                    TextButton(
+                        onClick = { confirmClear = true },
+                        enabled = !checking && values.any { it != 0 },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                        modifier = Modifier.heightIn(min = 48.dp).testTag("import-clear"),
+                    ) { Text(stringResource(R.string.import_clear)) }
+                    // Ink, not the stamp's red: adding a page is a way on, as "Back to the notebook" is.
+                    FilledTonalButton(
+                        onClick = { check() },
+                        enabled = !checking,
+                        modifier = Modifier.padding(end = 8.dp).heightIn(min = 48.dp).testTag("import-check"),
+                    ) { Text(stringResource(R.string.import_check)) }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         },
@@ -206,21 +220,6 @@ fun ImportScreen(onBack: () -> Unit, onImported: (PuzzleSpec) -> Unit) {
                 counts = false,
                 modifier = Modifier.widthIn(max = 480.dp),
             )
-            Row(Modifier.widthIn(max = 480.dp).fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(
-                    onClick = { confirmClear = true },
-                    enabled = !checking && values.any { it != 0 },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-                    modifier = Modifier.heightIn(min = 48.dp).testTag("import-clear"),
-                ) { Text(stringResource(R.string.import_clear)) }
-                Spacer(Modifier.weight(1f))
-                // Ink, not the stamp's red: adding a page is a way on, as "Back to the notebook" is.
-                FilledTonalButton(
-                    onClick = { check() },
-                    enabled = !checking,
-                    modifier = Modifier.heightIn(min = 48.dp).testTag("import-check"),
-                ) { Text(stringResource(R.string.import_check)) }
-            }
         }
     }
 
