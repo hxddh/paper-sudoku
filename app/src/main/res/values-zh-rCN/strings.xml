@@ -171,14 +171,6 @@
 <string name="contents_key_clean">干净完成</string>
     <string name="contents_key_coached">看过答案</string>
     <string name="handbook_example">看这个例子</string>
-    <string name="handbook_pen">怎么用笔</string>
-    <string name="handbook_pen_summary">写数、瞄准、拿起数字和铅笔。</string>
-    <string name="handbook_pen_tap">先点格子，再点数字；再点一次同一个数字就擦掉。</string>
-    <string name="handbook_pen_aim">按住滑动来瞄准：手指上方的放大镜显示是哪一格，松手就选中它。</string>
-    <string name="handbook_pen_hold">没选格子时点一个数字，就把它拿在手里；之后点哪格就写到哪格。再点一次这个数字，或点工具下方那行字，就放下。</string>
-    <string name="handbook_pen_pencil">铅笔写下的是小小的铅笔记号。写下一个数时，同行、同列、同宫里这个数的铅笔记号会被擦掉（可在设置里关闭）。</string>
-    <string name="handbook_pen_fill">在 9×9 页面上长按铅笔，可以一次填入所有候选数。这只是笔记，不影响干净完成。</string>
-    <string name="handbook_pen_keyboard">用键盘时：方向键移动，1–9 写数，Backspace 擦除，N 切换铅笔，Ctrl+Z 撤销，H 问教练，Esc 放下数字。</string>
     <string name="fill_candidates">填入所有候选数</string>
     <string name="fill_candidates_done">已填入所有候选数</string>
     <!-- 11.0: one-line hints, each shown the first time; the Coach's note closes with ×. -->

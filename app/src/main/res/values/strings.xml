@@ -172,14 +172,6 @@
 <string name="contents_key_clean">Clean</string>
     <string name="contents_key_coached">With the answer</string>
     <string name="handbook_example">In this example</string>
-    <string name="handbook_pen">Using the pen</string>
-    <string name="handbook_pen_summary">Writing, aiming, holding a digit and the pencil.</string>
-    <string name="handbook_pen_tap">Tap a cell, then a digit. Tap the same digit again to clear it.</string>
-    <string name="handbook_pen_aim">Press and slide to aim: a loupe above your finger shows the cell, and lifting chooses it.</string>
-    <string name="handbook_pen_hold">With no cell chosen, tap a digit to hold it; every cell you tap then gets it. Tap the digit again, or the line under the tools, to put it down.</string>
-    <string name="handbook_pen_pencil">The pencil writes small marks instead of digits. Writing a digit removes it from the pencil marks in its row, column and box (you can turn this off in Settings).</string>
-    <string name="handbook_pen_fill">On 9×9 pages, hold the pencil to pencil in every candidate at once. They are only notes: the page stays clean.</string>
-    <string name="handbook_pen_keyboard">With a keyboard: arrows move, 1–9 write, Backspace erases, N switches the pencil, Ctrl+Z undoes, H asks the Coach and Esc puts a digit down.</string>
     <string name="fill_candidates">Fill every candidate</string>
     <string name="fill_candidates_done">Every candidate pencilled in</string>
     <!-- 11.0: one-line hints, each shown the first time; the Coach's note closes with ×. -->
