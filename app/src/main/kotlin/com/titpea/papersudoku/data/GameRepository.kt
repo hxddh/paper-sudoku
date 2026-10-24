@@ -105,6 +105,12 @@ interface GameStore {
     /** Finished pages other than dailies (all 9×9), most recently finished first. */
     val solvedNineByNine: Flow<List<PageSummary>>
 
+    /**
+     * Weekly and technique pages begun and not finished, any week: 10.0 has no other way back to
+     * them (the weekly card and "Practise this" are gone).
+     */
+    val unfinishedOthers: Flow<List<PageSummary>>
+
     /** The practice page to continue, if one is unfinished. */
     val unfinishedPractice: Flow<PageSummary?>
 
@@ -205,6 +211,12 @@ class RoomGameStore(
             .distinctUntilChanged()
             .flowOn(Dispatchers.Default)
 
+    override val unfinishedOthers: Flow<List<PageSummary>> =
+        savedGames.observeUnfinishedOthers()
+            .map { rows -> rows.mapNotNull(::summary) }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
+
     override val solvedNineByNine: Flow<List<PageSummary>> =
         savedGames.observeSolvedNineByNine()
             .map { rows -> rows.mapNotNull(::summary) }
@@ -235,7 +247,9 @@ class RoomGameStore(
             epochDay = spec.epochDay,
             solved = state.solved,
             json = json,
-            updatedAt = now,
+            // A finished page keeps the time it was finished: reading it again later does not move
+            // it in the journal, which files it under that day.
+            updatedAt = if (state.solved) state.solvedAt ?: now else now,
             givens = spec.givens.digits(),
             grid = state.values.digits(),
         )

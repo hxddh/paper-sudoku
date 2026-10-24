@@ -122,9 +122,9 @@ class NotebookViewModel(
             store.dailies(0),
             store.days,
             store.unfinishedPractice,
-            combine(store.cleanPractice, store.page(Catalog.weeklyKey(sunday)), store.imported, store.solvedNineByNine, ::Pages),
+            combine(store.cleanPractice, store.page(Catalog.weeklyKey(sunday)), store.imported, store.solvedNineByNine, store.unfinishedOthers, ::Pages),
             combine(settingsStore.settings, store.stampedCount, store.practiceCompletions, ::Triple),
-        ) { dailies, days, practice, (clean, weekly, imported, finished), (settings, stampedCount, completions) ->
+        ) { dailies, days, practice, (clean, weekly, imported, finished, others), (settings, stampedCount, completions) ->
             val saved = dailies.associateBy { it.epochDay }
             val results = days.associateBy { it.epochDay }
             // A saved page says what it was dealt at; the calendar rule is for days not yet opened.
@@ -165,9 +165,8 @@ class NotebookViewModel(
                 weekOf = sunday,
                 weekly = weekly,
                 imported = imported,
-                // Finished weekly pages are in the journal; this week's waits here once begun.
-                unfinishedPages = imported.filter { !it.solved } +
-                    listOfNotNull(weekly?.takeIf { !it.solved && it.grid != it.givens }),
+                // Finished pages are in the journal; begun weekly and technique pages wait here.
+                unfinishedPages = imported.filter { !it.solved } + others,
                 journal = journal,
                 loaded = true,
             )
@@ -184,6 +183,7 @@ class NotebookViewModel(
         val weekly: PageSummary?,
         val imported: List<PageSummary>,
         val finished: List<PageSummary>,
+        val others: List<PageSummary>,
     )
 
     companion object {

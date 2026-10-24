@@ -176,6 +176,10 @@ interface SavedGameDao {
     @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind = :kind ORDER BY updatedAt DESC")
     fun observeKind(kind: String): Flow<List<SavedPageRow>>
 
+    /** Begun and not finished weekly and technique pages (9.0's), most recently touched first. */
+    @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind IN ('Weekly', 'Focus') AND solved = 0 AND grid != givens ORDER BY updatedAt DESC")
+    fun observeUnfinishedOthers(): Flow<List<SavedPageRow>>
+
     /** Finished 9×9 pages (practice, weekly, technique and typed-in), most recently finished first. */
     @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind != 'Daily' AND kind != 'Damaged' AND solved = 1 ORDER BY updatedAt DESC")
     fun observeSolvedNineByNine(): Flow<List<SavedPageRow>>

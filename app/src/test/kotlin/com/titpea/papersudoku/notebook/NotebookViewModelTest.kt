@@ -2,6 +2,7 @@ package com.titpea.papersudoku.notebook
 
 import com.titpea.papersudoku.data.GameResult
 import com.titpea.papersudoku.engine.Difficulty
+import com.titpea.papersudoku.engine.Technique
 import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.PuzzleKind
@@ -99,8 +100,8 @@ class NotebookViewModelTest {
     fun `finished practice pages are filed in the journal among the stamped days`() = runTest(dispatcher) {
         val day = Catalog.daily(today - 1).let { spec -> GameState.new(spec).copy(values = spec.solution).settle(5) }
         store.saveSolved(day, GameResult(day.spec.key, PuzzleKind.Daily, day.spec.difficulty, 60, 0, 0, 1, today - 1), now = 1)
-        val practice = Catalog.classic(Difficulty.Gentle, 0).let { spec -> GameState.new(spec).copy(values = spec.solution).settle(5) }
         val finishedAt = Instant.parse("2026-10-21T08:00:00Z").toEpochMilli()
+        val practice = Catalog.classic(Difficulty.Gentle, 0).let { spec -> GameState.new(spec).copy(values = spec.solution).settle(finishedAt) }
         store.saveSolved(practice, GameResult(practice.spec.key, PuzzleKind.Classic, Difficulty.Gentle, 60, 0, 0, 1, null), now = finishedAt)
         val state = viewModel(firstDay = today - 10).state.first { it.loaded && it.journal.sumOf { m -> m.rows.size } == 2 }
         val month = state.journal.single()
@@ -109,5 +110,23 @@ class NotebookViewModelTest {
         assertEquals(listOf(practice.spec.key, Catalog.dailyKey(today - 1)), month.rows.map { it.key })
         assertEquals(LocalDate.of(2026, 10, 21), month.rows.first().date)
         assertEquals(listOf(today - 1), state.stampedDays)
+    }
+
+    @Test
+    fun `begun technique and past weekly pages stay in the notebook until finished`() = runTest(dispatcher) {
+        // 9.0's ways back to them (the weekly card, "Practise this") are gone in 10.0.
+        val base = Catalog.classic(Difficulty.Gentle, 0)
+        fun begunAs(key: String, kind: PuzzleKind) = GameState.new(base.copy(key = key, kind = kind)).let { g ->
+            val empty = g.spec.givens.indexOfFirst { it == 0 }
+            g.select(empty).input(g.spec.solution[empty], true)
+        }
+        val focus = begunAs(Catalog.focusPrefix(Technique.XWing) + 0, PuzzleKind.Focus)
+        val weekly = begunAs(Catalog.weeklyKey(today - 17), PuzzleKind.Weekly)
+        val blank = GameState.new(base.copy(key = Catalog.weeklyKey(today - 24), kind = PuzzleKind.Weekly))
+        store.save(focus, now = 1)
+        store.save(weekly, now = 2)
+        store.save(blank, now = 3)
+        val state = viewModel(firstDay = today - 30).state.first { it.loaded && it.unfinishedPages.size == 2 }
+        assertEquals(listOf(weekly.spec.key, focus.spec.key), state.unfinishedPages.map { it.key })
     }
 }
