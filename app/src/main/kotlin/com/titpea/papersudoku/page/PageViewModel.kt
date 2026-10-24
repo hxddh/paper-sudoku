@@ -652,11 +652,15 @@ class PageViewModel(
             ).withDerived()
         }
         savedState[OPEN_PAGE] = next.spec.key
-        // Put away after the new page is on the desk: the write does not delay it.
-        if (keepPrevious && previous != null && previous.spec.key != next.spec.key) persist(previous)
-        // A daily only looked at has no save to write or drop (since 8.0 one is never kept, and
-        // the v5 migration dropped older ones): opening today's page touches no table.
-        if (next.spec.kind != PuzzleKind.Daily || !next.untouched) persist(next)
+        val outgoing = previous?.takeIf { keepPrevious && it.spec.key != next.spec.key }
+        // Put away after the new page is on the desk, so the write does not delay it, and in its
+        // own job: opening yet another page cancels this load, never the page being put away.
+        viewModelScope.launch {
+            outgoing?.let { persist(it) }
+            // A daily only looked at has no save to write or drop (since 8.0 one is never kept,
+            // and the v5 migration dropped older ones): opening today's page touches no table.
+            if (next.spec.kind != PuzzleKind.Daily || !next.untouched) persist(next)
+        }
     }
 
     /** Tomorrow's daily and the next practice page are generated now, so they open instantly. */

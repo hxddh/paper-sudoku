@@ -105,11 +105,17 @@ fun parsePage(text: String): List<Int>? {
  * temporary file and renamed, so it is never left half written.
  */
 class ImportDraft(private val file: File) {
-    fun read(): List<Int>? = runCatching { if (file.exists()) parsePage(file.readText()) else null }.getOrNull()
+    fun read(): List<Int>? = synchronized(LOCK) {
+        runCatching { if (file.exists()) parsePage(file.readText()) else null }.getOrNull()
+    }
 
-    fun write(values: List<Int>) {
+    /**
+     * One writer at a time: a write whose coroutine was cancelled by the next digit still runs its
+     * file operations to the end, and two writes through the same temporary file could lose both.
+     */
+    fun write(values: List<Int>): Unit = synchronized(LOCK) {
         if (values.all { it == 0 }) {
-            clear()
+            file.delete()
             return
         }
         runCatching {
@@ -123,10 +129,12 @@ class ImportDraft(private val file: File) {
     }
 
     fun clear() {
-        file.delete()
+        synchronized(LOCK) { file.delete() }
     }
 
     companion object {
+        private val LOCK = Any()
+
         fun of(context: Context) = ImportDraft(File(context.filesDir, "import-draft.txt"))
     }
 }
