@@ -101,10 +101,8 @@ jobs:
     timeout-minutes: 50
     if: github.event_name == 'push' || github.event_name == 'pull_request'
     # Read-only: the captures are pushed by publish-captures below, which runs none of this code.
-    # actions: read fetches main's benchmark traces to compare against.
     permissions:
       contents: read
-      actions: read
 
     steps:
       - name: Check out
@@ -127,6 +125,14 @@ jobs:
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0"
+
+      # main beside the PR, to benchmark both on the same emulator (runners differ far more than a
+      # change does, so only a same-device comparison says whether a PR is faster or slower).
+      - name: Check out main beside the PR
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --depth 1 origin main
+          git worktree add ../paper-sudoku-base FETCH_HEAD
 
       - name: Enable KVM
         run: |
@@ -185,6 +191,8 @@ jobs:
             mkdir -p app/build/outputs/benchmark
             cp -r benchmark/build/outputs/. app/build/outputs/benchmark/ || true
             python3 tools/ci/speed-budget.py app/build/outputs/benchmark || touch app/build/over-budget
+            # Then main's benchmark on the same emulator (PRs only; main has a lower versionCode, so the PR's app goes first).
+            if [ -d ../paper-sudoku-base ]; then adb uninstall com.titpea.papersudoku || true; ../paper-sudoku-base/gradlew --no-daemon -p ../paper-sudoku-base :benchmark:connectedBenchmarkAndroidTest || true; mkdir -p app/build/outputs/benchmark-base; cp -r ../paper-sudoku-base/benchmark/build/outputs/. app/build/outputs/benchmark-base/ || true; adb uninstall com.titpea.papersudoku || true; fi
             # Record the Baseline Profile of the real journey on this emulator. The release ships
             # the committed app/src/main/baseline-prof.txt; this prints what the journey ran
             # outside it, to extend it from (the generated file is uploaded below).
@@ -241,19 +249,17 @@ jobs:
           find app/build/outputs/benchmark -name "*benchmarkData.json" -exec cat {} \; || true
           find benchmark/build/outputs/androidTest-results -name "*.xml" -exec cat {} \; || true
 
-      # Where start-up and writing spend their time, against main's last green run: main-thread
-      # slices and states, app threads' CPU and what else ran on the device (medians, in ms).
-      - name: Where the time goes (Perfetto traces against main)
+      # The PR against main on the same emulator: each metric side by side, then where start-up
+      # and writing spend their time (main-thread slices and states, app threads' CPU, what else
+      # ran on the device; medians, in ms).
+      - name: Against main on the same device
         if: always()
         continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
+          if [ ! -d app/build/outputs/benchmark-base ]; then echo "No same-device run of main (not a PR)"; exit 0; fi
+          python3 tools/ci/benchmark-compare.py app/build/outputs/benchmark-base app/build/outputs/benchmark
           pip install --quiet perfetto
-          mkdir -p base-traces
-          run=$(gh run list -R "$GITHUB_REPOSITORY" --workflow android.yml --branch main --event push --status success --limit 1 --json databaseId --jq '.[0].databaseId' || true)
-          if [ -n "$run" ]; then gh run download "$run" -R "$GITHUB_REPOSITORY" -n paper-sudoku-benchmark -D base-traces || echo "No benchmark results on main's run $run"; fi
-          python3 tools/ci/trace-compare.py base-traces app/build/outputs/benchmark
+          python3 tools/ci/trace-compare.py app/build/outputs/benchmark-base app/build/outputs/benchmark
 
       - name: Upload benchmark results
         if: always()

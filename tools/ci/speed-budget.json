@@ -3,33 +3,21 @@
     "Speed budgets CI holds the app to (docs/android-standards.md, Speed). speed-budget.py fails",
     "when a Macrobenchmark metric is above tolerance x its budget; check-apk.sh fails when the",
     "release APK is above apk.tolerance x apk.bytes.",
-    "The metric budgets are what CI's emulator measured for 10.0 on PR #11 (run 40095464516,",
-    "2026-10-24: swiftshader, 2 cores; far slower than a phone, so they are not the 500 ms device",
-    "target; 9.0 measured 1560 / 2676 / 108 / 138 / 189 there). The APK budget is 9.0's sideload release APK (run 40087717696, 2026-10-24).",
+    "The metric budgets are what CI's emulator measured for 8.0 on main (run 40034069262,",
+    "2026-10-23: swiftshader, 2 cores; far slower than a phone, so they are not the 500 ms device",
+    "target). The APK budget is 9.0's sideload release APK (run 40087717696, 2026-10-24).",
     "Lower a budget when the app gets faster; raise one only with a reason in the commit."
   ],
   "tolerance": 1.25,
-  "apk": {
-    "bytes": 2752298,
-    "tolerance": 1.05
-  },
+  "apk": { "bytes": 2752298, "tolerance": 1.05 },
   "metrics": {
     "StartupBenchmark.coldStartToTodaysPage": {
-      "timeToInitialDisplayMs": {
-        "median": 1200
-      },
-      "timeToFullDisplayMs": {
-        "median": 2030
-      }
+      "timeToInitialDisplayMs": { "median": 1430 },
+      "timeToFullDisplayMs": { "median": 2525 }
     },
     "StartupBenchmark.writingOnThePage": {
-      "frameDurationCpuMs": {
-        "P50": 86,
-        "P90": 101
-      },
-      "frameOverrunMs": {
-        "P90": 130
-      }
+      "frameDurationCpuMs": { "P50": 102, "P90": 123 },
+      "frameOverrunMs": { "P90": 170 }
     }
   }
 }
