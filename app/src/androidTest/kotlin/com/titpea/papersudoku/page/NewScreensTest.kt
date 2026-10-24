@@ -2,7 +2,6 @@ package com.titpea.papersudoku.page
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onAllNodes
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
