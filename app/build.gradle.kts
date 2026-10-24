@@ -17,8 +17,10 @@ android {
         applicationId = "com.titpea.papersudoku"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "8.0.0"
+        // versionCode = major × 10000 + minor × 100 + patch of versionName (checked by
+        // tools/ci/release-preflight.sh), so every release has a larger one.
+        versionCode = 90000
+        versionName = "9.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
