@@ -32,4 +32,6 @@
     <string name="handbook_position">%1$d of %2$d</string>
     <string name="handbook_previous">Previous page</string>
     <string name="handbook_next">Next page</string>
+    <!-- 9.0's weekly and technique pages, now plain pages. -->
+    <string name="nine_by_nine" translatable="false">9×9</string>
 </resources>

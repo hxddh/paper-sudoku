@@ -1,6 +1,5 @@
 package com.titpea.papersudoku.notebook
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,7 +25,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -34,7 +32,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -56,12 +53,13 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.BuildConfig
 import com.titpea.papersudoku.R
 import com.titpea.papersudoku.data.PageSummary
+import com.titpea.papersudoku.designsystem.PaperSheet
 import com.titpea.papersudoku.designsystem.PaperType
+import com.titpea.papersudoku.designsystem.SheetShape
 import com.titpea.papersudoku.engine.Technique
 import com.titpea.papersudoku.game.model.PuzzleKind
 import com.titpea.papersudoku.page.DOT
@@ -207,13 +205,11 @@ fun NotebookScreen(
 /** How far text sits in from a card's edge; rows outside cards line up with it. */
 private val TextInset = 20.dp
 
-private val SheetShape = RoundedCornerShape(8.dp)
 
 /**
  * A sheet of the notebook: 8dp corners and a hairline edge, a step off the page; a shade deeper
  * when it is the page open beside the notebook.
  */
-// v11: PaperSheet
 @Composable
 internal fun NotebookSheet(
     modifier: Modifier = Modifier,
@@ -221,13 +217,10 @@ internal fun NotebookSheet(
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
-    val colors = MaterialTheme.colorScheme
-    val color = if (selected) colors.surfaceContainerHigh else colors.surfaceContainerLow
-    val border = BorderStroke(Dp.Hairline, colors.outlineVariant)
     if (onClick != null) {
-        Surface(onClick = onClick, modifier = modifier, shape = SheetShape, color = color, border = border, content = content)
+        PaperSheet(onClick = onClick, modifier = modifier, selected = selected) { content() }
     } else {
-        Surface(modifier = modifier, shape = SheetShape, color = color, border = border, content = content)
+        PaperSheet(modifier = modifier, selected = selected) { content() }
     }
 }
 

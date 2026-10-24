@@ -27,11 +27,11 @@ class SmokeTest {
         device.backToNotebook()
         // There are no settings (11.0): the licences are at the notebook's foot. Scroll down to them.
         val notebook = device.findTag("notebook-list", "The notebook's pages")
-        var licences = device.findObject(By.res("open-licences"))
+        var licences = device.findObject(By.res("notebook-licences"))
         var scrolls = 0
         while (licences == null && scrolls < 10) {
             notebook.scroll(Direction.DOWN, 0.8f)
-            licences = device.findObject(By.res("open-licences"))
+            licences = device.findObject(By.res("notebook-licences"))
             scrolls++
         }
         checkNotNull(licences) { "The notebook has no licences link" }.click()

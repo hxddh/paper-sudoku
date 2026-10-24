@@ -631,7 +631,7 @@ private fun SolvedNote(
     }
 }
 
-/** One line after a solve about what comes next; [news] when the level just moved up. */
+/** One line after a solve about what comes next; [news] when it is about the player's own progress. */
 private data class Outlook(val text: String, val news: Boolean = false)
 
 @Composable
@@ -650,17 +650,8 @@ private fun solvedOutlook(game: GameState, state: PageUiState): Outlook? {
                 Outlook(stringResource(R.string.practice_next, techniqueName(next)), news = after.leveledUp)
             }
         }
-        // A technique page says how far that technique is known now (counted once the solve is recorded).
-        game.spec.kind == PuzzleKind.Focus -> Catalog.focusTechnique(game.spec.key)?.let { technique ->
-            val clean = learner.found(technique)
-            if (clean > 0) {
-                Outlook(stringResource(R.string.solved_focus, techniqueName(technique), pluralStringResource(R.plurals.mastery_pages, clean, clean)))
-            } else {
-                null
-            }
-        }
-        game.spec.kind == PuzzleKind.Weekly -> Outlook(stringResource(R.string.solved_weekly_close))
-        game.spec.kind == PuzzleKind.Imported -> null
+        // 9.0's weekly and technique pages, and pages typed in, are plain 9×9 pages now.
+        game.spec.kind != PuzzleKind.Daily -> null
         // Today's page closes with tomorrow's: a reason to come back, without a streak.
         game.spec.epochDay == state.today -> Outlook(stringResource(R.string.solved_daily_close))
         // Finished a day late, just now, with today's page still to do.
@@ -669,18 +660,18 @@ private fun solvedOutlook(game: GameState, state: PageUiState): Outlook? {
     }
 }
 
-/** The small line above a page's title: where it comes from and how hard it is. */
+/**
+ * The small line above a page's title: where it comes from. Levels stay inside (11.0): progress
+ * is the technique path, never a level name.
+ */
 @Composable
 fun pageOverline(spec: PuzzleSpec, locale: Locale): String {
-    val level = difficultyName(spec.difficulty)
     val day = spec.epochDay
     return when (spec.kind) {
-        PuzzleKind.Daily -> if (day != null) weekday(LocalDate.ofEpochDay(day), locale) + DOT + level else level
-        PuzzleKind.Classic -> stringResource(R.string.practice) + DOT + level
-        PuzzleKind.Weekly -> stringResource(R.string.weekly) + DOT + level
-        PuzzleKind.Focus -> stringResource(R.string.focus) + DOT + level
-        PuzzleKind.Imported -> stringResource(R.string.imported) + DOT +
-            if (spec.beyondCoach) stringResource(R.string.imported_beyond_coach) else level
+        PuzzleKind.Daily -> day?.let { weekday(LocalDate.ofEpochDay(it), locale) }.orEmpty()
+        PuzzleKind.Classic, PuzzleKind.Focus -> stringResource(R.string.practice)
+        PuzzleKind.Weekly -> stringResource(R.string.nine_by_nine)
+        PuzzleKind.Imported -> if (spec.beyondCoach) stringResource(R.string.imported) + DOT + stringResource(R.string.imported_beyond_coach) else stringResource(R.string.imported)
     }
 }
 
@@ -691,8 +682,8 @@ fun pageTitle(spec: PuzzleSpec, locale: Locale): String {
     return when (spec.kind) {
         PuzzleKind.Daily -> day?.let { monthDay(LocalDate.ofEpochDay(it), locale) }.orEmpty()
         PuzzleKind.Classic -> stringResource(R.string.practice_page, (spec.number ?: 0) + 1)
-        PuzzleKind.Weekly -> stringResource(R.string.weekly_title, day?.let { monthDay(LocalDate.ofEpochDay(it), locale) }.orEmpty())
-        PuzzleKind.Focus -> Catalog.focusTechnique(spec.key)?.let { techniqueName(it) } ?: stringResource(R.string.focus)
+        PuzzleKind.Weekly -> day?.let { monthDay(LocalDate.ofEpochDay(it), locale) } ?: stringResource(R.string.nine_by_nine)
+        PuzzleKind.Focus -> stringResource(R.string.nine_by_nine)
         PuzzleKind.Imported -> stringResource(R.string.imported)
     }
 }
