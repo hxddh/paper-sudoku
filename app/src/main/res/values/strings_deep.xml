@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="difficulty_deep">Deep</string>
+    <string name="technique_naked_triple">Naked triple</string>
+    <string name="technique_hidden_triple">Hidden triple</string>
+    <string name="technique_swordfish">Swordfish</string>
+    <string name="technique_xy_wing">XY-Wing</string>
+    <string name="technique_desc_naked_triple">Three cells hold only the same three digits between them; the rest of their unit can’t use them.</string>
+    <string name="technique_desc_hidden_triple">Three digits fit only the same three cells; those cells hold nothing else.</string>
+    <string name="technique_desc_swordfish">An X-Wing across three lines: a digit confined to three crossing lines clears the rest of them.</string>
+    <string name="technique_desc_xy_wing">A cell with two candidates and two partners: whichever it is, one partner takes the third digit.</string>
+    <string name="look_naked_triple">Three cells share just three digits between them.</string>
+    <string name="look_hidden_triple">Three digits share the same three cells.</string>
+    <string name="look_swordfish">One digit sits on only three crossing lines, across three lines.</string>
+    <string name="look_xy_wing">A cell with two candidates sees two cells that each share one of them.</string>
+    <string name="why_naked_triple">In %1$s, three cells can only be %2$d, %3$d or %4$d. They take all three, so no other cell there can.</string>
+    <string name="why_hidden_triple">The digits %2$d, %3$d and %4$d fit only the same three cells in %1$s, so those cells hold nothing else.</string>
+    <string name="why_swordfish">In %1$s, %2$s and %3$s, a %7$d fits only where they cross %4$s, %5$s and %6$s. Each line takes one of those spots, each in a different crossing line, so no other cell of %4$s, %5$s or %6$s can be %7$d.</string>
+    <string name="why_xy_wing">The cell at %1$s can only be %4$d or %5$d. The cells at %2$s and %3$s each pair one of those with %6$d. Whichever it turns out to be, one of them is %6$d, so no cell that sees both can be %6$d.</string>
+</resources>

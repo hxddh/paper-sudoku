@@ -7,6 +7,7 @@ import com.titpea.papersudoku.data.SettingsStore
 import com.titpea.papersudoku.data.PageSummary
 import com.titpea.papersudoku.data.UserSettings
 import com.titpea.papersudoku.engine.Difficulty
+import com.titpea.papersudoku.engine.Technique
 import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.PuzzleKind
 import kotlinx.coroutines.flow.Flow
@@ -50,6 +51,11 @@ class FakeGameStore : GameStore {
         return (saved.keys.filter { it.startsWith(prefix) }.mapNotNull { it.removePrefix(prefix).toIntOrNull() }.maxOrNull() ?: -1) + 1
     }
 
+    override suspend fun nextFocusNumber(technique: Technique): Int {
+        val prefix = com.titpea.papersudoku.game.model.Catalog.focusPrefix(technique)
+        return (saved.keys.filter { it.startsWith(prefix) }.mapNotNull { it.removePrefix(prefix).toIntOrNull() }.maxOrNull() ?: -1) + 1
+    }
+
     override suspend fun discardUnsolvedPractice(except: String) {
         savedFlow.update { map ->
             map.filter { (key, value) -> key == except || !(value.first.spec.kind == PuzzleKind.Classic && !value.first.solved) }
@@ -67,6 +73,10 @@ class FakeGameStore : GameStore {
 
     override fun page(puzzleKey: String): Flow<PageSummary?> =
         savedFlow.map { map -> map[puzzleKey]?.first?.let(PageSummary::of) }
+
+    override val imported: Flow<List<PageSummary>> = savedFlow.map { map ->
+        map.values.filter { (g, _) -> g.spec.kind == PuzzleKind.Imported }.sortedByDescending { it.second }.map { PageSummary.of(it.first) }
+    }
 
     override val unfinishedPractice: Flow<PageSummary?> = savedFlow.map { map ->
         map.values.filter { (g, _) -> g.spec.kind == PuzzleKind.Classic && !g.solved }.maxByOrNull { it.second }?.first

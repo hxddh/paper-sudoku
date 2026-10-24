@@ -3,6 +3,7 @@ package com.titpea.papersudoku.data
 import android.util.Log
 import androidx.room.withTransaction
 import com.titpea.papersudoku.engine.Difficulty
+import com.titpea.papersudoku.engine.Technique
 import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.PuzzleKind
@@ -79,6 +80,9 @@ interface GameStore {
 
     suspend fun nextClassicNumber(difficulty: Difficulty): Int
 
+    /** The next page number for practising [technique]. */
+    suspend fun nextFocusNumber(technique: Technique): Int
+
     /** Drops unfinished practice pages other than [except]; numbering continues past them. */
     suspend fun discardUnsolvedPractice(except: String)
 
@@ -90,6 +94,9 @@ interface GameStore {
 
     /** One saved page, as it changes. */
     fun page(puzzleKey: String): Flow<PageSummary?>
+
+    /** Pages the player typed in, most recently touched first. */
+    val imported: Flow<List<PageSummary>>
 
     /** The practice page to continue, if one is unfinished. */
     val unfinishedPractice: Flow<PageSummary?>
@@ -116,7 +123,11 @@ class RoomGameStore(
         val json = savedGames.get(puzzleKey)?.json ?: return null
         return withContext(Dispatchers.Default) { GameState.decode(json) } ?: null.also {
             Log.w(TAG, "Unreadable saved page $puzzleKey; set aside, starting it afresh")
-            savedGames.setAside(puzzleKey, "damaged-$puzzleKey-${System.currentTimeMillis()}")
+            // Its stamp goes with it: the day reads as not done, and finishing it again stamps it.
+            database.withTransaction {
+                savedGames.setAside(puzzleKey, "damaged-$puzzleKey-${System.currentTimeMillis()}")
+                results.forget(puzzleKey)
+            }
         }
     }
 
@@ -124,9 +135,10 @@ class RoomGameStore(
 
     override suspend fun forgetUntouchedDailies() {
         for (key in savedGames.unwrittenDailyKeys()) {
-            val json = savedGames.get(key)?.json ?: continue
-            val game = withContext(Dispatchers.Default) { GameState.decode(json) } ?: continue
-            if (game.untouched) savedGames.delete(key)
+            val row = savedGames.get(key) ?: continue
+            val game = withContext(Dispatchers.Default) { GameState.decode(row.json) } ?: continue
+            // Only the row as read: a page begun meanwhile was saved again and stays.
+            if (game.untouched) savedGames.deleteIfUnchanged(key, row.updatedAt)
         }
     }
 
@@ -141,7 +153,7 @@ class RoomGameStore(
             if (results.exists(result.puzzleKey)) return@withTransaction false
             results.insert(
                 GameResultEntity(
-                    mode = if (result.kind == PuzzleKind.Daily) MODE_MINI else MODE_CLASSIC,
+                    mode = modeOf(result.kind),
                     durationSeconds = result.durationSeconds,
                     hints = result.coachAsks,
                     completedAt = result.completedAt,
@@ -158,7 +170,10 @@ class RoomGameStore(
     // Numbered by the level the page was dealt at (its key), not the grade the generator reached,
     // so a page that came out easier can never be dealt twice.
     override suspend fun nextClassicNumber(difficulty: Difficulty): Int =
-        (savedGames.maxClassicNumber(Catalog.classicPrefix(difficulty)) ?: -1) + 1
+        (savedGames.maxNumber(PuzzleKind.Classic.name, Catalog.classicPrefix(difficulty)) ?: -1) + 1
+
+    override suspend fun nextFocusNumber(technique: Technique): Int =
+        (savedGames.maxNumber(PuzzleKind.Focus.name, Catalog.focusPrefix(technique)) ?: -1) + 1
 
     override suspend fun discardUnsolvedPractice(except: String) =
         savedGames.discardUnsolvedPractice(except)
@@ -173,6 +188,12 @@ class RoomGameStore(
 
     override fun page(puzzleKey: String): Flow<PageSummary?> =
         savedGames.observePage(puzzleKey).map { it?.let(::summary) }.distinctUntilChanged()
+
+    override val imported: Flow<List<PageSummary>> =
+        savedGames.observeKind(PuzzleKind.Imported.name)
+            .map { rows -> rows.mapNotNull(::summary) }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
 
     override val unfinishedPractice: Flow<PageSummary?> =
         savedGames.observeLatestUnsolvedPractice().map { it?.let(::summary) }.distinctUntilChanged()
@@ -214,6 +235,15 @@ class RoomGameStore(
     companion object {
         const val MODE_MINI = "mini"
         const val MODE_CLASSIC = "classic"
+
+        /** Only practice pages are "classic": the levels and the month counts read that mode. */
+        fun modeOf(kind: PuzzleKind): String = when (kind) {
+            PuzzleKind.Daily -> MODE_MINI
+            PuzzleKind.Classic -> MODE_CLASSIC
+            PuzzleKind.Weekly -> "weekly"
+            PuzzleKind.Imported -> "imported"
+            PuzzleKind.Focus -> "focus"
+        }
         private const val TAG = "GameStore"
     }
 }

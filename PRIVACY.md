@@ -9,11 +9,11 @@ analytics, and does not request the `INTERNET` permission.
 
 The app stores only the data needed to run the game locally:
 
-- your games (board, notes, undo history, time, how much the Coach helped) in a local Room
-  database;
+- your games (board, notes, undo history, the digits written in order, time, how much the Coach
+  helped), including puzzles you type in, in a local Room database;
 - finished-puzzle results (mode, difficulty, time, Coach use, date) for the notebook;
-- settings (theme, note tidying, techniques you have met, whether you have written your first
-  digit) in Android DataStore.
+- settings (theme, note tidying, techniques you have met and how many clean pages needed each,
+  whether you have written your first digit) in Android DataStore.
 
 The home-screen widget reads today's page from the same local database.
 

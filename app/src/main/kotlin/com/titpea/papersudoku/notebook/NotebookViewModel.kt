@@ -62,6 +62,13 @@ data class NotebookUiState(
     val practiceByMonth: Map<YearMonth, Int> = emptyMap(),
     val stamped: Int = 0,
     val techniquesMet: Set<Technique> = emptySet(),
+    /** Clean pages per technique, for how well each is known. */
+    val cleanPages: Map<Technique, Int> = emptyMap(),
+    /** The Sunday that starts this week, and its 9×9 page if it has been opened. */
+    val weekOf: Long = 0,
+    val weekly: PageSummary? = null,
+    /** Pages the player typed in, most recently touched first. */
+    val imported: List<PageSummary> = emptyList(),
     /** False until the store has answered; the list stays empty so it opens at today, not below it. */
     val loaded: Boolean = true,
 )
@@ -85,14 +92,15 @@ class NotebookViewModel(
     private val today = MutableStateFlow(LocalDate.now(clock).toEpochDay())
 
     val state: StateFlow<NotebookUiState> = today.flatMapLatest { day ->
+        val sunday = Catalog.weekOf(day)
         combine(
             // One row per day ever begun (projected columns only), so the whole notebook is one read.
             store.dailies(0),
             store.days,
             store.unfinishedPractice,
-            store.cleanPractice,
+            combine(store.cleanPractice, store.page(Catalog.weeklyKey(sunday)), store.imported, ::Triple),
             combine(settingsStore.settings, store.stampedCount, store.practiceCompletions, ::Triple),
-        ) { dailies, days, practice, clean, (settings, stampedCount, completions) ->
+        ) { dailies, days, practice, (clean, weekly, imported), (settings, stampedCount, completions) ->
             val saved = dailies.associateBy { it.epochDay }
             val results = days.associateBy { it.epochDay }
             // A saved page says what it was dealt at; the calendar rule is for days not yet opened.
@@ -118,6 +126,10 @@ class NotebookViewModel(
                     .eachCount(),
                 stamped = stampedCount,
                 techniquesMet = settings.techniquesMet,
+                cleanPages = settings.cleanPages,
+                weekOf = sunday,
+                weekly = weekly,
+                imported = imported,
                 loaded = true,
             )
         }

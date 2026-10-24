@@ -12,7 +12,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.runtime.ProvidedValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
+import android.content.res.Configuration
+import java.util.Locale
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
@@ -42,7 +49,8 @@ class ScreenshotMatrixTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private enum class Frame { Phone, Wide, LargeText }
+    /** Chinese is half the copy and is built from pieces, so it gets frames of its own. */
+    private enum class Frame { Phone, Wide, LargeText, Chinese }
 
     private data class Shot(val name: String, val dark: Boolean, val frame: Frame, val content: @Composable () -> Unit)
 
@@ -70,6 +78,9 @@ class ScreenshotMatrixTest {
         }
         add(Shot("paper-large-text-page", false, Frame.LargeText, page(Fixtures.page(coach = Fixtures.coach(2)))))
         add(Shot("paper-large-text-notebook", false, Frame.LargeText, notebook))
+        add(Shot("zh-page-coach-why", false, Frame.Chinese, page(Fixtures.page(coach = Fixtures.coach(2)))))
+        add(Shot("zh-notebook", false, Frame.Chinese, notebook))
+        add(Shot("zh-handbook", false, Frame.Chinese, handbook))
     }
 
     @Test
@@ -85,8 +96,24 @@ class ScreenshotMatrixTest {
                 // A 1000×600dp landscape window drawn at a smaller scale so it fits the device.
                 Frame.Wide -> Density(base.density * 0.4f, base.fontScale)
                 Frame.LargeText -> Density(base.density, 2f)
+                Frame.Chinese -> base
             }
-            CompositionLocalProvider(LocalDensity provides density) {
+            val context = LocalContext.current
+            val configuration = LocalConfiguration.current
+            val chinese = remember(context, configuration) {
+                val zh = Configuration(configuration).apply { setLocale(Locale.SIMPLIFIED_CHINESE) }
+                zh to context.createConfigurationContext(zh)
+            }
+            val locale = if (shot.frame == Frame.Chinese) {
+                arrayOf<ProvidedValue<*>>(
+                    LocalConfiguration provides chinese.first,
+                    LocalContext provides chinese.second,
+                    LocalResources provides chinese.second.resources,
+                )
+            } else {
+                emptyArray()
+            }
+            CompositionLocalProvider(LocalDensity provides density, *locale) {
                 SudokuTheme(darkTheme = shot.dark) {
                     Box(
                         (if (shot.frame == Frame.Wide) Modifier.requiredSize(1000.dp, 600.dp) else Modifier.fillMaxSize())

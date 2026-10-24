@@ -1,4 +1,4 @@
-# Android 开发规范 / Checklist — v8.0
+# Android 开发规范 / Checklist — v9.0
 
 > 基线：`targetSdk 36`、`compileSdk 37`、`minSdk 26`，Jetpack Compose + Material 3 Expressive
 > （`material3 1.5.0-beta01`）、Material 3 Adaptive 1.1、Navigation 3、Room 2.8、DataStore、Glance。
@@ -86,7 +86,7 @@
 - [x] ViewModel：自动保存恢复、计时、只记一次、Coach 三级与多步讲解、错误提示、经典续玩、换页时切回或打开别页、启动落到今天
 - [x] Compose UI：棋盘语义、事件、Coach、完成页、单页宽布局（双栏未渲染）、RTL 点按、目录与手册入口；Compose 无障碍检查（`enableAccessibilityChecks()`，每次 perform* 时运行）
 - [x] Room 迁移仪器测试（含 3 → 4：JSON 列移到最后、两个索引）
-- [x] CI：JVM 测试、debug/release 构建、lint（每条警告打印在日志里，报告每次都上传）、schema 已提交检查、API 36 模拟器仪器测试；Gradle 构建缓存与配置缓存
+- [x] CI：JVM 测试、debug/release 构建、lint（由 tools/ci/lint-summary.py 从 SARIF 汇总，按规则计数并逐条打印在日志里；报告每次都上传）、schema 已提交检查、API 36 模拟器仪器测试；Gradle 构建缓存与配置缓存
 - [x] 截图矩阵（Paper/Night × 页面状态 × 手册 × 单页宽屏；200% 字号仅 Paper）与已提交的基准图逐张比对；另有按 Play 尺寸生成的商店截图（不比对）
 - [x] 每日题与练习页固定样例、3.0 存档格式样例
 - [x] Macrobenchmark：冷启动到今日页（有/无 Baseline Profile 两组）、书写帧时间（每轮清空数据，只往空格写；CI 上开着动画跑，日志打印各项中位数；模拟器数据仅看趋势）；混淆构建冒烟测试（页面 → 本子 → 设置 → 开源许可 → 回到今天）

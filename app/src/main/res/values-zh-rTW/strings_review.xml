@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 9.0：復盤，以及抄進自己的題目。 -->
+<resources>
+    <!-- 復盤 -->
+    <string name="review_title">復盤</string>
+    <string name="review_empty">這一頁寫下時，筆記本還不會記下每一步。</string>
+    <string name="review_summary_title">這一頁</string>
+    <string name="review_summary_technique">%1$s：%2$d</string>
+    <plurals name="review_summary_beyond">
+        <item quantity="other">%1$d 個數字超出了教練的技巧</item>
+    </plurals>
+    <plurals name="review_summary_mistakes">
+        <item quantity="other">寫錯 %1$d 次</item>
+    </plurals>
+    <string name="review_summary_no_mistakes">沒有寫錯。</string>
+    <plurals name="review_summary_coach">
+        <item quantity="other">教練出手 %1$d 步</item>
+    </plurals>
+    <string name="review_position">第 %1$d 步，共 %2$d 步</string>
+    <string name="review_written">第 %1$d 列第 %2$d 行：%3$d</string>
+    <string name="review_erased">第 %1$d 列第 %2$d 行：擦掉 %3$d</string>
+    <string name="review_cell">第 %1$d 列第 %2$d 行</string>
+    <string name="review_why_technique">這一步用到：%1$s。</string>
+    <string name="review_why_beyond">在當時，這一步超出了教練的技巧。</string>
+    <string name="review_why_mistake">寫錯了：最終答案裡這一格是別的數字。</string>
+    <string name="review_why_erased">擦掉了，這一格又空了。</string>
+    <string name="review_coach_answer">這是教練給的答案。</string>
+    <string name="review_coach_took_back">教練把它收回了。</string>
+    <string name="review_previous">上一步</string>
+    <string name="review_next">下一步</string>
+    <string name="review_slider">步數</string>
+
+    <!-- 抄題 -->
+    <string name="import_title">抄一頁題目</string>
+    <string name="import_intro">把報紙或書上的題目抄進來。教練會像對待其他頁一樣幫你。</string>
+    <string name="import_check">檢查並加入</string>
+    <string name="import_clear">清空</string>
+    <string name="import_clear_title">清空這一頁？</string>
+    <string name="import_clear_body">你填進去的數字都會被擦掉。</string>
+    <string name="import_clash">有數字在同一行、列或宮裡重複了。</string>
+    <string name="import_too_few">一道數獨至少要有 17 個題目數字。</string>
+    <string name="import_no_solution">這一頁無解。請對照原題檢查數字。</string>
+    <string name="import_many_solutions">這一頁不止一個解，教練沒法講解。請對照原題檢查數字。</string>
+    <string name="import_shape">這不是一張 9×9 的題。</string>
+</resources>

@@ -13,6 +13,18 @@ data class Snapshot(
 )
 
 /**
+ * A pencil mark [digit] in [cell] that a wrong digit at [by] took away (written there, or left out
+ * when candidates were pencilled in). Kept only for wrong digits, so the list stays small: when
+ * the Coach takes the mistake back, the mark comes back with it.
+ */
+@Serializable
+data class Struck(val cell: Int, val digit: Int, val by: Int)
+
+/** One change of a digit on the page, in order: [digit] 0 is an erasure. For reading a page back. */
+@Serializable
+data class Move(val cell: Int, val digit: Int, val coach: Boolean = false)
+
+/**
  * How much the Coach was needed. [deepest] is 0 (never), 1 (look), 2 (why) or 3 (answer).
  */
 @Serializable
@@ -43,7 +55,19 @@ data class GameState(
     val solved: Boolean = false,
     /** Wall-clock time the game was first solved, for the journal. */
     val solvedAt: Long? = null,
+    /** Marks taken away by wrong digits (9.0). */
+    val struck: List<Struck> = emptyList(),
+    /** Every digit written or erased, in order (9.0); pages begun earlier have none. */
+    val moves: List<Move> = emptyList(),
+    /**
+     * The board when [moves] began, for a page begun before 9.0 and finished after: its earlier
+     * digits have no moves, so reading it back starts here. Null: the log starts at the givens.
+     */
+    val logStart: List<Int>? = null,
 ) {
+    /** The board [moves] replay from. */
+    val movesFrom: List<Int> get() = logStart ?: spec.givens
+
     val size: Int get() = spec.size
 
     fun isGiven(index: Int): Boolean = spec.givens[index] != 0
@@ -89,7 +113,7 @@ data class GameState(
             if (values[index] != 0) this
             else remember().copy(notes = notes.replace(index, DigitMask.toggle(notes[index], digit)))
         } else if (values[index] == digit) {
-            remember().copy(values = values.replace(index, 0))
+            remember().copy(values = values.replace(index, 0), moves = moves + Move(index, 0))
         } else {
             remember().place(index, digit, autoClearNotes)
         }
@@ -98,37 +122,39 @@ data class GameState(
     /** Writes the Coach's answer. */
     fun placeHint(index: Int, digit: Int, autoClearNotes: Boolean): GameState {
         if (!isEditable(index) || digit !in 1..size) return this
-        return remember().place(index, digit, autoClearNotes).copy(selected = index)
+        return remember().place(index, digit, autoClearNotes, coach = true).copy(selected = index)
     }
 
     fun erase(): GameState {
         val index = selected ?: return this
         if (!isEditable(index)) return this
         if (values[index] == 0 && notes[index] == 0) return this
-        return remember().copy(values = values.replace(index, 0), notes = notes.replace(index, 0))
+        val logged = if (values[index] != 0) moves + Move(index, 0) else moves
+        return remember().copy(values = values.replace(index, 0), notes = notes.replace(index, 0), moves = logged)
     }
 
     /**
-     * Takes back a wrong digit the Coach pointed out. Writing it had also crossed it out of the
-     * pencil marks of every empty cell it sees; those marks come back, so the cell's own answer is
-     * not left missing from its notes.
+     * Takes back a wrong digit the Coach pointed out. The pencil marks it took away (crossed out
+     * when it was written, or left out when candidates were pencilled in) come back wherever the
+     * digit is possible again, so a cell's own answer is never left missing from its notes.
      */
     fun eraseMistake(index: Int): GameState {
         if (!isEditable(index) || values[index] == 0) return this
         val digit = values[index]
-        val before = history.lastOrNull { it.values[index] != digit }
+        val after = values.replace(index, 0)
         val geometry = spec.geometry
-        val peers = geometry.peers[index]
-        // Only where the digit is still possible: a later placement may have ruled it out again.
-        fun stillPossible(i: Int) = geometry.peers[i].none { it != index && values[it] == digit }
-        val restored = notes.mapIndexed { i, mask ->
-            if (before != null && i in peers && values[i] == 0 && DigitMask.contains(before.notes[i], digit) && stillPossible(i)) {
-                mask or (1 shl digit)
-            } else {
-                mask
-            }
-        }
-        return remember().copy(values = values.replace(index, 0), notes = restored.replace(index, 0), selected = index)
+        // Possible again: no digit left on the board that rules it out (a second slip of the same
+        // digit, or a later correct one, keeps its mark away).
+        fun possible(cell: Int) = after[cell] == 0 && geometry.peers[cell].none { after[it] == digit }
+        val back = struck.filter { it.digit == digit && after[it.by] != digit && possible(it.cell) }
+        val restored = back.fold(notes) { n, s -> n.replace(s.cell, n[s.cell] or (1 shl digit)) }
+        return remember().copy(
+            values = after,
+            notes = restored.replace(index, 0),
+            selected = index,
+            struck = struck - back.toSet(),
+            moves = moves + Move(index, 0, coach = true),
+        )
     }
 
     /**
@@ -140,20 +166,30 @@ data class GameState(
         if (solved) return this
         val engine = SudokuEngine(spec.puzzle)
         val board = values.toIntArray()
+        val geometry = spec.geometry
+        val left = mutableListOf<Struck>()
         val filled = notes.mapIndexed { i, mask ->
-            if (values[i] == 0 && mask == 0) DigitMask.of(engine.candidates(board, i)) else mask
+            if (values[i] != 0 || mask != 0) return@mapIndexed mask
+            // A digit left out only because of a wrong digit is remembered, to come back with it.
+            for (peer in geometry.peers[i]) {
+                val v = values[peer]
+                if (v != 0 && !isGiven(peer) && v != spec.solution[peer]) left += Struck(i, v, peer)
+            }
+            DigitMask.of(engine.candidates(board, i))
         }
-        return if (filled == notes) this else remember().copy(notes = filled)
+        return if (filled == notes) this else remember().copy(notes = filled, struck = struck + left)
     }
 
     fun undo(): GameState {
         if (solved) return this
         val last = history.lastOrNull() ?: return this
+        val changed = values.indices.filter { last.values[it] != values[it] }.map { Move(it, last.values[it]) }
         return copy(
             values = last.values,
             notes = last.notes,
             selected = last.selected,
             history = history.dropLast(1),
+            moves = moves + changed,
         )
     }
 
@@ -177,15 +213,25 @@ data class GameState(
 
     fun encode(): String = json.encodeToString(serializer(), this)
 
-    private fun place(index: Int, digit: Int, autoClearNotes: Boolean): GameState {
+    private fun place(index: Int, digit: Int, autoClearNotes: Boolean, coach: Boolean = false): GameState {
         var newNotes = notes.replace(index, 0)
+        var newStruck = struck
         if (autoClearNotes) {
             val peers = spec.geometry.peers[index]
+            // A wrong digit remembers the marks it takes, so taking it back gives them back.
+            if (digit != spec.solution[index]) {
+                newStruck = newStruck + peers.filter { DigitMask.contains(notes[it], digit) }.map { Struck(it, digit, index) }
+            }
             newNotes = newNotes.mapIndexed { i, mask ->
                 if (peers.contains(i)) DigitMask.remove(mask, digit) else mask
             }
         }
-        val placed = copy(values = values.replace(index, digit), notes = newNotes)
+        val placed = copy(
+            values = values.replace(index, digit),
+            notes = newNotes,
+            struck = newStruck,
+            moves = moves + Move(index, digit, coach),
+        )
         // Every copy of the held digit is on the board: put it down.
         return if (placed.lockedDigit != null && placed.remaining[placed.lockedDigit] <= 0) placed.copy(lockedDigit = null) else placed
     }
@@ -208,7 +254,10 @@ data class GameState(
 
         /** Null if the text is not a game this version understands. */
         fun decode(text: String): GameState? = runCatching {
-            json.decodeFromString(serializer(), text).takeIf { it.isConsistent() }
+            json.decodeFromString(serializer(), text).takeIf { it.isConsistent() }?.let { game ->
+                // Written on before the move log existed: its log starts from the board as it is.
+                if (game.moves.isEmpty() && game.logStart == null && game.values != game.spec.givens) game.copy(logStart = game.values) else game
+            }
         }.getOrNull()
 
         /** A readable but damaged save is refused rather than crashing later (remaining, undo). */
@@ -228,6 +277,9 @@ data class GameState(
                 (lockedDigit == null || lockedDigit in 1..spec.size) &&
                 history.all { boardOk(it.values, it.notes, it.selected) } &&
                 coach.deepest in 0..3 && elapsedMillis >= 0 &&
+                struck.all { it.cell in 0 until cells && it.by in 0 until cells && it.digit in 1..spec.size } &&
+                moves.all { it.cell in 0 until cells && it.digit in digits } &&
+                (logStart == null || boardOk(logStart, notes, null)) &&
                 // "Solved" with a wrong board would lock it for good.
                 (!solved || values == spec.solution)
         }

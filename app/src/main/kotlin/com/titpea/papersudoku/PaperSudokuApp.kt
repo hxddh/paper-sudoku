@@ -66,6 +66,9 @@ import com.titpea.papersudoku.notebook.NotebookScreen
 import com.titpea.papersudoku.notebook.NotebookViewModel
 import com.titpea.papersudoku.page.PageEvent
 import com.titpea.papersudoku.page.PageKeys
+import com.titpea.papersudoku.page.ImportScreen
+import com.titpea.papersudoku.page.ReviewScreen
+import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.page.PageScreen
 import com.titpea.papersudoku.page.PageViewModel
 import com.titpea.papersudoku.settings.LicencesScreen
@@ -79,7 +82,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
-enum class Screen { Home, Settings, Licences, Handbook }
+enum class Screen { Home, Settings, Licences, Handbook, Review, Import }
 
 /**
  * Destinations on a Navigation 3 back stack: the notebook (home), the handbook, Settings and the
@@ -108,6 +111,12 @@ fun PaperSudokuApp(
     // The widget asks for today's page: leave Settings if it is open, open today, and let the
     // notebook move its detail pane once it is on screen.
     var showToday by rememberSaveable { mutableStateOf(false) }
+    // A page opened from another screen (the handbook, typing one in): the notebook shows it.
+    var showKey by rememberSaveable { mutableStateOf<String?>(null) }
+    fun backToNotebookWith(key: String) {
+        while (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+        showKey = key
+    }
     LaunchedEffect(openTodayRequests) {
         openTodayRequests.collect {
             while (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
@@ -170,6 +179,10 @@ fun PaperSudokuApp(
                                 },
                                 showToday = showToday,
                                 onTodayShown = { showToday = false },
+                                showKey = showKey,
+                                onKeyShown = { showKey = null },
+                                onReadBack = { if (backStack.lastOrNull() == Screen.Home) backStack.add(Screen.Review) },
+                                onTypeIn = { if (backStack.lastOrNull() == Screen.Home) backStack.add(Screen.Import) },
                             )
                             Screen.Settings -> {
                                 val state by pageViewModel.state.collectAsStateWithLifecycle()
@@ -190,9 +203,33 @@ fun PaperSudokuApp(
                                 HandbookScreen(
                                     start = handbookStart,
                                     techniquesMet = state.settings.techniquesMet,
+                                    cleanPages = state.settings.cleanPages,
                                     onBack = { if (backStack.lastOrNull() == Screen.Handbook) backStack.removeAt(backStack.lastIndex) },
+                                    onPractise = { technique ->
+                                        if (backStack.lastOrNull() == Screen.Handbook) {
+                                            pageViewModel.onEvent(PageEvent.PractiseTechnique(technique))
+                                            backToNotebookWith(Catalog.focusPrefix(technique))
+                                        }
+                                    },
                                 )
                             }
+                            Screen.Review -> {
+                                val state by pageViewModel.state.collectAsStateWithLifecycle()
+                                val game = state.game
+                                val back = { if (backStack.lastOrNull() == Screen.Review) backStack.removeAt(backStack.lastIndex) }
+                                if (game != null) ReviewScreen(spec = game.spec, moves = game.moves, from = game.movesFrom, onBack = { back() })
+                                // The page went away under it (after process death, before it loads).
+                                else LaunchedEffect(Unit) { back() }
+                            }
+                            Screen.Import -> ImportScreen(
+                                onBack = { if (backStack.lastOrNull() == Screen.Import) backStack.removeAt(backStack.lastIndex) },
+                                onImported = { spec ->
+                                    if (backStack.lastOrNull() == Screen.Import) {
+                                        pageViewModel.onEvent(PageEvent.OpenImported(spec))
+                                        backToNotebookWith(spec.key)
+                                    }
+                                },
+                            )
                         }
                         }
                     }
@@ -240,6 +277,10 @@ private fun NotebookHome(
     onOpenHandbook: (Int) -> Unit,
     showToday: Boolean,
     onTodayShown: () -> Unit,
+    showKey: String?,
+    onKeyShown: () -> Unit,
+    onReadBack: () -> Unit,
+    onTypeIn: () -> Unit,
 ) {
     val page by pageViewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -280,6 +321,11 @@ private fun NotebookHome(
         navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, PageKeys.daily(pageViewModel.state.value.today))
         onTodayShown()
     }
+    LaunchedEffect(showKey) {
+        val key = showKey ?: return@LaunchedEffect
+        navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, key)
+        onKeyShown()
+    }
     val notebookTitle = stringResource(R.string.notebook)
     val pageTitle = stringResource(R.string.page_pane)
 
@@ -303,6 +349,17 @@ private fun NotebookHome(
                         },
                         onOpenSettings = onOpenSettings,
                         onOpenHandbook = onOpenHandbook,
+                        onOpenWeekly = {
+                            pageViewModel.onEvent(PageEvent.OpenWeekly)
+                            scope.launch {
+                                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, Catalog.weeklyKey(Catalog.weekOf(pageViewModel.state.value.today)))
+                            }
+                        },
+                        onOpenSaved = { key ->
+                            pageViewModel.onEvent(PageEvent.OpenSaved(key))
+                            scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, key) }
+                        },
+                        onTypeIn = onTypeIn,
                         selectedKey = if (twoPane) openKey else null,
                         boardTransition = { key ->
                             Modifier.sharedBounds(rememberSharedContentState("board-$key"), paneScope)
@@ -324,6 +381,7 @@ private fun NotebookHome(
                         onBack = if (twoPane) null else ({ scope.launch { navigator.navigateBack() } }),
                         onPrint = { printPuzzle(context, it) },
                         onShare = { sharePage(context, it) },
+                        onReadBack = { onReadBack() },
                         effects = pageViewModel.effects,
                         // Keyed by the page being opened, not the one still on screen while it loads.
                         // Bounds, not element: the live board and the thumbnail cross-fade as

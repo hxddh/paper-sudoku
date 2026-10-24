@@ -28,6 +28,8 @@ data class UserSettings(
     val autoClearNotes: Boolean = true,
     /** Techniques met in solved puzzles or explained by the Coach. */
     val techniquesMet: Set<Technique> = emptySet(),
+    /** Per technique, pages it was needed on and finished without the Coach's answer (9.0). */
+    val cleanPages: Map<Technique, Int> = emptyMap(),
     /** The player has written a first digit; the one-line how-to stops showing. */
     val wroteFirstDigit: Boolean = false,
 )
@@ -58,6 +60,7 @@ class DataStoreSettings(context: Context) : SettingsStore {
             p[AUTO_CLEAR_NOTES] = next.autoClearNotes
             p[TECHNIQUES_MET] = next.techniquesMet.map { it.name }.toSet()
             p[WROTE_FIRST_DIGIT] = next.wroteFirstDigit
+            p[CLEAN_PAGES] = next.cleanPages.map { (t, n) -> "${t.name}=$n" }.toSet()
         }
     }
 
@@ -68,6 +71,11 @@ class DataStoreSettings(context: Context) : SettingsStore {
             .mapNotNull { name -> Technique.entries.firstOrNull { it.name == name } }
             .toSet(),
         wroteFirstDigit = this[WROTE_FIRST_DIGIT] ?: false,
+        cleanPages = this[CLEAN_PAGES].orEmpty().mapNotNull { entry ->
+            val technique = Technique.entries.firstOrNull { it.name == entry.substringBefore('=') }
+            val count = entry.substringAfter('=', "").toIntOrNull()
+            if (technique != null && count != null && count > 0) technique to count else null
+        }.toMap(),
     )
 
     private companion object {
@@ -77,5 +85,7 @@ class DataStoreSettings(context: Context) : SettingsStore {
         val AUTO_CLEAR_NOTES = booleanPreferencesKey("auto_clear_notes")
         val TECHNIQUES_MET = stringSetPreferencesKey("techniques_met")
         val WROTE_FIRST_DIGIT = booleanPreferencesKey("wrote_first_digit")
+        /** "Technique=count" entries. */
+        val CLEAN_PAGES = stringSetPreferencesKey("clean_pages")
     }
 }

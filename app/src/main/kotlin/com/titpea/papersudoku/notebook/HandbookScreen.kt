@@ -11,13 +11,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -25,7 +29,9 @@ import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
 import com.titpea.papersudoku.engine.Technique
 import com.titpea.papersudoku.game.model.HandbookExamples
+import com.titpea.papersudoku.game.model.Mastery
 import com.titpea.papersudoku.page.Board
+import com.titpea.papersudoku.page.DOT
 import com.titpea.papersudoku.page.CoachUi
 import com.titpea.papersudoku.page.coachMarks
 import com.titpea.papersudoku.page.techniqueName
@@ -47,10 +53,17 @@ sealed interface HandbookTopic {
  * The handbook: how to use the pen, then each technique with a worked example from a real
  * practice page, drawn the way the Coach draws it (the unit, the pattern, the crossed-out
  * candidates, the cell it settles) and explained in the Coach's own words. It opens at the topic
- * tapped in the notebook; the rest are a scroll away.
+ * tapped in the notebook; the rest are a scroll away. Each technique shows how well it is known
+ * (met, practised, known: from clean pages that needed it) and offers a page to practise it.
  */
 @Composable
-fun HandbookScreen(start: Int, techniquesMet: Set<Technique>, onBack: () -> Unit) {
+fun HandbookScreen(
+    start: Int,
+    techniquesMet: Set<Technique>,
+    onBack: () -> Unit,
+    cleanPages: Map<Technique, Int> = emptyMap(),
+    onPractise: ((Technique) -> Unit)? = null,
+) {
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = start.coerceIn(0, HandbookTopic.all.lastIndex))
     SettingsScaffold(
         title = stringResource(R.string.notebook_techniques),
@@ -62,7 +75,12 @@ fun HandbookScreen(start: Int, techniquesMet: Set<Technique>, onBack: () -> Unit
             item(key = topic.toString()) {
                 when (topic) {
                     HandbookTopic.Pen -> PenSection()
-                    is HandbookTopic.Of -> TechniqueSection(topic.technique, topic.technique in techniquesMet)
+                    is HandbookTopic.Of -> TechniqueSection(
+                        technique = topic.technique,
+                        mastery = Mastery.of(topic.technique in techniquesMet, cleanPages[topic.technique] ?: 0),
+                        cleanPages = cleanPages[topic.technique] ?: 0,
+                        onPractise = onPractise,
+                    )
                 }
             }
         }
@@ -114,7 +132,7 @@ private fun PenSection() {
 }
 
 @Composable
-private fun TechniqueSection(technique: Technique, met: Boolean) {
+private fun TechniqueSection(technique: Technique, mastery: Mastery, cleanPages: Int, onPractise: ((Technique) -> Unit)?) {
     val page = remember(technique) { HandbookExamples.page(technique) }
     val hint = remember(technique) { HandbookExamples.of(technique).hint }
     val geometry = page.spec.geometry
@@ -122,7 +140,7 @@ private fun TechniqueSection(technique: Technique, met: Boolean) {
     val coach = CoachUi(hint, level = 2, step = hint.groundwork.lastIndex.coerceAtLeast(0))
     val marks = remember(technique) { coachMarks(geometry, page.values, coach) }
     SectionColumn("handbook-${technique.name}") {
-        Title(techniqueName(technique), if (met) stringResource(R.string.technique_seen) else null)
+        Title(techniqueName(technique), masteryLine(mastery, cleanPages))
         Body(techniqueSummary(technique))
         Board(
             game = page,
@@ -139,5 +157,23 @@ private fun TechniqueSection(technique: Technique, met: Boolean) {
             color = MaterialTheme.colorScheme.primary,
         )
         workedExample(geometry, hint).forEach { Body(it) }
+        if (onPractise != null) {
+            // Ink, not the Coach's red.
+            OutlinedButton(
+                onClick = { onPractise(technique) },
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                modifier = Modifier.heightIn(min = 48.dp).testTag("practise-${technique.name}"),
+            ) { Text(stringResource(R.string.focus_practise)) }
+        }
     }
+}
+
+/** Ink, not a score: how far the technique is known, and the clean pages behind it. */
+@Composable
+private fun masteryLine(mastery: Mastery, cleanPages: Int): String? = when (mastery) {
+    Mastery.Unmet -> null
+    Mastery.Met -> stringResource(R.string.mastery_met)
+    Mastery.Practised -> stringResource(R.string.mastery_practised) + DOT +
+        pluralStringResource(R.plurals.mastery_pages, cleanPages, cleanPages)
+    Mastery.Mastered -> stringResource(R.string.mastery_mastered)
 }

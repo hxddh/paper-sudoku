@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="difficulty_deep">深入</string>
+    <string name="technique_naked_triple">显性三数组</string>
+    <string name="technique_hidden_triple">隐性三数组</string>
+    <string name="technique_swordfish">剑鱼</string>
+    <string name="technique_xy_wing">XY 翼</string>
+    <string name="technique_desc_naked_triple">三格的候选数合起来只有同样的三个数字，同一单元的其他格不能再用它们。</string>
+    <string name="technique_desc_hidden_triple">三个数字只能放在同样的三格，这三格不能是别的数字。</string>
+    <string name="technique_desc_swordfish">三条线上的 X 翼：某个数字只落在三条交叉线上，可擦掉这三条线上其他位置的它。</string>
+    <string name="technique_desc_xy_wing">一个双候选格和两个搭档：无论它是哪个数，总有一个搭档是第三个数字。</string>
+    <string name="look_naked_triple">有三格的候选数合起来只有三个数字。</string>
+    <string name="look_hidden_triple">有三个数字只能落在同样的三格里。</string>
+    <string name="look_swordfish">某个数字在三条线上，只落在三条交叉线上。</string>
+    <string name="look_xy_wing">一个只有两个候选数的格子，看得见两个各与它共用一个数字的格子。</string>
+    <string name="why_naked_triple">在%1$s里，有三格只能是 %2$d、%3$d 或 %4$d，它们占用了这三个数字，其他格就不能再用。</string>
+    <string name="why_hidden_triple">在%1$s里，%2$d、%3$d 和 %4$d 只能放在同样的三格，所以这三格不能是别的数字。</string>
+    <string name="why_swordfish">在%1$s、%2$s和%3$s里，%7$d 只能出现在与%4$s、%5$s、%6$s交叉的位置。每条线各占一处，且分别在不同的交叉线上，所以%4$s、%5$s和%6$s的其他位置不能是 %7$d。</string>
+    <string name="why_xy_wing">%1$s只能是 %4$d 或 %5$d。%2$s和%3$s各把其中一个数与 %6$d 配对。不论%1$s是哪一个，两者中总有一格是 %6$d，所以同时看得见这两格的格子不能是 %6$d。</string>
+</resources>

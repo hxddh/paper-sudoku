@@ -81,7 +81,8 @@ class PageViewModelTest {
     private fun PageViewModel.solveFully() {
         val spec = game().spec
         for (i in spec.givens.indices) {
-            if (spec.givens[i] == 0) {
+            // Cells already right are left alone: tapping their digit again would clear them.
+            if (spec.givens[i] == 0 && game().values[i] != spec.solution[i]) {
                 onEvent(PageEvent.Tap(i))
                 onEvent(PageEvent.Digit(spec.solution[i]))
             }
@@ -288,9 +289,41 @@ class PageViewModelTest {
         assertEquals(Catalog.dailyKey(today.toEpochDay() + 1), vm.game().spec.key)
     }
 
+    /** Writes one right digit, so the page is begun. */
+    private fun PageViewModel.begin() {
+        val spec = game().spec
+        val empty = spec.givens.indexOfFirst { it == 0 }
+        onEvent(PageEvent.Tap(empty))
+        onEvent(PageEvent.Digit(spec.solution[empty]))
+    }
+
+    @Test
+    fun `a blank daily left open past midnight turns to the new day`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.Background)
+        instant = Instant.parse("2026-10-22T07:00:00Z")
+        vm.onEvent(PageEvent.Foreground)
+        advanceUntilIdle()
+        assertEquals(Catalog.dailyKey(today.toEpochDay() + 1), vm.game().spec.key)
+    }
+
+    @Test
+    fun `a blank daily restored after a night away is the new day's`() = test {
+        val handle = SavedStateHandle()
+        viewModel(savedState = handle)
+        advanceUntilIdle()
+        instant = Instant.parse("2026-10-22T07:00:00Z")
+        val restored = viewModel(savedState = SavedStateHandle(handle.keys().associateWith { handle.get<Any>(it) }))
+        advanceUntilIdle()
+        assertEquals(Catalog.dailyKey(today.toEpochDay() + 1), restored.game().spec.key)
+    }
+
     @Test
     fun `an unfinished daily stays open past midnight`() = test {
         val vm = viewModel()
+        advanceUntilIdle()
+        vm.begin()
         advanceUntilIdle()
         vm.onEvent(PageEvent.Background)
         instant = Instant.parse("2026-10-22T07:00:00Z")
@@ -602,6 +635,8 @@ class PageViewModelTest {
     fun `a daily solved a day late still turns to the new day`() = test {
         val vm = viewModel()
         advanceUntilIdle()
+        vm.begin()
+        advanceUntilIdle()
         vm.onEvent(PageEvent.Background)
         instant = Instant.parse("2026-10-22T09:00:00Z")
         vm.onEvent(PageEvent.Foreground)
@@ -618,6 +653,8 @@ class PageViewModelTest {
     fun `a daily finished a day late says today's page is waiting`() = test {
         val vm = viewModel()
         advanceUntilIdle()
+        vm.begin()
+        advanceUntilIdle()
         vm.onEvent(PageEvent.Background)
         instant = Instant.parse("2026-10-22T09:00:00Z")
         vm.onEvent(PageEvent.Foreground)
@@ -625,6 +662,54 @@ class PageViewModelTest {
         advanceUntilIdle()
         assertEquals(today.toEpochDay() + 1, vm.state.value.today)
         assertTrue(vm.game().spec.epochDay!! < vm.state.value.today)
+        assertTrue(vm.state.value.todayWaiting)
+        // Reopened later, the page no longer says so.
+        vm.onEvent(PageEvent.OpenToday)
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.OpenDaily(today.toEpochDay()))
+        advanceUntilIdle()
+        assertFalse(vm.state.value.todayWaiting)
+    }
+
+    @Test
+    fun `a clean page counts once towards each technique it needed`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        val used = vm.game().spec.techniquesUsed
+        vm.solveFully()
+        advanceUntilIdle()
+        assertEquals(used.associateWith { 1 }, settings.flow.value.cleanPages)
+    }
+
+    @Test
+    fun `practising a technique deals its own pages, outside practice`() = test {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.PractiseTechnique(com.titpea.papersudoku.engine.Technique.Pointing))
+        advanceUntilIdle()
+        val page = vm.game().spec
+        assertEquals(com.titpea.papersudoku.game.model.PuzzleKind.Focus, page.kind)
+        assertEquals(Catalog.focusPrefix(com.titpea.papersudoku.engine.Technique.Pointing) + 0, page.key)
+        // Asked again while it is unfinished: the same page.
+        vm.onEvent(PageEvent.OpenToday)
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.PractiseTechnique(com.titpea.papersudoku.engine.Technique.Pointing))
+        advanceUntilIdle()
+        assertEquals(page.key, vm.game().spec.key)
+        assertEquals(null, store.latestUnsolvedPracticeKey())
+    }
+
+    @Test
+    fun `this week's page opens and comes back after process death`() = test {
+        val handle = SavedStateHandle()
+        val vm = viewModel(savedState = handle)
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.OpenWeekly)
+        advanceUntilIdle()
+        assertEquals(Catalog.weeklyKey(Catalog.weekOf(today.toEpochDay())), vm.game().spec.key)
+        val restored = viewModel(savedState = SavedStateHandle(handle.keys().associateWith { handle.get<Any>(it) }))
+        advanceUntilIdle()
+        assertEquals(Catalog.weeklyKey(Catalog.weekOf(today.toEpochDay())), restored.game().spec.key)
     }
 
     @Test

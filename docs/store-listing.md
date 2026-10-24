@@ -20,7 +20,11 @@ practice stack waits: 9×9 pages that grow harder as you learn.
 Stuck? The Coach writes in the margin: where to look, then why, and the answer only if you ask.
 
 - One page a day, the same for everyone, fully offline
-- Practice that follows you: singles → pointing and pairs → hidden pairs and X-Wings
+- Practice that follows you: singles → pointing and pairs → hidden pairs and X-Wings → triples,
+  Swordfish and XY-Wing
+- A handbook that shows what you know, and pages to practise each technique
+- Read a solved page back, move by move
+- Type in a puzzle from a book or newspaper; a 9×9 page each week
 - Press and slide to aim; pick up a digit and write it across the page
 - Printed digits, your ink, pencil marks — and print a blank copy of any page on real paper
 - A notebook of stamped days. No streaks.

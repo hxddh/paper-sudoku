@@ -18,7 +18,7 @@
     <string name="keypad_done">%1$d，已全部填入</string>
     <string name="keypad_pencil">%1$d，铅笔记号</string>
     <string name="board_description">数独盘面，%1$d × %1$d</string>
-    <string name="cell_description">第 %1$d 行，第 %2$d 列，%3$s</string>
+    <string name="cell_description">第 %1$d 行，第 %2$d 列，%4$s，%3$s</string>
     <string name="cell_label">第 %1$d 行第 %2$d 列</string>
     <string name="cell_empty">空</string>
     <string name="cell_given">题目数字 %1$d</string>
@@ -74,7 +74,6 @@
     <string name="technique_desc_naked_pair">两格共享同样的两个候选数，同一单元的其他格不能再用它们。</string>
     <string name="technique_desc_hidden_pair">两个数字只能放在同样的两格，这两格不能是别的数字。</string>
     <string name="technique_desc_x_wing">某个数字在两条线上构成矩形，可清除交叉线上的同一数字。</string>
-    <string name="technique_seen">遇到过</string>
     <string name="stamp_title">完成</string>
     <string name="coach_usage_none">干净完成，全靠自己。</string>
     <string name="coach_usage_look">干净完成，教练指了个方向。</string>
@@ -125,7 +124,7 @@
     <string name="keypad_held">%1$d，已拿起，点格子填入。</string>
     <string name="loupe_label">%1$d 行 %2$d 列</string>
     <string name="menu_next_practice">换一页练习</string>
-    <string name="next_practice_title">放下这一页？</string>
+    <string name="next_practice_title">换一页练习？</string>
     <string name="next_practice_body">这一页不计入进度，换上新的一页练习。</string>
     <string name="next_practice_confirm">换一页</string>
     <string name="notebook">本子</string>
@@ -141,7 +140,7 @@
     <string name="practice_continue">继续第 %1$d 页</string>
     <string name="practice_new_page">新的一页</string>
     <string name="practice_page">第 %1$d 页</string>
-    <string name="practice_top_level">已到最高级：隐性数对与 X 翼</string>
+    <string name="practice_top_level">已到最高级：三数组、剑鱼与 XY 翼</string>
     <string name="settings_language">语言</string>
     <string name="settings_language_desc">打开系统设置，更改应用语言</string>
     <string name="shortcut_put_down">放下拿起的数字或收起教练（Esc）</string>
@@ -177,7 +176,7 @@
     <string name="box_bottom_middle">下中宫</string>
     <string name="box_bottom_right">右下宫</string>
     <string name="widget_ready">随时开始</string>
-    <string name="solved_level_up">升级了：从下一页起是%1$s。</string>
+    <string name="solved_level_up">难度提高了：下一页起是「%1$s」。</string>
     <string name="solved_daily_waiting">今天的一页已经在等你了。</string>
     <string name="solved_daily_close">明天有新的一页。</string>
     <string name="page_answer_shown">看过答案</string>
@@ -195,7 +194,7 @@
     <string name="handbook_pen_tap">先点格子，再点数字；再点一次同一个数字就擦掉。</string>
     <string name="handbook_pen_aim">按住滑动来瞄准：手指上方的放大镜显示是哪一格，松手就选中它。</string>
     <string name="handbook_pen_hold">没选格子时点一个数字，就把它拿在手里；之后点哪格就写到哪格。再点一次这个数字，或点工具下方那行字，就放下。</string>
-    <string name="handbook_pen_pencil">铅笔写下的是小小的铅笔记号。写下一个数时，它看得到的格子里这个数的铅笔记号会被划掉（可在设置里关闭）。</string>
+    <string name="handbook_pen_pencil">铅笔写下的是小小的铅笔记号。写下一个数时，同行、同列、同宫里这个数的铅笔记号会被擦掉（可在设置里关闭）。</string>
     <string name="handbook_pen_fill">在 9×9 页面上长按铅笔，可以一次填入所有候选数。这只是笔记，不影响干净完成。</string>
     <string name="handbook_pen_keyboard">用键盘时：方向键移动，1–9 写数，Backspace 擦除，N 切换铅笔，Ctrl+Z 撤销，H 问教练，Esc 放下数字。</string>
     <string name="fill_candidates">填入所有候选数</string>

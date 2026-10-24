@@ -329,7 +329,7 @@ fun unitLabel(geometry: Geometry, unit: UnitRef): String = when (unit.kind) {
 }
 
 /** The name of box [index] by its place: 3 × 3 boxes on 9×9, 3 rows × 2 columns on 6×6. */
-private fun boxName(geometry: Geometry, index: Int): Int {
+internal fun boxName(geometry: Geometry, index: Int): Int {
     val across = geometry.size / geometry.boxCols
     val down = geometry.size / geometry.boxRows
     val vertical = position(index / across, down)
@@ -360,6 +360,10 @@ fun techniqueName(technique: Technique): String = stringResource(
         Technique.NakedPair -> R.string.technique_naked_pair
         Technique.HiddenPair -> R.string.technique_hidden_pair
         Technique.XWing -> R.string.technique_x_wing
+        Technique.NakedTriple -> R.string.technique_naked_triple
+        Technique.HiddenTriple -> R.string.technique_hidden_triple
+        Technique.Swordfish -> R.string.technique_swordfish
+        Technique.XYWing -> R.string.technique_xy_wing
     },
 )
 
@@ -373,6 +377,10 @@ fun techniqueSummary(technique: Technique): String = stringResource(
         Technique.NakedPair -> R.string.technique_desc_naked_pair
         Technique.HiddenPair -> R.string.technique_desc_hidden_pair
         Technique.XWing -> R.string.technique_desc_x_wing
+        Technique.NakedTriple -> R.string.technique_desc_naked_triple
+        Technique.HiddenTriple -> R.string.technique_desc_hidden_triple
+        Technique.Swordfish -> R.string.technique_desc_swordfish
+        Technique.XYWing -> R.string.technique_desc_xy_wing
     },
 )
 
@@ -386,6 +394,10 @@ private fun lookTip(technique: Technique): String = stringResource(
         Technique.NakedPair -> R.string.look_naked_pair
         Technique.HiddenPair -> R.string.look_hidden_pair
         Technique.XWing -> R.string.look_x_wing
+        Technique.NakedTriple -> R.string.look_naked_triple
+        Technique.HiddenTriple -> R.string.look_hidden_triple
+        Technique.Swordfish -> R.string.look_swordfish
+        Technique.XYWing -> R.string.look_xy_wing
     },
 )
 
@@ -407,6 +419,28 @@ private fun whyText(geometry: Geometry, lesson: Step): String = when (lesson) {
             Technique.Claiming -> stringResource(R.string.why_claiming, unitLabel(geometry, u[0]), d[0], unitLabel(geometry, u[1]))
             Technique.NakedPair -> stringResource(R.string.why_naked_pair, unitLabel(geometry, u[0]), d[0], d[1])
             Technique.HiddenPair -> stringResource(R.string.why_hidden_pair, unitLabel(geometry, u[0]), d[0], d[1])
+            Technique.NakedTriple -> stringResource(R.string.why_naked_triple, unitLabel(geometry, u[0]), d[0], d[1], d[2])
+            Technique.HiddenTriple -> stringResource(R.string.why_hidden_triple, unitLabel(geometry, u[0]), d[0], d[1], d[2])
+            Technique.Swordfish -> stringResource(
+                R.string.why_swordfish,
+                unitLabel(geometry, u[0]),
+                unitLabel(geometry, u[1]),
+                unitLabel(geometry, u[2]),
+                unitLabel(geometry, u[3]),
+                unitLabel(geometry, u[4]),
+                unitLabel(geometry, u[5]),
+                d[0],
+            )
+            // Digits are the third digit first, then the pivot's two; cells are the pivot, then the pincers.
+            Technique.XYWing -> stringResource(
+                R.string.why_xy_wing,
+                cellLabel(geometry, lesson.patternCells[0]),
+                cellLabel(geometry, lesson.patternCells[1]),
+                cellLabel(geometry, lesson.patternCells[2]),
+                d[1],
+                d[2],
+                d[0],
+            )
             Technique.XWing -> stringResource(
                 R.string.why_x_wing,
                 unitLabel(geometry, u[0]),

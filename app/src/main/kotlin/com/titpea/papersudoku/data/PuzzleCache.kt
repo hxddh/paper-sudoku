@@ -2,6 +2,7 @@ package com.titpea.papersudoku.data
 
 import android.util.Log
 import com.titpea.papersudoku.engine.Difficulty
+import com.titpea.papersudoku.engine.Technique
 import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.PuzzleSource
 import com.titpea.papersudoku.game.model.PuzzleSpec
@@ -34,6 +35,12 @@ class CachedPuzzleSource(
     override suspend fun classic(difficulty: Difficulty, number: Int): PuzzleSpec =
         cached(Catalog.classicKey(difficulty, number)) { Catalog.classic(difficulty, number) }
 
+    override suspend fun weekly(sunday: Long): PuzzleSpec =
+        cached(Catalog.weeklyKey(sunday)) { Catalog.weekly(sunday) }
+
+    override suspend fun focus(technique: Technique, number: Int): PuzzleSpec =
+        cached(Catalog.focusPrefix(technique) + number) { Catalog.focus(technique, number) }
+
     private suspend fun cached(key: String, generate: () -> PuzzleSpec): PuzzleSpec = withContext(dispatcher) {
         if (pruned.compareAndSet(false, true)) prune()
         // One generation per page at a time: a prefetch and an open of the same page share the
@@ -50,7 +57,8 @@ class CachedPuzzleSource(
         directory.listFiles()?.forEach { file ->
             val name = file.name
             val stale = !name.endsWith(SUFFIX) ||
-                (Catalog.dayOf(name.removeSuffix(SUFFIX))?.let { it < yesterday } ?: false)
+                (Catalog.dayOf(name.removeSuffix(SUFFIX))?.let { it < yesterday } ?: false) ||
+                (Catalog.dayOfWeekly(name.removeSuffix(SUFFIX))?.let { it < yesterday - 7 } ?: false)
             if (stale) file.delete()
         }
     }

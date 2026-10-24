@@ -17,8 +17,10 @@ android {
         applicationId = "com.titpea.papersudoku"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "8.0.0"
+        // versionCode = major × 10000 + minor × 100 + patch of versionName (checked by
+        // tools/ci/release-preflight.sh), so every release has a larger one.
+        versionCode = 90000
+        versionName = "9.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -27,8 +29,24 @@ android {
     val releaseStorePassword = providers.environmentVariable("PAPER_SUDOKU_STORE_PASSWORD").orNull
     val releaseKeyAlias = providers.environmentVariable("PAPER_SUDOKU_KEY_ALIAS").orNull
     val releaseKeyPassword = providers.environmentVariable("PAPER_SUDOKU_KEY_PASSWORD").orNull
+    // The fixed key for the GitHub "-sideload" APKs (not the Play upload key), so one sideload
+    // build updates the next. Without it, sideload builds fall back to the debug key.
+    val sideloadKeystore = providers.environmentVariable("PAPER_SUDOKU_SIDELOAD_KEYSTORE").orNull
+    val sideloadStorePassword = providers.environmentVariable("PAPER_SUDOKU_SIDELOAD_STORE_PASSWORD").orNull
+    val sideloadKeyAlias = providers.environmentVariable("PAPER_SUDOKU_SIDELOAD_KEY_ALIAS").orNull
+    val sideloadKeyPassword = providers.environmentVariable("PAPER_SUDOKU_SIDELOAD_KEY_PASSWORD").orNull
 
     signingConfigs {
+        if (sideloadKeystore != null && sideloadStorePassword != null &&
+            sideloadKeyAlias != null && sideloadKeyPassword != null
+        ) {
+            create("sideload") {
+                storeFile = file(sideloadKeystore)
+                storePassword = sideloadStorePassword
+                keyAlias = sideloadKeyAlias
+                keyPassword = sideloadKeyPassword
+            }
+        }
         if (releaseKeystore != null && releaseStorePassword != null &&
             releaseKeyAlias != null && releaseKeyPassword != null
         ) {
@@ -45,10 +63,11 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            // -PpaperSudoku.sideload=true signs with the build machine's debug key, for the
-            // GitHub "-sideload" releases. Play builds use the private upload key above.
+            // -PpaperSudoku.sideload=true signs for the GitHub "-sideload" releases: with the
+            // sideload key above when its four PAPER_SUDOKU_SIDELOAD_* variables are set, else
+            // with the build machine's debug key. Play builds use the private upload key above.
             signingConfig = if (sideload) {
-                signingConfigs.getByName("debug")
+                signingConfigs.findByName("sideload") ?: signingConfigs.getByName("debug")
             } else {
                 signingConfigs.findByName("release")
             }
@@ -82,11 +101,9 @@ android {
 
     lint {
         abortOnError = true
-        // Warnings don't fail the build: print them all in the CI log, and keep a SARIF report
-        // (uploaded with the HTML one by android.yml).
-        textReport = true
-        textOutput = file("stdout")
-        sarifReport = true
+        // Warnings don't fail the build. Lint always writes its HTML, XML, SARIF and text reports
+        // to build/reports; android.yml prints the findings (tools/ci/lint-summary.py) and
+        // uploads the reports.
     }
 }
 

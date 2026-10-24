@@ -21,10 +21,10 @@ day is there. Finish a page and it is stamped. When you are stuck, the Coach wri
 
 | Surface | Component |
 |---|---|
-| App | Navigation 3 back stack: Notebook → Settings → Licences; every page is an opaque sheet of paper |
+| App | Navigation 3 back stack: Notebook → Settings → Licences, Handbook, Read back, Type in a page; every page is an opaque sheet of paper |
 | Notebook + page | `NavigableListDetailPaneScaffold` (one pane on phones, two on wide windows); predictive back |
-| Notebook | `LargeTopAppBar` (collapsing), today and practice cards (one build, 112dp thumbnails, 88dp at large text), the month's contents (a day grid: filled dot clean, ring with the answer, grey dot begun; today circled; a key under it; the month's stamped and practice pages counted — never days in a row), the handbook card (using the pen, then the techniques; every row opens its page), unfinished pages, then stamped pages under sticky month headers; one text edge 20dp in from the cards. Only pages written on are listed: blank days are reached through the contents, and a page only looked at is not kept as begun. Unfinished dailies are kept for good; an unfinished practice page set aside is dropped. |
-| Handbook | a page per topic: using the pen (tap, aim, hold a digit, pencil, pencil-in-candidates, keyboard), then each technique with a worked example from a real practice page, drawn and explained as the Coach does it |
+| Notebook | `MediumTopAppBar` (collapsing), today, practice and this week's cards (one build, 112dp thumbnails, 88dp at large text), the month's contents (a day grid: filled dot clean, ring with the answer, grey dash begun; today circled; a key under it; the month's stamped and practice pages counted — never days in a row), the handbook card (using the pen, then the techniques with met / practised / known; every row opens its page), the player's own pages and "Type in a page", unfinished pages, then stamped pages under sticky month headers; one text edge 20dp in from the cards. Only pages written on are listed: blank days are reached through the contents, and a page only looked at is not kept as begun. Unfinished dailies are kept for good; an unfinished practice page set aside is dropped. |
+| Handbook | a page per topic: using the pen (tap, aim, hold a digit, pencil, pencil-in-candidates, keyboard), then each technique with a worked example from a real practice page, drawn and explained as the Coach does it, how well it is known, and "Practise this" (a focus page that needs it, outside the levels) |
 | Page header | small transparent `TopAppBar`: back (one-pane only), weekday · level, date, overflow |
 | Tools | `HorizontalFloatingToolbar`: Undo, Pencil (an icon toggle, secondary container when on; a long press on 9×9 pencils in every candidate), Coach — all three equally quiet |
 | Keypad | `ButtonGroup` with connected keys (outer corners round, inner tight, press rounds fully); Erase is the last key: 5 + 5 on 9×9, seven keys on 6×6 |
@@ -48,13 +48,13 @@ day is there. Finish a page and it is stamped. When you are stuck, the Coach wri
   with no marks yet (one undo takes it back; notes only, so the page stays clean).
 - **Mistakes:** erasing a wrong digit the Coach found also gives back the pencil marks it had
   crossed out.
-- **Coach:** Look washes the unit in the Coach's terracotta and outlines it inside its cells, and the ink line brackets the board's side beside it (a column gets a bracket under it); Why adds the pattern and crossed-out candidates. When the
+- **Coach:** Look washes the unit in the Coach's terracotta and outlines it inside its cells, and the ink line brackets the board's side beside it (a column gets a bracket under it, in every layout; on a phone a box is bracketed on its own side); Why adds the pattern and crossed-out candidates. When the
   placement needs eliminations first, Why walks through each (only those the placement depends
   on), keeping earlier crossings-out, and names the cell only at the last. Answer shows the digit
   faintly and offers Place. A wrong digit is pointed out first.
 - **Leaving** a page (back, notebook, background) stops the hidden clock.
 - **First page:** until the first digit is ever written, the status line reads "Tap a cell, then a
-  digit. Or hold and slide to zoom in." It is the app's only how-to.
+  digit. Or press and slide to aim." It is the app's only how-to.
 - **Solved:** the note says what comes next — the practice level reached or how many clean pages
   to the next, or that a new daily page comes tomorrow. A page whose answer was shown says so in
   its header.

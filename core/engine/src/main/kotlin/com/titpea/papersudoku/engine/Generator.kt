@@ -57,12 +57,18 @@ class PuzzleGenerator(private val geometry: Geometry) {
     private val solver = BacktrackingSolver(geometry)
     private val grader = Grader(geometry)
 
-    fun generate(seed: Long, difficulty: Difficulty, maxAttempts: Int = 3000): GeneratedPuzzle {
+    fun generate(
+        seed: Long,
+        difficulty: Difficulty,
+        maxAttempts: Int = 3000,
+        /** What a page must be to be dealt: by default, exactly [difficulty]. */
+        accept: (Grade) -> Boolean = { it.difficulty == difficulty },
+    ): GeneratedPuzzle {
         val random = SplitMix64(seed)
         var best: GeneratedPuzzle? = null
         repeat(maxAttempts) {
             val candidate = carve(random, difficulty)
-            if (candidate.grade.difficulty == difficulty) return candidate
+            if (accept(candidate.grade)) return candidate
             if (best == null || candidate.grade.hardest.tier > best.grade.hardest.tier) best = candidate
         }
         return checkNotNull(best)

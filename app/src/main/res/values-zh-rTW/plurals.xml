@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="contents_stamped">
+        <item quantity="other">每日 %1$d 頁</item>
+    </plurals>
+    <plurals name="contents_practice">
+        <item quantity="other">練習 %1$d 頁</item>
+    </plurals>
+    <plurals name="contents_tally">
+        <item quantity="other">%2$s已蓋章</item>
+    </plurals>
+    <plurals name="practice_to_next">
+        <item quantity="other">再乾淨完成 %1$d 頁，進入%2$s</item>
+    </plurals>
+</resources>

@@ -79,7 +79,8 @@ class SudokuEngine(private val puzzle: Puzzle) {
     /**
      * The eliminations [single] depends on. Working back from the single, an elimination is kept
      * when it removed a candidate that something kept relies on; what it relies on in turn (its
-     * digits across its units, or every digit of a naked pair) is then needed as well. Whatever
+     * digits across its units, or every candidate of the cells a naked pair, a naked triple or an
+     * XY-Wing is made of) is then needed as well. Whatever
      * is dropped touched none of that, so the kept steps stay valid and still lead to the single.
      */
     private fun essential(groundwork: List<Elimination>, single: Placement): List<Elimination> {
@@ -96,7 +97,7 @@ class SudokuEngine(private val puzzle: Puzzle) {
         for (step in groundwork.asReversed()) {
             if (step.removals.none { needed[it.index] and (1 shl it.digit) != 0 }) continue
             kept.addFirst(step)
-            if (step.technique == Technique.NakedPair) {
+            if (step.technique in CELL_PATTERNS) {
                 for (cell in step.patternCells) needed[cell] = all
             } else {
                 val digits = step.digits.fold(0) { mask, d -> mask or (1 shl d) }
@@ -136,10 +137,10 @@ class SudokuEngine(private val puzzle: Puzzle) {
                 val d = step.digits[0]
                 units[1].filter { it !in units[0] && has(it, d) }.map { Candidate(it, d) }
             }
-            Technique.NakedPair -> units[0]
+            Technique.NakedPair, Technique.NakedTriple -> units[0]
                 .filter { it !in step.patternCells }
                 .flatMap { cell -> step.digits.filter { has(cell, it) }.map { Candidate(cell, it) } }
-            Technique.HiddenPair -> step.patternCells.flatMap { cell ->
+            Technique.HiddenPair, Technique.HiddenTriple -> step.patternCells.flatMap { cell ->
                 (1..geometry.size).filter { it !in step.digits && has(cell, it) }.map { Candidate(cell, it) }
             }
             // Units: the two base lines, then the two cover lines.
@@ -147,11 +148,27 @@ class SudokuEngine(private val puzzle: Puzzle) {
                 val d = step.digits[0]
                 (units[2] + units[3]).filter { it !in step.patternCells && has(it, d) }.map { Candidate(it, d) }
             }
+            // Units: the three base lines, then the three cover lines.
+            Technique.Swordfish -> {
+                val d = step.digits[0]
+                (units[3] + units[4] + units[5]).filter { it !in step.patternCells && has(it, d) }.map { Candidate(it, d) }
+            }
+            // Pattern: the pivot, then the two pincers; digits: z first.
+            Technique.XYWing -> {
+                val z = step.digits[0]
+                val (_, a, b) = step.patternCells
+                (0 until geometry.cellCount)
+                    .filter { it !in step.patternCells && geometry.sees(it, a) && geometry.sees(it, b) && has(it, z) }
+                    .map { Candidate(it, z) }
+            }
             else -> step.removals
         }
     }
 
     private companion object {
         const val MAX_GROUNDWORK = 24
+
+        /** Patterns that rest on their cells holding nothing else, not on a digit's places. */
+        val CELL_PATTERNS = setOf(Technique.NakedPair, Technique.NakedTriple, Technique.XYWing)
     }
 }
