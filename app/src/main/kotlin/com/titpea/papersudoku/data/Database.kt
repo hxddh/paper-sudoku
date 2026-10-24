@@ -15,7 +15,6 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.titpea.papersudoku.game.model.GameState
-import kotlinx.coroutines.flow.Flow
 
 /**
  * One finished puzzle. v1 rows have an empty [puzzleKey]/[difficulty] and no [epochDay].
@@ -46,7 +45,7 @@ data class GameResultEntity(
  *
  * Room orders the table's columns by field order: [json] (up to ~110 KB with the undo history) is
  * kept last so that queries reading only the small columns stop before its overflow pages. The two
- * indices serve the notebook's dailies and the unfinished-practice lookups.
+ * indices serve page numbering and the unfinished-practice lookup.
  */
 @Entity(
     tableName = "saved_games",
@@ -82,17 +81,14 @@ data class SavedPageRow(
     val updatedAt: Long,
 )
 
-/** Per mode and difficulty. [bestSeconds] ignores games where the Coach gave the answer. */
-data class StatsRow(
+/** What the notebook needs of a finished puzzle. */
+data class ResultRow(
     val mode: String,
     val difficulty: String,
-    val solved: Int,
-    val bestSeconds: Long?,
-)
-
-data class DifficultyCount(
-    val difficulty: String,
-    val solved: Int,
+    val coachLevel: Int,
+    val durationSeconds: Long,
+    val completedAt: Long,
+    val epochDay: Long?,
 )
 
 data class DayResult(
@@ -113,38 +109,9 @@ interface GameResultDao {
     @Query("DELETE FROM game_results WHERE puzzleKey = :puzzleKey AND puzzleKey != ''")
     suspend fun forget(puzzleKey: String)
 
-    @Query(
-        """
-        SELECT mode, difficulty, COUNT(*) AS solved,
-               MIN(CASE WHEN coachLevel < 3 THEN durationSeconds END) AS bestSeconds
-        FROM game_results GROUP BY mode, difficulty ORDER BY mode, difficulty
-        """,
-    )
-    fun observeStats(): Flow<List<StatsRow>>
-
-    @Query(
-        """
-        SELECT epochDay, MIN(coachLevel) AS coachLevel, MIN(durationSeconds) AS durationSeconds
-        FROM game_results WHERE epochDay IS NOT NULL GROUP BY epochDay
-        """,
-    )
-    fun observeDays(): Flow<List<DayResult>>
-
-    @Query("SELECT COUNT(*) FROM game_results")
-    fun observeCount(): Flow<Int>
-
-    /** When each practice (9×9) page was finished, for the contents' month counts. */
-    @Query("SELECT completedAt FROM game_results WHERE mode = 'classic'")
-    fun observePracticeCompletions(): Flow<List<Long>>
-
-    /** Practice (9×9) solves without the Coach's answer, per difficulty. */
-    @Query(
-        """
-        SELECT difficulty, COUNT(*) AS solved FROM game_results
-        WHERE mode = 'classic' AND coachLevel < 3 AND difficulty != '' GROUP BY difficulty
-        """,
-    )
-    fun observeCleanPractice(): Flow<List<DifficultyCount>>
+    /** Every result, read once for everything the notebook counts. */
+    @Query("SELECT mode, difficulty, coachLevel, durationSeconds, completedAt, epochDay FROM game_results")
+    suspend fun all(): List<ResultRow>
 }
 
 @Dao
@@ -155,14 +122,12 @@ interface SavedGameDao {
     @Query("SELECT * FROM saved_games WHERE puzzleKey = :puzzleKey")
     suspend fun get(puzzleKey: String): SavedGameEntity?
 
-    @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind = 'Classic' AND solved = 0 ORDER BY updatedAt DESC LIMIT 1")
-    fun observeLatestUnsolvedPractice(): Flow<SavedPageRow?>
+    @Query("SELECT puzzleKey FROM saved_games WHERE kind = 'Classic' AND solved = 0 ORDER BY updatedAt DESC LIMIT 1")
+    suspend fun latestUnsolvedPracticeKey(): String?
 
-    @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind = 'Daily' AND epochDay >= :fromEpochDay ORDER BY epochDay DESC")
-    fun observeDailies(fromEpochDay: Long): Flow<List<SavedPageRow>>
-
-    @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE puzzleKey = :puzzleKey")
-    fun observePage(puzzleKey: String): Flow<SavedPageRow?>
+    /** Every page (small columns only), read once for everything the notebook and widget show. */
+    @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind != 'Damaged'")
+    suspend fun pages(): List<SavedPageRow>
 
     /**
      * Highest page number dealt under a key prefix such as "classic-steady-" (the requested level).
@@ -171,18 +136,6 @@ interface SavedGameDao {
      */
     @Query("SELECT MAX(number) FROM saved_games WHERE kind = :kind AND puzzleKey LIKE :prefix || '%'")
     suspend fun maxNumber(kind: String, prefix: String): Int?
-
-    /** Pages of one kind (the player's own), most recently touched first. */
-    @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind = :kind ORDER BY updatedAt DESC")
-    fun observeKind(kind: String): Flow<List<SavedPageRow>>
-
-    /** Begun and not finished weekly and technique pages (9.0's), most recently touched first. */
-    @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind IN ('Weekly', 'Focus') AND solved = 0 AND grid != givens ORDER BY updatedAt DESC")
-    fun observeUnfinishedOthers(): Flow<List<SavedPageRow>>
-
-    /** Finished 9×9 pages (practice, weekly, technique and typed-in), most recently finished first. */
-    @Query("SELECT $PAGE_COLUMNS FROM saved_games WHERE kind != 'Daily' AND kind != 'Damaged' AND solved = 1 ORDER BY updatedAt DESC")
-    fun observeSolvedNineByNine(): Flow<List<SavedPageRow>>
 
     @Query("DELETE FROM saved_games WHERE kind = 'Classic' AND solved = 0 AND puzzleKey != :except")
     suspend fun discardUnsolvedPractice(except: String)
