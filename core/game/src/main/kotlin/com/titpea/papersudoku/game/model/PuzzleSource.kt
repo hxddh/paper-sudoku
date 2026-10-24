@@ -17,6 +17,10 @@ interface PuzzleSource {
     /** Page [number] for practising [technique]. */
     suspend fun focus(technique: Technique, number: Int): PuzzleSpec =
         withContext(Dispatchers.Default) { Catalog.focus(technique, number) }
+
+    /** Practice page [number] at [difficulty], dealt to need [target] (10.0: see [Catalog.practice]). */
+    suspend fun practice(difficulty: Difficulty, number: Int, target: Technique?): PuzzleSpec =
+        if (target == null) classic(difficulty, number) else withContext(Dispatchers.Default) { Catalog.practice(difficulty, number, target) }
 }
 
 /** Generates every page on demand from [Catalog]. */
@@ -32,4 +36,7 @@ class GeneratingPuzzleSource(
 
     override suspend fun focus(technique: Technique, number: Int): PuzzleSpec =
         withContext(dispatcher) { Catalog.focus(technique, number) }
+
+    override suspend fun practice(difficulty: Difficulty, number: Int, target: Technique?): PuzzleSpec =
+        withContext(dispatcher) { Catalog.practice(difficulty, number, target) }
 }

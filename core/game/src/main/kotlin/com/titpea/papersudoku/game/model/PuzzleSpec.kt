@@ -162,26 +162,50 @@ object Catalog {
         )
     }
 
-    fun daily(epochDay: Long): PuzzleSpec {
+    fun daily(epochDay: Long): PuzzleSpec = dealDaily(epochDay).spec
+
+    /**
+     * The daily, from [CatalogTable] when the day is in it (one carve), else by searching. A
+     * weekend page must need its elimination idea: the generator settles for its best try when
+     * it never reaches the level, so the day is dealt again from a derived seed (the first try is
+     * unchanged, so every day that already matched keeps its puzzle).
+     */
+    internal fun dealDaily(epochDay: Long, table: Boolean = true): Dealt {
         val difficulty = dailyDifficulty(epochDay)
         val generator = PuzzleGenerator(Geometry.Mini)
         val base = seed(1, epochDay)
-        // The generator settles for its best try when it never reaches the level; a weekend page
-        // must need its elimination idea, so the day is dealt again (the first try is unchanged,
-        // so every day that already matched keeps its puzzle).
-        var generated = generator.generate(base, difficulty)
-        var attempt = 1L
-        while (generated.grade.difficulty != difficulty && attempt <= DAILY_RETRIES) {
-            generated = generator.generate(SplitMix64.mix(base xor attempt), difficulty)
-            attempt++
+        fun seedOf(attempt: Long) = if (attempt == 0L) base else SplitMix64.mix(base xor attempt)
+        val tabled = if (table) CatalogTable.daily(epochDay) else null
+        if (tabled != null) {
+            val generated = generator.carveAt(seedOf(tabled.attempt), tabled.draws, difficulty)
+            return Dealt(spec(dailyKey(epochDay), PuzzleKind.Daily, generated, epochDay = epochDay), 1, tabled)
         }
-        return spec(dailyKey(epochDay), PuzzleKind.Daily, generated, epochDay = epochDay)
+        var attempt = 0L
+        var carving = generator.search(base, difficulty)
+        var carves = carving.carves
+        while (carving.generated.grade.difficulty != difficulty && attempt < DAILY_RETRIES) {
+            attempt++
+            carving = generator.search(seedOf(attempt), difficulty)
+            carves += carving.carves
+        }
+        val spec = spec(dailyKey(epochDay), PuzzleKind.Daily, carving.generated, epochDay = epochDay)
+        return Dealt(spec, carves, TableEntry(attempt, carving.draws))
     }
 
-    fun classic(difficulty: Difficulty, number: Int): PuzzleSpec {
-        val generated = PuzzleGenerator(Geometry.Classic)
-            .generate(seed(2 + difficulty.ordinal.toLong(), number.toLong()), difficulty)
-        return spec(classicKey(difficulty, number), PuzzleKind.Classic, generated, number = number)
+    fun classic(difficulty: Difficulty, number: Int): PuzzleSpec = dealClassic(difficulty, number).spec
+
+    /** Practice page [number] at [difficulty], from [CatalogTable] when it is there (one carve). */
+    internal fun dealClassic(difficulty: Difficulty, number: Int, table: Boolean = true): Dealt {
+        val generator = PuzzleGenerator(Geometry.Classic)
+        val seed = seed(2 + difficulty.ordinal.toLong(), number.toLong())
+        val key = classicKey(difficulty, number)
+        val tabled = if (table) CatalogTable.classic(difficulty, number) else null
+        if (tabled != null) {
+            val generated = generator.carveAt(seed, tabled.draws, difficulty)
+            return Dealt(spec(key, PuzzleKind.Classic, generated, number = number), 1, tabled)
+        }
+        val carving = generator.search(seed, difficulty)
+        return Dealt(spec(key, PuzzleKind.Classic, carving.generated, number = number), carving.carves, TableEntry(0, carving.draws))
     }
 
     /**
@@ -189,18 +213,46 @@ object Catalog {
      * path, see [Path]). Without a target it is exactly [classic]. With one, it comes from that
      * technique's own stream and carries it in its key ("classic-steady-12-pointing"), so the same
      * page is dealt again for the same key; if no page at the level needs the technique within
-     * [PATH_CARVES], the plain page is dealt instead.
+     * [PATH_CARVES] carves (the plain page included), the plain page is dealt instead.
      */
-    fun practice(difficulty: Difficulty, number: Int, target: Technique?): PuzzleSpec {
-        if (target == null) return classic(difficulty, number)
-        val generated = PuzzleGenerator(Geometry.Classic).generate(
-            seed(PATH_STREAM + target.ordinal, difficulty.ordinal * 1_000_000L + number),
-            difficulty,
-            maxAttempts = PATH_CARVES,
-            accept = { it.difficulty == difficulty && target in it.techniques },
-        )
-        if (generated.grade.difficulty != difficulty || target !in generated.grade.techniques) return classic(difficulty, number)
-        return spec(practiceKey(difficulty, number, target), PuzzleKind.Classic, generated, number = number)
+    fun practice(difficulty: Difficulty, number: Int, target: Technique?): PuzzleSpec =
+        dealPractice(difficulty, number, target).spec
+
+    /**
+     * Each try at a path page is carved from a seed of its own ([pathSeed]), not drawn one after
+     * another from one stream: which try needs the target depends only on the key, never on the
+     * tries before it, so [CatalogTable] keeps the try for the early pages of each level and
+     * technique (one carve), and the tries could be carved in parallel.
+     */
+    internal fun dealPractice(difficulty: Difficulty, number: Int, target: Technique?, table: Boolean = true): Dealt {
+        if (target == null) return dealClassic(difficulty, number, table)
+        val generator = PuzzleGenerator(Geometry.Classic)
+        val key = practiceKey(difficulty, number, target)
+        fun dealt(attempt: Int, generated: com.titpea.papersudoku.engine.GeneratedPuzzle, carves: Int) =
+            Dealt(spec(key, PuzzleKind.Classic, generated, number = number), carves, TableEntry(attempt.toLong(), 0))
+        val tabled = if (table) CatalogTable.path(difficulty, target, number) else null
+        if (tabled != null) {
+            if (tabled == CatalogTable.MISS) return plainInstead(difficulty, number, table, 0)
+            return dealt(tabled, generator.carveAt(pathSeed(difficulty, number, target, tabled), 0, difficulty), 1)
+        }
+        for (attempt in 0 until PATH_CARVES - 1) {
+            val generated = generator.carveAt(pathSeed(difficulty, number, target, attempt), 0, difficulty)
+            if (generated.grade.difficulty == difficulty && target in generated.grade.techniques) {
+                return dealt(attempt, generated, attempt + 1)
+            }
+        }
+        return plainInstead(difficulty, number, table, PATH_CARVES - 1)
+    }
+
+    private fun plainInstead(difficulty: Difficulty, number: Int, table: Boolean, tried: Int): Dealt {
+        val plain = dealClassic(difficulty, number, table)
+        return Dealt(plain.spec, tried + plain.carves, CatalogTable.MISS_ENTRY)
+    }
+
+    /** The seed of try [attempt] at path page [number] of [difficulty] for [target]. */
+    private fun pathSeed(difficulty: Difficulty, number: Int, target: Technique, attempt: Int): Long {
+        require(number >= 0 && attempt in 0 until 0x10000)
+        return seed(PATH_STREAM + target.ordinal, (difficulty.ordinal.toLong() shl 48) or (number.toLong() shl 16) or attempt.toLong())
     }
 
     fun practiceKey(difficulty: Difficulty, number: Int, target: Technique?): String =
@@ -218,7 +270,8 @@ object Catalog {
     private const val WEEKLY_STREAM = 10L
     private const val FOCUS_STREAM = 20L
     private const val PATH_STREAM = 40L
-    private const val PATH_CARVES = 600
+    /** Carves a path page may cost at most, the plain page it falls back to included. */
+    internal const val PATH_CARVES = 600
     private const val FOCUS_CARVES = 600
     /** Fewer than 17 clues never has a single solution. */
     private const val MIN_IMPORT_CLUES = 17
@@ -250,6 +303,15 @@ object Catalog {
         )
     }
 }
+
+/**
+ * A page and what dealing it cost: [carves] carves, and where the page sits in its seeds
+ * ([entry]), which is what [CatalogTable] keeps.
+ */
+internal class Dealt(val spec: PuzzleSpec, val carves: Int, val entry: TableEntry)
+
+/** What a page is in [CatalogTable]. */
+internal data class TableEntry(val attempt: Long, val draws: Long)
 
 /** What became of a typed-in page. */
 sealed interface Import {
