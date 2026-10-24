@@ -10,4 +10,6 @@
     <string name="notebook_version">Version %1$s</string>
     <string name="notebook_privacy">No account, no ads, no network access.</string>
     <string name="notebook_licences">Licences</string>
+    <!-- After a solve, on the page that makes a technique known: "Naked pair is known now." -->
+    <string name="solved_known_now">%1$s is known now.</string>
 </resources>

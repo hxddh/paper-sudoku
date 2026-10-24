@@ -137,7 +137,6 @@
     <string name="practice_continue">继续第 %1$d 页</string>
     <string name="practice_new_page">新的一页</string>
     <string name="practice_page">第 %1$d 页</string>
-    <string name="practice_top_level">已到最高级：三数组、剑鱼与 XY 翼</string>
     <string name="settings_language">语言</string>
     <string name="settings_language_desc">打开系统设置，更改应用语言</string>
     <string name="shortcut_put_down">放下拿起的数字或收起教练（Esc）</string>
@@ -173,7 +172,6 @@
     <string name="box_bottom_middle">下中宫</string>
     <string name="box_bottom_right">右下宫</string>
     <string name="widget_ready">随时开始</string>
-    <string name="solved_level_up">难度提高了：下一页起是「%1$s」。</string>
     <string name="solved_daily_waiting">今天的一页已经在等你了。</string>
     <string name="solved_daily_close">明天有新的一页。</string>
     <string name="page_answer_shown">看过答案</string>

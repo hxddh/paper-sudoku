@@ -6,7 +6,4 @@
     <plurals name="contents_pages">
         <item quantity="other">%1$d 页</item>
     </plurals>
-    <plurals name="practice_to_next">
-        <item quantity="other">再干净完成 %1$d 页，进入%2$s</item>
-    </plurals>
 </resources>

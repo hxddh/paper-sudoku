@@ -26,7 +26,7 @@
     <string name="coach_missing_mark_why">Row %1$d, column %2$d can still be %3$d, but your marks there leave it out.</string>
     <string name="coach_missing_mark_answer">Add %3$d back to the marks at row %1$d, column %2$d.</string>
     <string name="coach_add_mark">Add the mark</string>
-    <!-- 10.0: the practice card's one line into the handbook, e.g. "Next: X-Wing". -->
+    <!-- After a practice page: where the technique path goes next, e.g. "Next: X-Wing". -->
     <string name="practice_next">Next: %1$s</string>
     <!-- Where a handbook page is: "8 of 14". -->
     <string name="handbook_position">%1$d of %2$d</string>

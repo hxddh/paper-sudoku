@@ -137,7 +137,6 @@
     <string name="practice_continue">Continue page %1$d</string>
     <string name="practice_new_page">A fresh page</string>
     <string name="practice_page">Page %1$d</string>
-    <string name="practice_top_level">Top level: triples, Swordfish and XY-Wings</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_desc">Opens system settings to change the app’s language</string>
     <string name="shortcut_put_down">Put down a held digit or close the Coach (Esc)</string>
@@ -174,7 +173,6 @@
     <string name="box_bottom_middle">the bottom-middle box</string>
     <string name="box_bottom_right">the bottom-right box</string>
     <string name="widget_ready">Ready when you are</string>
-    <string name="solved_level_up">Up a level: the next pages are %1$s.</string>
     <string name="solved_daily_waiting">Today’s page is waiting.</string>
     <string name="solved_daily_close">A new page tomorrow.</string>
     <string name="page_answer_shown">answer shown</string>

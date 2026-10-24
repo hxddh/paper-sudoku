@@ -6,4 +6,5 @@
     <string name="notebook_version">版本 %1$s</string>
     <string name="notebook_privacy">没有账号、广告或网络访问。</string>
     <string name="notebook_licences">开源许可</string>
+    <string name="solved_known_now">%1$s，现在你已经掌握了。</string>
 </resources>

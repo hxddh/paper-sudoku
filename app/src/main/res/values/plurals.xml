@@ -10,8 +10,4 @@
         <item quantity="one">%1$d page</item>
         <item quantity="other">%1$d pages</item>
     </plurals>
-    <plurals name="practice_to_next">
-        <item quantity="one">One more clean page to %2$s</item>
-        <item quantity="other">%1$d more clean pages to %2$s</item>
-    </plurals>
 </resources>
