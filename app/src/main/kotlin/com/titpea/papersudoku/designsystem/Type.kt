@@ -48,46 +48,80 @@ object FrauncesAxes {
     const val DISPLAY = "'wght' 400, 'opsz' 96"
 }
 
+/**
+ * Fraunces has three uses only: the display date (today's, 44), figures (list dates, times, the
+ * calendar, 28; below 20sp the printed opsz-36 cut, which holds up small) and the printed and pen
+ * digits on the board and the keys. The stamp's capitals are the display cut at 600.
+ */
 object PaperType {
-    /** The date on a page corner, e.g. "21". */
+    /** Today's date on its card, e.g. "21": the one display numeral. */
     val pageNumeral = TextStyle(
         fontFamily = FrauncesDisplay,
         fontWeight = FontWeight.Normal,
         fontSize = 44.sp,
-        lineHeight = 44.sp,
+        lineHeight = 48.sp,
         letterSpacing = (-0.5).sp,
         fontFeatureSettings = "lnum, tnum",
     )
 
-    /** Figures in the notebook (stamped pages, times). */
+    /** Figures in the notebook: list dates, times, the calendar's month. */
     val figure = TextStyle(
         fontFamily = FrauncesDisplay,
         fontWeight = FontWeight.Normal,
-        fontSize = 32.sp,
-        lineHeight = 36.sp,
+        fontSize = 28.sp,
+        lineHeight = 32.sp,
+        fontFeatureSettings = "lnum, tnum",
+    )
+
+    /**
+     * Figures below 20sp (a calendar's day numbers): the printed cut, drawn for small sizes, on
+     * the Support line's size. Copy it with another size up to 20sp; above that use [figure].
+     */
+    val figureSmall = TextStyle(
+        fontFamily = FrauncesPrinted,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
         fontFeatureSettings = "lnum, tnum",
     )
 }
 
 private val Sans = FontFamily.Default
 
-/** The Material 3 type scale in the platform sans. */
-val PaperTypography = Typography().let { base ->
-    Typography(
-        displayLarge = base.displayLarge.copy(fontFamily = Sans),
-        displayMedium = base.displayMedium.copy(fontFamily = Sans),
-        displaySmall = base.displaySmall.copy(fontFamily = Sans),
-        headlineLarge = base.headlineLarge.copy(fontFamily = Sans, fontWeight = FontWeight.Medium),
-        headlineMedium = base.headlineMedium.copy(fontFamily = Sans, fontWeight = FontWeight.Medium),
-        headlineSmall = base.headlineSmall.copy(fontFamily = Sans, fontWeight = FontWeight.Medium),
-        titleLarge = base.titleLarge.copy(fontFamily = Sans, fontWeight = FontWeight.Medium),
-        titleMedium = base.titleMedium.copy(fontFamily = Sans),
-        titleSmall = base.titleSmall.copy(fontFamily = Sans),
-        bodyLarge = base.bodyLarge.copy(fontFamily = Sans),
-        bodyMedium = base.bodyMedium.copy(fontFamily = Sans),
-        bodySmall = base.bodySmall.copy(fontFamily = Sans),
-        labelLarge = base.labelLarge.copy(fontFamily = Sans),
-        labelMedium = base.labelMedium.copy(fontFamily = Sans),
-        labelSmall = base.labelSmall.copy(fontFamily = Sans),
-    )
+/*
+ * The platform sans in five styles, no more. Material's roles map onto them, so every component
+ * inherits the scale: titles and headlines are Title, small titles and button labels Heading, body
+ * text Body, smaller body Support, labels Caption.
+ */
+private val Title = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Medium, fontSize = 22.sp, lineHeight = 28.sp, letterSpacing = 0.sp)
+private val Heading = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 22.sp, letterSpacing = 0.sp)
+private val Body = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.sp)
+private val Support = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.sp)
+private val Caption = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.4.sp)
+
+/** The five sans styles by name, for code that means one of them rather than a Material role. */
+object PaperText {
+    val title = Title
+    val heading = Heading
+    val body = Body
+    val support = Support
+    val caption = Caption
 }
+
+/** Material's type roles, each one of the five styles. */
+val PaperTypography = Typography(
+    displayLarge = Title,
+    displayMedium = Title,
+    displaySmall = Title,
+    headlineLarge = Title,
+    headlineMedium = Title,
+    headlineSmall = Title,
+    titleLarge = Title,
+    titleMedium = Heading,
+    titleSmall = Heading,
+    bodyLarge = Body,
+    bodyMedium = Support,
+    bodySmall = Support,
+    labelLarge = Heading,
+    labelMedium = Caption,
+    labelSmall = Caption,
+)
