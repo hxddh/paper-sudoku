@@ -231,7 +231,11 @@ class PageViewModel(
             PageEvent.OpenPractice -> openPractice()
             PageEvent.NextPractice -> nextPractice()
             PageEvent.OpenWeekly -> openWeekly(Catalog.weekOf(today()))
-            is PageEvent.PractiseTechnique -> load { focusPage(event.technique) }
+            // A solve still being recorded decides whether the last page is unfinished.
+            is PageEvent.PractiseTechnique -> load {
+                recordJob?.join()
+                focusPage(event.technique)
+            }
             is PageEvent.OpenImported -> load { store.load(event.spec.key) ?: GameState.new(event.spec) }
             is PageEvent.OpenSaved -> if (_state.value.game?.spec?.key == event.key) resumeCurrent() else load {
                 store.load(event.key) ?: dailyFor(today())

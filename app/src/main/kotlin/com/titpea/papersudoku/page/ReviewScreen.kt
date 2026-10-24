@@ -54,9 +54,15 @@ import kotlin.math.roundToInt
  * the main thread; until it is ready the page stays blank rather than flashing a half state.
  */
 @Composable
-fun ReviewScreen(spec: PuzzleSpec, moves: List<Move>, onBack: () -> Unit) {
-    val steps by produceState<List<ReviewStep>?>(null, spec, moves) {
-        value = withContext(Dispatchers.Default) { Review.of(spec, moves) }
+fun ReviewScreen(
+    spec: PuzzleSpec,
+    moves: List<Move>,
+    onBack: () -> Unit,
+    /** The board the moves start from: the givens, or where a page begun before 9.0 was. */
+    from: List<Int> = spec.givens,
+) {
+    val steps by produceState<List<ReviewStep>?>(null, spec, moves, from) {
+        value = withContext(Dispatchers.Default) { Review.of(spec, moves, from) }
     }
     var index by rememberSaveable(spec.key, moves.size) { mutableIntStateOf(moves.lastIndex) }
     val ready = steps
@@ -99,7 +105,7 @@ fun ReviewScreen(spec: PuzzleSpec, moves: List<Move>, onBack: () -> Unit) {
             Controls(at = at, count = ready.size, onMove = { index = it })
         }
         item(key = "why") {
-            val before = if (at > 0) ready[at - 1].values else spec.givens
+            val before = if (at > 0) ready[at - 1].values else from
             StepNote(spec, ready[at], before[ready[at].move.cell])
         }
         item(key = "summary") { Summary(ready) }

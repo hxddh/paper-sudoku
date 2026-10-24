@@ -39,4 +39,23 @@ class ReviewTest {
         assertEquals(listOf(ReviewStep.Kind.Mistake, ReviewStep.Kind.Erased), review.map { it.kind })
         assertTrue(review.last().move.coach)
     }
+
+    @Test
+    fun `a page begun before the move log reads back from where its log began`() {
+        val spec = Catalog.classic(com.titpea.papersudoku.engine.Difficulty.Steady, 3)
+        val empties = spec.givens.indices.filter { spec.givens[it] == 0 }
+        // Saved by 8.0: two digits written, no moves.
+        var old = GameState.new(spec)
+        for (cell in empties.take(2)) old = old.select(cell).input(spec.solution[cell], true)
+        val decoded = checkNotNull(GameState.decode(old.copy(moves = emptyList()).encode()))
+        assertEquals(old.values, decoded.movesFrom)
+        // Played on after the upgrade: the read back's last board is the whole page.
+        var game = decoded
+        val cell = empties[2]
+        game = game.select(cell).input(spec.solution[cell], true)
+        val steps = Review.of(spec, game.moves, game.movesFrom)
+        assertEquals(game.values, steps.last().values)
+        // A page begun with the log starts from the givens.
+        assertEquals(spec.givens, GameState.new(spec).movesFrom)
+    }
 }
