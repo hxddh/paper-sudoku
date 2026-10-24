@@ -103,6 +103,8 @@ fun ReviewScreen(
     Scaffold(
         modifier = Modifier.testTag("review"),
         containerColor = Color.Transparent,
+        // A transparent container names no content colour: text and icons would fall back to black.
+        contentColor = MaterialTheme.colorScheme.onBackground,
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
             TopAppBar(

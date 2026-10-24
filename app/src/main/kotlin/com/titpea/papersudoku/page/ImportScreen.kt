@@ -156,6 +156,8 @@ fun ImportScreen(onBack: () -> Unit, onImported: (PuzzleSpec) -> Unit) {
     Scaffold(
         modifier = Modifier.testTag("import"),
         containerColor = Color.Transparent,
+        // A transparent container names no content colour: text and icons would fall back to black.
+        contentColor = MaterialTheme.colorScheme.onBackground,
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
             TopAppBar(
