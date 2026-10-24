@@ -610,7 +610,7 @@ class PageViewModel(
             // read from the page itself: each digit they wrote, judged by what it needed then.
             // A page typed in that the Coach can't finish has no techniques on record.
             if (spec.beyondCoach) return@launch
-            val steps = if (first) withContext(compute) { Review.of(spec, game.moves) } else emptyList()
+            val steps = if (first) withContext(compute) { Review.of(spec, game.moves, game.movesFrom) } else emptyList()
             var found: Technique? = null
             updateSettings { settings ->
                 val learner = if (first) settings.learner.record(steps, game.coach) else settings.learner

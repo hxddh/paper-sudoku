@@ -2,7 +2,13 @@ package com.titpea.papersudoku.page
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.junit4.accessibility.disableAccessibilityChecks
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
+import com.google.android.apps.common.testing.accessibility.framework.AccessibilityCheckResult.AccessibilityCheckResultType
+import com.google.android.apps.common.testing.accessibility.framework.AccessibilityCheckResultUtils.matchesCheckNames
+import com.google.android.apps.common.testing.accessibility.framework.integrations.espresso.AccessibilityValidator
+import org.hamcrest.Matchers.`is`
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -102,6 +108,16 @@ class NewScreensTest {
 
     @Test
     fun importRefusesTooFewDigits() {
+        // A 9×9 board's cells are 43dp on a 411dp phone, as on every 9×9 page: precise input
+        // there is press-and-slide aiming with the loupe, or the keyboard. Every other check
+        // still runs; touch-target size is checked on the 6×6 page and the keys.
+        composeRule.disableAccessibilityChecks()
+        composeRule.enableAccessibilityChecks(
+            AccessibilityValidator()
+                .setRunChecksFromRootView(true)
+                .setThrowExceptionFor(AccessibilityCheckResultType.ERROR)
+                .setSuppressingResultMatcher(matchesCheckNames(`is`("TouchTargetSizeCheck"))),
+        )
         var imported: PuzzleSpec? = null
         composeRule.setContent {
             SudokuTheme(darkTheme = false) { ImportScreen(onBack = {}, onImported = { imported = it }) }

@@ -85,9 +85,15 @@ private val StatusLineHeight: Dp = 48.dp
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReviewScreen(spec: PuzzleSpec, moves: List<Move>, onBack: () -> Unit) {
-    val steps by produceState<List<ReviewStep>?>(null, spec, moves) {
-        value = withContext(Dispatchers.Default) { Review.of(spec, moves) }
+fun ReviewScreen(
+    spec: PuzzleSpec,
+    moves: List<Move>,
+    onBack: () -> Unit,
+    /** The board the moves start from: the givens, or where a page begun before 9.0 was. */
+    from: List<Int> = spec.givens,
+) {
+    val steps by produceState<List<ReviewStep>?>(null, spec, moves, from) {
+        value = withContext(Dispatchers.Default) { Review.of(spec, moves, from) }
     }
     var index by rememberSaveable(spec.key, moves.size) { mutableIntStateOf(moves.lastIndex) }
     var showSummary by rememberSaveable(spec.key) { mutableStateOf(false) }
@@ -153,6 +159,7 @@ fun ReviewScreen(spec: PuzzleSpec, moves: List<Move>, onBack: () -> Unit) {
         val workHeight = maxOf(WorkAreaMinHeight * fontScale, ToolbarHeight + StatusLineHeight + keypadHeight(spec.size))
         val panel = @Composable { modifier: Modifier ->
             ReviewPanel(
+                from = from,
                 spec = spec,
                 steps = ready,
                 at = at,
@@ -231,6 +238,7 @@ private fun ReviewBoard(game: GameState, conflicts: Set<Int>, show: Boolean, mod
 @Composable
 private fun ReviewPanel(
     spec: PuzzleSpec,
+    from: List<Int>,
     steps: List<ReviewStep>?,
     at: Int,
     empty: Boolean,
@@ -246,7 +254,7 @@ private fun ReviewPanel(
                 if (showSummary) {
                     Summary(steps)
                 } else {
-                    val before = if (at > 0) steps[at - 1].values else spec.givens
+                    val before = if (at > 0) steps[at - 1].values else from
                     StepNote(spec, steps[at], before[steps[at].move.cell])
                 }
             }

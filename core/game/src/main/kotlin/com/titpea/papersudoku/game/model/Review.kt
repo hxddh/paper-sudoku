@@ -28,11 +28,12 @@ data class ReviewStep(
 object Review {
     private const val MAX_ELIMINATIONS = 24
 
-    fun of(spec: PuzzleSpec, moves: List<Move>): List<ReviewStep> {
+    /** [from]: the board the moves start on (the givens, unless the log began part-way). */
+    fun of(spec: PuzzleSpec, moves: List<Move>, from: List<Int> = spec.givens): List<ReviewStep> {
         val geometry = spec.geometry
         val solver = LogicalSolver(geometry)
         val solution = spec.solution.toIntArray()
-        val values = spec.givens.toIntArray()
+        val values = from.toIntArray()
         return moves.map { move ->
             val kind = when {
                 move.digit == 0 -> ReviewStep.Kind.Erased

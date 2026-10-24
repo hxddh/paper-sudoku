@@ -72,7 +72,15 @@ data class GameState(
     val struck: List<Struck> = emptyList(),
     /** Every digit written or erased, in order (9.0); pages begun earlier have none. */
     val moves: List<Move> = emptyList(),
+    /**
+     * The board when [moves] began, for a page begun before 9.0 and finished after: its earlier
+     * digits have no moves, so reading it back starts here. Null: the log starts at the givens.
+     */
+    val logStart: List<Int>? = null,
 ) {
+    /** The board [moves] replay from. */
+    val movesFrom: List<Int> get() = logStart ?: spec.givens
+
     val size: Int get() = spec.size
 
     fun isGiven(index: Int): Boolean = spec.givens[index] != 0
@@ -303,7 +311,10 @@ data class GameState(
                 val plain = json.decodeFromJsonElement(serializer(), JsonObject(tree - HISTORY_PACKED - MOVES_PACKED))
                 plain.copy(history = history ?: plain.history, moves = moves ?: plain.moves)
             }
-            game.takeIf { it.isConsistent() }
+            game.takeIf { it.isConsistent() }?.let { g ->
+                // Written on before the move log existed: its log starts from the board as it is.
+                if (g.moves.isEmpty() && g.logStart == null && g.values != g.spec.givens) g.copy(logStart = g.values) else g
+            }
         }.getOrNull()
 
         /** A readable but damaged save is refused rather than crashing later (remaining, undo). */
@@ -325,6 +336,7 @@ data class GameState(
                 coach.deepest in 0..3 && coach.byTechnique.values.all { it in 1..3 } && elapsedMillis >= 0 &&
                 struck.all { it.cell in 0 until cells && it.by in 0 until cells && it.digit in 1..spec.size } &&
                 moves.all { it.cell in 0 until cells && it.digit in digits } &&
+                (logStart == null || boardOk(logStart, notes, null)) &&
                 // "Solved" with a wrong board would lock it for good.
                 (!solved || values == spec.solution)
         }

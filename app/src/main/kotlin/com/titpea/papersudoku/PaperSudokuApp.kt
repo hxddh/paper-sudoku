@@ -212,7 +212,7 @@ fun PaperSudokuApp(
                                 val state by pageViewModel.state.collectAsStateWithLifecycle()
                                 val game = state.game
                                 val back = { if (backStack.lastOrNull() == Screen.Review) backStack.removeAt(backStack.lastIndex) }
-                                if (game != null) ReviewScreen(spec = game.spec, moves = game.moves, onBack = { back() })
+                                if (game != null) ReviewScreen(spec = game.spec, moves = game.moves, from = game.movesFrom, onBack = { back() })
                                 // The page went away under it (after process death, before it loads).
                                 else LaunchedEffect(Unit) { back() }
                             }
