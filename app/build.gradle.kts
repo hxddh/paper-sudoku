@@ -82,11 +82,9 @@ android {
 
     lint {
         abortOnError = true
-        // Warnings don't fail the build: print them all in the CI log, and keep a SARIF report
-        // (uploaded with the HTML one by android.yml).
-        textReport = true
-        textOutput = file("stdout")
-        sarifReport = true
+        // Warnings don't fail the build. Lint always writes its HTML, XML, SARIF and text reports
+        // to build/reports; android.yml prints the findings (tools/ci/lint-summary.py) and
+        // uploads the reports.
     }
 }
 

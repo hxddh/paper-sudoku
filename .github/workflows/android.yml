@@ -53,7 +53,12 @@ jobs:
       - name: Run lint
         run: ./gradlew --no-daemon :app:lintDebug
 
-      # Warnings (printed above) don't fail the build; the full report is kept either way.
+      # Warnings don't fail the build: count them per rule and list each one (file:line: rule:
+      # message) in the log, errors included when lint failed.
+      - name: Lint findings
+        if: always()
+        run: python3 tools/ci/lint-summary.py app/build/reports/lint-results-debug.sarif
+
       - name: Upload lint report
         if: always()
         uses: actions/upload-artifact@v7
@@ -62,6 +67,7 @@ jobs:
           path: |
             app/build/reports/lint-results-debug.html
             app/build/reports/lint-results-debug.sarif
+            app/build/reports/lint-results-debug.xml
             app/build/reports/lint-results-debug.txt
           if-no-files-found: ignore
 
