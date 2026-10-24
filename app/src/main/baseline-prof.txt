@@ -1,4 +1,6 @@
 # Hand-written Baseline Profile rules (ART pre-compiles these at install via profileinstaller).
+# The release ships this file. CI records the real journey on its emulator (BaselineProfileGenerator)
+# and prints what it ran outside these rules (tools/ci/profile-coverage.py): extend this file from it.
 # Everything on the launch → today's page → first input path lives in these packages.
 HSPLcom/titpea/papersudoku/**;->**(**)**
 Lcom/titpea/papersudoku/**;
@@ -13,5 +15,27 @@ Lkotlinx/serialization/**;
 # Every screen's state is a StateFlow collected on the main dispatcher; saves run on IO.
 HSPLkotlinx/coroutines/**;->**(**)**
 Lkotlinx/coroutines/**;
-# Compose (and other AndroidX libraries) ship their own profiles, merged at build time.
-# benchmark/.../BaselineProfileGenerator.kt records the journey, to compare or regenerate this file.
+# 10.0, from the benchmark journeys (cold start, writing, the Coach, the notebook): the Kotlin
+# standard library ships no profile, and the engine, the catalog table and every screen's state
+# run through its collections, ranges, sequences and text functions.
+HSPLkotlin/collections/**;->**(**)**
+Lkotlin/collections/**;
+HSPLkotlin/ranges/**;->**(**)**
+Lkotlin/ranges/**;
+HSPLkotlin/sequences/**;->**(**)**
+Lkotlin/sequences/**;
+HSPLkotlin/text/**;->**(**)**
+Lkotlin/text/**;
+HSPLkotlin/jvm/internal/**;->**(**)**
+Lkotlin/jvm/internal/**;
+HSPLkotlin/*;->**(**)**
+Lkotlin/*;
+# The saved page is read (Room over SQLite) and the settings (DataStore) before the first frame.
+# Where these libraries ship profiles of their own the rules merge; where not, they cover them.
+HSPLandroidx/room/**;->**(**)**
+Landroidx/room/**;
+HSPLandroidx/sqlite/**;->**(**)**
+Landroidx/sqlite/**;
+HSPLandroidx/datastore/**;->**(**)**
+Landroidx/datastore/**;
+# Compose (and the other AndroidX libraries) ship their own profiles, merged at build time.

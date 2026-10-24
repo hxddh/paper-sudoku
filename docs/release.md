@@ -65,7 +65,8 @@ alone to a GitHub release with `CHANGELOG.md` as notes. No APK is published for 
 under Play App Signing, Play re-signs the app, so an upload-key APK could neither update from Play
 nor be updated by it. Either kind of tag first checks the release APK with `tools/ci/check-apk.sh`
 (permissions exactly as `tools/ci/permissions.allowed`, Baseline Profile packaged, zip alignment
-with `zipalign -c -P 16 -v 4`, size printed). Without all four upload-key secrets the workflow
+with `zipalign -c -P 16 -v 4`, size within 1.05 × the `apk.bytes` of
+`tools/ci/speed-budget.json`, which is 9.0's APK; raise it only with a reason in the commit). Without all four upload-key secrets the workflow
 stops with an error instead of publishing an unsigned or debug-signed build. The AAB is not run
 through `bundletool validate`: bundletool is published on Google's Maven repository and GitHub,
 not Maven Central, so the workflow does not fetch it; Play validates the AAB on upload.
