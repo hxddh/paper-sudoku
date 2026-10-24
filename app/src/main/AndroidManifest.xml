@@ -2,18 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- WorkManager (under the Glance widget) declares this for network-constrained work; the app
-         schedules none and promises no network, so it is removed from the merged manifest. -->
-    <uses-permission
-        android:name="android.permission.ACCESS_NETWORK_STATE"
-        tools:node="remove" />
-
-    <!-- WorkManager's foreground-work support: the app never runs foreground work, so neither
-         the permission nor the service is kept (tools/ci/permissions.allowed lists what is). -->
-    <uses-permission
-        android:name="android.permission.FOREGROUND_SERVICE"
-        tools:node="remove" />
-
     <application
         android:name=".SudokuApplication"
         android:allowBackup="true"
@@ -55,12 +43,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/today_widget_info" />
         </receiver>
-        <!-- WorkManager's foreground service: the app never runs work in the foreground. The
-             class lives in WorkManager (a Glance dependency), which lint does not resolve here. -->
-        <service
-            android:name="androidx.work.impl.foreground.SystemForegroundService"
-            tools:ignore="MissingClass"
-            tools:node="remove" />
     </application>
 
 </manifest>

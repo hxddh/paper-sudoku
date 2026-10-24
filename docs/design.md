@@ -51,7 +51,7 @@ day is there. Finish a page and it is stamped. When you are stuck, the Coach wri
 | Solved note | in the work area: how the page was done (Title), "Solved in 2:05" in plain sans, one outlook line (news in ink Heading, else Support), share / print / read back as icons and the way on as a 1dp ink-outlined button |
 | Transitions | taps: shared axis X (10%) on the motion scheme; back gesture: the leaving page scales to 90%, rounds 28dp and lifts, linear with the finger, fading as it commits; thumbnail ↔ board as shared bounds (cross-fade); ink connector drawn by pen from the note's rule to a bracket on the board's edge. The work area never animates between tools and note: the note simply appears above the keys |
 | Icons | Material Symbols Rounded, weight 400, unfilled, as vector drawables |
-| Widget | Glance: date, status, page miniature drawn as tinted layers (follows day/night); opens today |
+| Widget | RemoteViews: date, status, page miniature drawn as tinted layers (follows day/night); opens today |
 | Icon | adaptive: paper background, a Fraunces Italic 5 in pen blue circled by a tapered terracotta pencil ring (the Coach marking an answer); readable at 36dp; monochrome layer for themed icons |
 
 ## Interaction

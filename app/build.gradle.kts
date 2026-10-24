@@ -132,7 +132,6 @@ dependencies {
     implementation(libs.androidx.compose.material3.adaptive)
     implementation(libs.androidx.compose.material3.adaptive.layout)
     implementation(libs.androidx.compose.material3.adaptive.navigation)
-    implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

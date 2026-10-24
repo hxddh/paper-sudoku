@@ -79,7 +79,7 @@ review the images and commit them as the new goldens.
 ```
 :core:engine   pure Kotlin  techniques, logical and backtracking solvers, generator, grader, Coach hints
 :core:game     pure Kotlin  Catalog (dailies, practice), Practice progression, GameState (serializable, undo)
-:app           Android      Room + DataStore, PageViewModel, NotebookViewModel, Compose UI, Glance widget
+:app           Android      Room + DataStore, PageViewModel, NotebookViewModel, Compose UI, RemoteViews widget
 :benchmark     Android test Macrobenchmark: cold start (with and without the Baseline Profile),
                writing frames; a smoke test of the minified build; a Baseline Profile generator
 ```

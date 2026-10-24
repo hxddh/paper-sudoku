@@ -1,7 +1,7 @@
 # Android 开发规范 / Checklist — v10.0
 
 > 基线：`targetSdk 36`、`compileSdk 37`、`minSdk 26`，Jetpack Compose + Material 3 Expressive
-> （`material3 1.5.0-beta01`）、Material 3 Adaptive 1.1、Navigation 3、Room 2.8、DataStore、Glance。
+> （`material3 1.5.0-beta01`）、Material 3 Adaptive 1.1、Navigation 3、Room 2.8、DataStore。
 >
 > 依赖说明：Expressive 公共 API 目前在 1.5 beta。发布前跟踪 1.5 stable；若仍未发布，需要在
 > “固定 beta”与“等待 stable”之间做一次明确决策并记录在 release notes 中。
@@ -14,7 +14,7 @@
 - [x] 不锁方向、不禁止 resize；布局按窗口尺寸而非设备类型决定
 - [x] SplashScreen API（`core-splashscreen`），启动画面停留到主题设置读出，深色用户无纸色闪烁（启动画面自身跟随系统主题：`setApplicationNightMode` 没有“跟随系统”的取值，故不使用）
 - [x] R8 + 资源压缩的 release 构建；kotlinx.serialization 自带 R8 规则
-- [x] 合并清单只申请 `WAKE_LOCK`、`RECEIVE_BOOT_COMPLETED` 与 AndroidX 自定义的签名级权限（移除网络状态与前台服务声明及其服务）；CI 与发布流程用 `tools/ci/check-apk.sh` 对照 `tools/ci/permissions.allowed` 逐项检查 release APK；Android 备份包含 Room 与 DataStore
+- [x] 合并清单只申请 AndroidX 自定义的签名级权限（小组件不再经由 Glance 与 WorkManager，因此没有唤醒锁、开机广播、网络状态或前台服务）；CI 与发布流程用 `tools/ci/check-apk.sh` 对照 `tools/ci/permissions.allowed` 逐项检查 release APK；Android 备份包含 Room 与 DataStore
 - [ ] Play Data Safety、内容分级、隐私政策托管（文案已更新，提交待 owner）
 
 ## 1. 触控与视觉
@@ -40,7 +40,7 @@
 | 页面顶栏 | 透明小 `TopAppBar` |
 | 工具栏 | `HorizontalFloatingToolbar`，三个同样安静的图标按钮（铅笔为自绘开关：`combinedClickable`，长按填入候选数，TalkBack 有对应操作）；图标为 Material Symbols Rounded 矢量 |
 | 数字键盘 | `ButtonGroup` 连接式按键，擦除为最后一键 |
-| 小组件 | Glance `GlanceAppWidget`（响应式尺寸、`appWidgetBackground`、系统圆角、`previewLayout`） |
+| 小组件 | RemoteViews `AppWidgetProvider`（按尺寸切换布局、`@android:id/background`、系统圆角、`previewLayout`） |
 | 确认 | `AlertDialog`（重开、换一页练习） |
 | 加载 | Expressive `LoadingIndicator` |
 | 设置 | `ListItem` + `Switch`、`SingleChoiceSegmentedButtonRow`、系统按应用语言设置（外链图标）、开源许可页（OFL 与 Apache 全文）；顶栏滚动时上色；触感跟随系统 |

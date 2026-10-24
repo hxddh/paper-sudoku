@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget's paper, rounded as the launcher rounds its widgets. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/widget_paper" />
+    <corners android:radius="@android:dimen/system_app_widget_background_radius" />
+</shape>

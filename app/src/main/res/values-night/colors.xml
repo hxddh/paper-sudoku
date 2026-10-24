@@ -2,8 +2,9 @@
 <resources>
     <color name="window_background">#14130F</color>
     <color name="widget_paper">#14130F</color>
-    <color name="widget_sheet">#0F0E0A</color>
+    <color name="widget_sheet">#1C1A16</color>
     <color name="widget_ink">#EDE6DA</color>
     <color name="widget_grid">#6E675B</color>
     <color name="widget_accent">#EFA489</color>
+    <color name="widget_pen">#A9C8E8</color>
 </resources>
