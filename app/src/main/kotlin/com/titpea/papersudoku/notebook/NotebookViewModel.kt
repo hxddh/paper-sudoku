@@ -43,7 +43,7 @@ data class PageEntry(
     val clean: Boolean get() = (result?.coachLevel ?: 3) < 3
 
     /** Something on this day is finished: its own page or another. */
-    val finished: Boolean get() = stamped || others.any { it.solved }
+    val finished: Boolean get() = stamped || saved?.solved == true || others.any { it.solved }
 
     /** Begun and not finished, and nothing finished beside it: a dash in the contents. */
     val unfinished: Boolean get() = !finished && (saved != null || others.isNotEmpty())
