@@ -31,21 +31,33 @@ object Review {
     fun of(spec: PuzzleSpec, moves: List<Move>): List<ReviewStep> {
         val geometry = spec.geometry
         val solver = LogicalSolver(geometry)
+        val solution = spec.solution.toIntArray()
         val values = spec.givens.toIntArray()
         return moves.map { move ->
-            val before = values.copyOf()
-            values[move.cell] = move.digit
-            val after = values.toList()
-            when {
-                move.digit == 0 -> ReviewStep(move, after, ReviewStep.Kind.Erased)
-                move.digit != spec.solution[move.cell] -> ReviewStep(move, after, ReviewStep.Kind.Mistake)
-                else -> {
-                    // Wrong digits elsewhere on the board say nothing about this one: judge it without them.
-                    val correct = IntArray(before.size) { i -> if (before[i] == spec.solution[i]) before[i] else 0 }
-                    ReviewStep(move, after, ReviewStep.Kind.Placed, justify(correct, move, solver))
-                }
+            val kind = when {
+                move.digit == 0 -> ReviewStep.Kind.Erased
+                move.digit != solution[move.cell] -> ReviewStep.Kind.Mistake
+                else -> ReviewStep.Kind.Placed
             }
+            // Wrong digits elsewhere on the board say nothing about this one: judge it without them.
+            val technique = if (kind == ReviewStep.Kind.Placed) {
+                justify(IntArray(values.size) { i -> if (values[i] == solution[i]) values[i] else 0 }, move, solver)
+            } else {
+                null
+            }
+            values[move.cell] = move.digit
+            ReviewStep(move, Digits(values), kind, technique)
         }
+    }
+
+    /**
+     * A board after one move, one byte per cell: a long page read back keeps a board per move,
+     * and a list of boxed digits is about three times the size.
+     */
+    private class Digits(values: IntArray) : AbstractList<Int>(), RandomAccess {
+        private val cells = ByteArray(values.size) { values[it].toByte() }
+        override val size: Int get() = cells.size
+        override fun get(index: Int): Int = cells[index].toInt()
     }
 
     private fun justify(before: IntArray, move: Move, solver: LogicalSolver): Technique? {
