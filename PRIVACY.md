@@ -29,19 +29,15 @@ uses Android's print service and the printer or "Save as PDF" target you pick.
 ## Permissions and sharing
 
 The app does not request network, location, contacts, camera, microphone, notification or
-advertising permissions. It asks Android for exactly three, all added by the AndroidX libraries
-the home-screen widget is built with:
+advertising permissions. It asks Android for exactly one, added by AndroidX:
 
-- `WAKE_LOCK` and `RECEIVE_BOOT_COMPLETED` — WorkManager (used by the widget library to draw the
-  widget) keeps the device awake for the moment a redraw runs, and restores its pending work after
-  the phone restarts;
 - `com.titpea.papersudoku.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` — a permission the app
   defines for itself (androidx.core adds it) so that only the app can message its own internal
   receivers.
 
 The widget's redraw just after midnight is an ordinary alarm and needs no permission.
 
-None of them gives access to any data. The app does not run foreground services. A build check
+It gives access to no data. The app does not run foreground services. A build check
 fails if the app ever asks for anything else. The app does not share data with third parties.
 
 ## Children

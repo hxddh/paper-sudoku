@@ -5,7 +5,7 @@
      the system sends APPWIDGET_UPDATE, which redraws and reschedules. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_description"
-    android:initialLayout="@layout/glance_default_loading_layout"
+    android:initialLayout="@layout/widget_loading"
     android:minWidth="180dp"
     android:minHeight="110dp"
     android:minResizeWidth="110dp"

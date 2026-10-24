@@ -2,6 +2,9 @@ package com.titpea.papersudoku.widget
 
 import android.app.AlarmManager
 import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProvider
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -9,52 +12,16 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.Build
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import android.os.Bundle
+import android.util.Log
+import android.util.SizeF
+import android.widget.RemoteViews
 import androidx.core.content.res.ResourcesCompat
-import androidx.glance.ColorFilter
-import androidx.glance.GlanceId
-import androidx.glance.GlanceModifier
-import androidx.glance.Image
-import androidx.glance.ImageProvider
-import androidx.glance.LocalSize
-import androidx.glance.action.clickable
-import androidx.glance.appwidget.GlanceAppWidget
-import androidx.glance.appwidget.GlanceAppWidgetReceiver
-import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.action.actionStartActivity
-import androidx.glance.appwidget.appWidgetBackground
-import androidx.glance.appwidget.cornerRadius
-import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.updateAll
-import androidx.glance.background
-import androidx.glance.color.ColorProvider
-import androidx.glance.layout.Alignment
-import androidx.glance.layout.Box
-import androidx.glance.layout.Column
-import androidx.glance.layout.Row
-import androidx.glance.layout.Spacer
-import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.padding
-import androidx.glance.layout.size
-import androidx.glance.layout.width
-import androidx.glance.text.FontWeight
-import androidx.glance.text.Text
-import androidx.glance.text.TextStyle
-import androidx.glance.unit.ColorProvider as GlanceColor
 import com.titpea.papersudoku.MainActivity
 import com.titpea.papersudoku.R
 import com.titpea.papersudoku.SudokuApplication
-import com.titpea.papersudoku.designsystem.FrauncesAxes
 import com.titpea.papersudoku.data.PageSummary
+import com.titpea.papersudoku.designsystem.FrauncesAxes
 import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.GameState
 import kotlinx.coroutines.CoroutineScope
@@ -65,7 +32,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.TextStyle as JavaTextStyle
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicReference
 
@@ -73,171 +39,147 @@ import java.util.concurrent.atomic.AtomicReference
  * Today's page on the home screen: the date, how far it has got, and a miniature of the page as
  * it stands. A tap opens the app on today's page.
  *
- * The miniature is drawn as three alpha masks (grid, printed digits, the player's ink), each tinted
- * with a day/night colour, so it follows the system theme without being redrawn.
+ * Plain RemoteViews (layout/widget_today_*): the miniature is three alpha masks (grid, printed
+ * digits, the player's ink), each tinted with a day/night colour resource, so it follows the
+ * system theme without being redrawn. Redrawn when the app saves today's page, at midnight and
+ * when the clock or time zone moves; nothing is scheduled beyond the midnight alarm.
  */
-class TodayWidget : GlanceAppWidget() {
+object TodayWidget {
+    private const val TAG = "TodayWidget"
 
-    override val sizeMode: SizeMode = SizeMode.Responsive(setOf(Small, Wide))
+    /** The miniature alone below this width (dp); the date and status beside it from here. */
+    private const val WIDE_DP = 220f
+    private const val HEIGHT_DP = 110f
 
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val container = (context.applicationContext as SudokuApplication).container
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val pending = MutableStateFlow(false)
+
+    /** What the widgets last showed: today's key, its saved page (null: not started) and the locale. */
+    private data class Shown(val key: String, val page: PageSummary?, val locale: Locale)
+
+    private val shown = AtomicReference<Shown?>(null)
+
+    /**
+     * Redraws placed widgets if today's page differs from what they last showed; overlapping
+     * requests collapse into one. Cheap when none are placed, and when nothing changed (the app
+     * asks on every put-away). The midnight and clock changes go through [updateNow].
+     */
+    fun requestUpdate(context: Context) {
+        if (!pending.compareAndSet(expect = false, update = true)) return
+        val app = context.applicationContext
+        scope.launch {
+            pending.value = false
+            runCatching { if (placed(app).isNotEmpty() && !showsCurrent(app)) update(app) }
+                .onFailure { Log.w(TAG, "Could not redraw the widget", it) }
+        }
+    }
+
+    /** Redraws placed widgets now, then calls [done] whether or not that succeeded. */
+    fun updateNow(context: Context, done: () -> Unit) {
+        val app = context.applicationContext
+        scope.launch {
+            try {
+                runCatching { update(app) }.onFailure { Log.w(TAG, "Could not redraw the widget", it) }
+            } finally {
+                done()
+            }
+        }
+    }
+
+    private fun placed(app: Context): IntArray =
+        AppWidgetManager.getInstance(app).getAppWidgetIds(ComponentName(app, TodayWidgetReceiver::class.java))
+
+    private suspend fun showsCurrent(app: Context): Boolean {
+        val last = shown.get() ?: return false
+        val container = (app as? SudokuApplication)?.container ?: return false
+        val key = Catalog.dailyKey(LocalDate.now(container.clock).toEpochDay())
+        val now = Shown(key, container.gameStore.page(key).first(), app.resources.configuration.locales[0])
+        return now == last
+    }
+
+    private suspend fun update(app: Context) {
+        val manager = AppWidgetManager.getInstance(app)
+        val ids = placed(app)
+        if (ids.isEmpty()) return
+        val container = (app as SudokuApplication).container
         val date = LocalDate.now(container.clock)
         val key = Catalog.dailyKey(date.toEpochDay())
-        val blank = PageSummary.of(GameState.new(container.puzzles.daily(date.toEpochDay())))
-        val pages = container.gameStore.page(key)
-        // Read once before the first frame, so a started page never flashes as blank.
-        val initial = pages.first()
-        NewDayAlarm.schedule(context, date)
-        val weekday = date.dayOfWeek.getDisplayName(JavaTextStyle.SHORT, context.resources.configuration.locales[0])
-        // The date in Fraunces, as in the app (Glance text can't use a bundled font).
-        val numeral = Numeral.render(context, date.dayOfMonth.toString())
-        val open = Intent(context, MainActivity::class.java)
+        val saved = container.gameStore.page(key).first()
+        val page = saved ?: PageSummary.of(GameState.new(container.puzzles.daily(date.toEpochDay())))
+        val locale = app.resources.configuration.locales[0]
+        NewDayAlarm.schedule(app, date)
+        val status = app.getString(
+            when {
+                saved == null -> R.string.widget_ready
+                page.solved -> R.string.widget_stamped
+                else -> R.string.page_in_progress
+            },
+        )
+        val content = Content(
+            layers = PageLayers.render(app, page),
+            numeral = Numeral.render(app, date.dayOfMonth.toString()),
+            day = date.dayOfMonth.toString(),
+            status = status,
+            description = app.getString(R.string.widget_page_description) + app.getString(R.string.list_separator) + status,
+            open = openToday(app),
+        )
+        for (id in ids) manager.updateAppWidget(id, views(app, content, manager.getAppWidgetOptions(id)))
+        shown.set(Shown(key, saved, locale))
+    }
+
+    private class Content(
+        val layers: PageLayers,
+        val numeral: Numeral,
+        val day: String,
+        val status: String,
+        val description: String,
+        val open: PendingIntent,
+    )
+
+    /**
+     * The layouts for the sizes the launcher may give: Android 12+ picks among them itself as the
+     * widget is resized; before that, one is chosen per orientation from the widget's options.
+     */
+    private fun views(app: Context, content: Content, options: Bundle): RemoteViews {
+        fun at(widthDp: Float) = if (widthDp >= WIDE_DP) wide(app, content) else small(app, content)
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            RemoteViews(mapOf(SizeF(HEIGHT_DP, HEIGHT_DP) to small(app, content), SizeF(WIDE_DP, HEIGHT_DP) to wide(app, content)))
+        } else {
+            val portrait = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH).toFloat()
+            val landscape = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH).toFloat()
+            RemoteViews(at(landscape), at(portrait))
+        }
+    }
+
+    private fun small(app: Context, content: Content) =
+        RemoteViews(app.packageName, R.layout.widget_today_small).apply { page(content) }
+
+    private fun wide(app: Context, content: Content) =
+        RemoteViews(app.packageName, R.layout.widget_today_wide).apply {
+            setImageViewBitmap(R.id.widget_numeral, content.numeral.bitmap)
+            setContentDescription(R.id.widget_numeral, content.day)
+            setTextViewText(R.id.widget_status, content.status)
+            page(content)
+        }
+
+    private fun RemoteViews.page(content: Content) {
+        setImageViewBitmap(R.id.widget_grid, content.layers.grid)
+        setImageViewBitmap(R.id.widget_printed, content.layers.printed)
+        setImageViewBitmap(R.id.widget_pen, content.layers.pen)
+        setContentDescription(R.id.widget_page, content.description)
+        setOnClickPendingIntent(android.R.id.background, content.open)
+    }
+
+    private fun openToday(app: Context): PendingIntent {
+        val open = Intent(app, MainActivity::class.java)
             .setAction(MainActivity.ACTION_OPEN_TODAY)
             // SINGLE_TOP with CLEAR_TOP: a running activity gets onNewIntent instead of being recreated.
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-
-        provideContent {
-            // Read inside the composition, so an update to a running session shows the latest page.
-            val saved by remember { pages }.collectAsState(initial = initial)
-            val page = saved ?: blank
-            SideEffect { shown.set(Shown(key, saved, context.resources.configuration.locales[0])) }
-            val status = context.getString(
-                when {
-                    saved == null -> R.string.widget_ready
-                    page.solved -> R.string.widget_stamped
-                    else -> R.string.page_in_progress
-                },
-            )
-            val layers = remember(page.grid) { PageLayers.render(context, page) }
-            val size = LocalSize.current
-            val wide = size.width >= Wide.width
-            // The miniature fits the cell the launcher gives, down to the smallest size.
-            val side = minOf(96.dp, size.height - 28.dp, if (wide) 96.dp else size.width - 28.dp).coerceAtLeast(40.dp)
-            Row(
-                modifier = GlanceModifier
-                    .fillMaxSize()
-                    .appWidgetBackground()
-                    .background(Paper)
-                    .then(systemCorners())
-                    .padding(14.dp)
-                    .clickable(actionStartActivity(open)),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                if (wide) {
-                    Column(modifier = GlanceModifier.defaultWeight()) {
-                        Text(context.getString(R.string.today), style = TextStyle(color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Medium))
-                        Image(
-                            provider = ImageProvider(numeral.bitmap),
-                            contentDescription = date.dayOfMonth.toString(),
-                            colorFilter = ColorFilter.tint(InkColor),
-                            modifier = GlanceModifier.size(numeral.width, numeral.height),
-                        )
-                        // At the shortest size the weekday gives way, so the status always fits.
-                        if (size.height >= 130.dp) {
-                            Text(weekday, style = TextStyle(color = Muted, fontSize = 13.sp))
-                            Spacer(GlanceModifier.size(6.dp))
-                        }
-                        Text(status, style = TextStyle(color = InkColor, fontSize = 13.sp, fontWeight = FontWeight.Medium))
-                    }
-                    Spacer(GlanceModifier.width(8.dp))
-                }
-                Miniature(layers, side, context.getString(R.string.widget_page_description) + context.getString(R.string.list_separator) + status)
-            }
-        }
-    }
-
-    companion object {
-        private val Small = DpSize(110.dp, 110.dp)
-        private val Wide = DpSize(220.dp, 110.dp)
-
-        private val Paper = ColorProvider(day = Color(0xFFF4EFE5), night = Color(0xFF14130F))
-        // A step lighter than the widget's paper at night too, as in the app.
-        private val Sheet = ColorProvider(day = Color(0xFFFFFDF8), night = Color(0xFF1C1A16))
-        private val InkColor = ColorProvider(day = Color(0xFF1F1C18), night = Color(0xFFEDE6DA))
-        private val Muted = ColorProvider(day = Color(0xFF5F574C), night = Color(0xFFCFC5B5))
-        private val Accent = ColorProvider(day = Color(0xFFA8442F), night = Color(0xFFEFA489))
-        private val GridInk = ColorProvider(day = Color(0xFF9C9081), night = Color(0xFF6E675B))
-        private val PenInk = ColorProvider(day = Color(0xFF2D5577), night = Color(0xFFA9C8E8))
-
-        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        private val pending = MutableStateFlow(false)
-
-        /** What a widget last composed: today's key, its saved page (null: not started) and the locale. */
-        private data class Shown(val key: String, val page: PageSummary?, val locale: Locale)
-
-        private val shown = AtomicReference<Shown?>(null)
-
-        /**
-         * Redraws placed widgets if today's page differs from what they last showed; overlapping
-         * requests collapse into one. Cheap when none are placed, and when nothing changed (the
-         * app asks on every put-away). The midnight and clock changes go through [updateNow].
-         */
-        fun requestUpdate(context: Context) {
-            if (!pending.compareAndSet(expect = false, update = true)) return
-            val app = context.applicationContext
-            scope.launch {
-                pending.value = false
-                runCatching {
-                    if (!showsCurrent(app)) TodayWidget().updateAll(app)
-                }
-            }
-        }
-
-        private suspend fun showsCurrent(app: Context): Boolean {
-            val last = shown.get() ?: return false
-            val container = (app as? SudokuApplication)?.container ?: return false
-            val key = Catalog.dailyKey(LocalDate.now(container.clock).toEpochDay())
-            val now = Shown(key, container.gameStore.page(key).first(), app.resources.configuration.locales[0])
-            return now == last
-        }
-
-        /** Redraws placed widgets now, then calls [done] whether or not that succeeded. */
-        fun updateNow(context: Context, done: () -> Unit) {
-            val app = context.applicationContext
-            scope.launch {
-                try {
-                    runCatching { TodayWidget().updateAll(app) }
-                } finally {
-                    done()
-                }
-            }
-        }
-
-        /** The launcher's own widget radius (Android 12+; older launchers draw square widgets). */
-        private fun systemCorners(): GlanceModifier =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                GlanceModifier.cornerRadius(android.R.dimen.system_app_widget_background_radius)
-            } else {
-                GlanceModifier
-            }
-
-        @Composable
-        private fun Miniature(layers: PageLayers, side: Dp, description: String) {
-            Box(
-                modifier = GlanceModifier.size(side).background(Sheet).cornerRadius(6.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Layer(layers.grid, GridInk, description)
-                Layer(layers.printed, InkColor, null)
-                Layer(layers.pen, PenInk, null)
-            }
-        }
-
-        @Composable
-        private fun Layer(bitmap: Bitmap, tint: GlanceColor, description: String?) {
-            Image(
-                provider = ImageProvider(bitmap),
-                contentDescription = description,
-                colorFilter = ColorFilter.tint(tint),
-                modifier = GlanceModifier.fillMaxSize(),
-            )
-        }
+        return PendingIntent.getActivity(app, 0, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
     }
 }
 
-/** A page drawn as alpha masks for tinting. Glance cannot run Compose drawing. */
+/** A page drawn as alpha masks for tinting. */
 class PageLayers(val grid: Bitmap, val printed: Bitmap, val pen: Bitmap) {
     companion object {
         fun render(context: Context, page: PageSummary, px: Int = 240): PageLayers {
@@ -279,20 +221,35 @@ class PageLayers(val grid: Bitmap, val printed: Bitmap, val pen: Bitmap) {
     }
 }
 
-class TodayWidgetReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = TodayWidget()
+/**
+ * The widget's receiver. Its name is kept from the Glance widget it replaced, so widgets already
+ * placed carry on.
+ */
+class TodayWidgetReceiver : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             // A new day, or the clock or time zone moved: today's page may be a different one.
-            NewDayAlarm.ACTION_NEW_DAY, Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED -> {
-                // The broadcast may be all that keeps the process alive: hold it until the redraw
-                // (which also schedules the next midnight) is done.
-                val result = goAsync()
-                TodayWidget.updateNow(context) { result.finish() }
-            }
+            NewDayAlarm.ACTION_NEW_DAY, Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED -> redraw(context)
             else -> super.onReceive(context, intent)
         }
+    }
+
+    // Placed, restored, or after a reboot or an app update.
+    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = redraw(context)
+
+    // Resized: before Android 12 the layout for the new size is chosen here.
+    override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, options: Bundle) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) redraw(context)
+    }
+
+    /**
+     * The broadcast may be all that keeps the process alive: hold it until the redraw (which also
+     * schedules the next midnight) is done. Called only while a broadcast is being received.
+     */
+    private fun redraw(context: Context) {
+        val result = goAsync()
+        TodayWidget.updateNow(context) { result.finish() }
     }
 }
 
@@ -313,7 +270,7 @@ object NewDayAlarm {
 }
 
 /** A numeral drawn in Fraunces as an alpha mask, tinted like the miniature. */
-class Numeral(val bitmap: Bitmap, val width: Dp, val height: Dp) {
+class Numeral(val bitmap: Bitmap) {
     companion object {
         private const val SIZE_DP = 36f
 
@@ -328,11 +285,9 @@ class Numeral(val bitmap: Bitmap, val width: Dp, val height: Dp) {
             val bounds = android.graphics.Rect()
             paint.getTextBounds(text, 0, text.length, bounds)
             val pad = (2 * density).toInt()
-            val w = bounds.width() + pad * 2
-            val h = bounds.height() + pad * 2
-            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ALPHA_8)
+            val bitmap = Bitmap.createBitmap(bounds.width() + pad * 2, bounds.height() + pad * 2, Bitmap.Config.ALPHA_8)
             Canvas(bitmap).drawText(text, (pad - bounds.left).toFloat(), (pad - bounds.top).toFloat(), paint)
-            return Numeral(bitmap, (w / density).dp, (h / density).dp)
+            return Numeral(bitmap)
         }
     }
 }

@@ -33,7 +33,7 @@ day is there. Finish a page and it is stamped. When you are stuck, the Coach wri
 | Coach | margin note: 2dp ink rule, the technique as tag, "Why n/m" with step pips, note in upright `onSurfaceVariant`, two actions ("Back to the page" once it has helped); the answer is an outlined button with its cost said above it; boxes are named by position (top right box / 右上宫) ; it reads the page as the player has it (10.0): a pencil mark leaving out a cell's answer first, steps near the selected cell before others; a known technique's Look is the title alone, and a technique never found or explained opens its Why with what it is |
 | Transitions | taps: shared axis X (10%) on the motion scheme; back gesture: the leaving page scales to 90%, rounds 28dp and lifts, linear with the finger, fading as it commits; thumbnail ↔ board as shared bounds (cross-fade); ink connector drawn by pen to a bracket on the board's edge |
 | Icons | Material Symbols Rounded, weight 400, unfilled, as vector drawables |
-| Widget | Glance: date, status, page miniature drawn as tinted layers (follows day/night); opens today |
+| Widget | RemoteViews: date, status, page miniature drawn as tinted layers (follows day/night); opens today |
 | Icon | adaptive: paper background, a Fraunces Italic 5 in pen blue circled by a tapered terracotta pencil ring (the Coach marking an answer); readable at 36dp; monochrome layer for themed icons |
 
 ## Interaction
