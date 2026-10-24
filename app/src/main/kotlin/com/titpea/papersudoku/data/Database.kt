@@ -143,25 +143,6 @@ interface SavedGameDao {
     @Query("DELETE FROM saved_games WHERE puzzleKey = :puzzleKey")
     suspend fun delete(puzzleKey: String)
 
-    @Query("DELETE FROM saved_games WHERE puzzleKey = :puzzleKey AND updatedAt = :updatedAt")
-    suspend fun deleteIfUnchanged(puzzleKey: String, updatedAt: Long)
-
-    /**
-     * Unsolved dailies with no digit written and no undo step or Coach use in their save: the only
-     * rows that may hold a page never begun. A save leaves out what is at its default, so a page
-     * with any undo step or Coach use names `historyPacked`, `history` or `coach`; those rows are
-     * skipped here instead of being decoded. Since 8.0 a page only looked at is not saved, so
-     * once the old ones are gone this finds nothing, and only the small columns are read for the
-     * rows with no digit written.
-     */
-    @Query(
-        """
-        SELECT puzzleKey FROM saved_games WHERE kind = 'Daily' AND solved = 0 AND grid = givens
-        AND instr(json, '"history') = 0 AND instr(json, '"coach"') = 0
-        """,
-    )
-    suspend fun unwrittenDailyKeys(): List<String>
-
     /** Moves an unreadable row out of every query's way, under a key no page will ask for. */
     @Query("UPDATE saved_games SET puzzleKey = :newKey, kind = 'Damaged' WHERE puzzleKey = :puzzleKey")
     suspend fun setAside(puzzleKey: String, newKey: String)
@@ -171,7 +152,7 @@ private const val PAGE_COLUMNS = "puzzleKey, kind, difficulty, number, epochDay,
 
 @Database(
     entities = [GameResultEntity::class, SavedGameEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class SudokuDatabase : RoomDatabase() {
@@ -183,7 +164,7 @@ abstract class SudokuDatabase : RoomDatabase() {
 
         fun create(context: Context, name: String = NAME): SudokuDatabase =
             Room.databaseBuilder(context.applicationContext, SudokuDatabase::class.java, name)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
     }
 }
@@ -260,6 +241,35 @@ val MIGRATION_3_4: Migration = object : Migration(3, 4) {
             "CREATE INDEX IF NOT EXISTS `index_saved_games_kind_solved_updatedAt` " +
                 "ON `saved_games` (`kind`, `solved`, `updatedAt`)",
         )
+    }
+}
+
+/**
+ * v4 → v5, no schema change: drops the dailies that versions before 8.0 saved only for being
+ * opened, so the notebook does not offer them as begun. Since 8.0 such a page is never saved; this
+ * tidy ran on every launch until 11.0 and now runs once.
+ *
+ * A save leaves out what is at its default, so a page with any undo step or Coach use names
+ * `historyPacked`, `history` or `coach`: only the rows with no digit written and neither of those
+ * are decoded.
+ */
+val MIGRATION_4_5: Migration = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        val rows = buildList {
+            db.query(
+                """
+                SELECT `puzzleKey`, `json` FROM `saved_games` WHERE `kind` = 'Daily' AND `solved` = 0
+                AND `grid` = `givens` AND instr(`json`, '"history') = 0 AND instr(`json`, '"coach"') = 0
+                """.trimIndent(),
+            ).use { cursor ->
+                while (cursor.moveToNext()) add(cursor.getString(0) to cursor.getString(1))
+            }
+        }
+        for ((key, json) in rows) {
+            if (GameState.decode(json)?.untouched == true) {
+                db.execSQL("DELETE FROM `saved_games` WHERE `puzzleKey` = ?", arrayOf(key))
+            }
+        }
     }
 }
 

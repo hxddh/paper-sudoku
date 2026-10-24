@@ -81,9 +81,6 @@ interface GameStore {
     /** Drops a saved page: a daily only looked at is not kept as begun. */
     suspend fun forget(puzzleKey: String)
 
-    /** Drops saved dailies that were opened but never begun (saved that way before 8.0). */
-    suspend fun forgetUntouchedDailies()
-
     /**
      * Saves the solved page and records its first completion together, so a page is never left
      * solved but unstamped. Later replays are ignored; returns whether a result was recorded.
@@ -196,15 +193,6 @@ class RoomGameStore(
     }
 
     override suspend fun forget(puzzleKey: String) = write { savedGames.delete(puzzleKey) }
-
-    override suspend fun forgetUntouchedDailies() {
-        for (key in savedGames.unwrittenDailyKeys()) {
-            val row = savedGames.get(key) ?: continue
-            val game = withContext(Dispatchers.Default) { GameState.decode(row.json) } ?: continue
-            // Only the row as read: a page begun meanwhile was saved again and stays.
-            if (game.untouched) write { savedGames.deleteIfUnchanged(key, row.updatedAt) }
-        }
-    }
 
     override suspend fun save(state: GameState, now: Long) {
         val entity = entity(state, now)

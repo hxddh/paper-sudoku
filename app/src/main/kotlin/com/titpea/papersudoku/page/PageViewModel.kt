@@ -216,16 +216,6 @@ class PageViewModel(
         viewModelScope.launch {
             settingsStore.settings.collect { settings -> _state.update { it.copy(settings = settings) } }
         }
-        // Pages saved by earlier versions just for being opened are not begun.
-        viewModelScope.launch {
-            try {
-                store.forgetUntouchedDailies()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not tidy unbegun pages", e)
-            }
-        }
         // After process death, reopen the page that was on the desk.
         open(savedState.get<String>(OPEN_PAGE)?.let(PageTarget::fromKey) ?: PageTarget.Daily(today()))
     }
@@ -555,7 +545,6 @@ class PageViewModel(
 
     private suspend fun show(next: GameState, keepPrevious: Boolean) {
         val previous = _state.value.game
-        if (keepPrevious && previous != null && previous.spec.key != next.spec.key) persist(previous)
         _state.update {
             it.copy(
                 loading = false,
@@ -569,7 +558,11 @@ class PageViewModel(
             ).withDerived()
         }
         savedState[OPEN_PAGE] = next.spec.key
-        persist(next)
+        // Put away after the new page is on the desk: the write does not delay it.
+        if (keepPrevious && previous != null && previous.spec.key != next.spec.key) persist(previous)
+        // A daily only looked at has no save to write or drop (since 8.0 one is never kept, and
+        // the v5 migration dropped older ones): opening today's page touches no table.
+        if (next.spec.kind != PuzzleKind.Daily || !next.untouched) persist(next)
     }
 
     /** Tomorrow's daily and the next practice page are generated now, so they open instantly. */

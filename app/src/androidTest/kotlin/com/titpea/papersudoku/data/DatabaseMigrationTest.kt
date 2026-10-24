@@ -163,6 +163,53 @@ class DatabaseMigrationTest {
     }
 
     @Test
+    fun migratesV4DroppingDailiesOnlyOpened() = runBlocking {
+        val opened = GameState.new(Catalog.daily(20_000))
+        val begun = GameState.new(Catalog.daily(20_001)).let { it.select(it.spec.givens.indexOfFirst { v -> v == 0 }).input(2, true) }
+        val noted = GameState.new(Catalog.daily(20_002)).let { it.select(it.spec.givens.indexOfFirst { v -> v == 0 }).toggleNotesMode().input(3, true) }
+        raw(version = 4) {
+            execSQL(
+                "CREATE TABLE IF NOT EXISTS `game_results` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`mode` TEXT NOT NULL, `durationSeconds` INTEGER NOT NULL, `hints` INTEGER NOT NULL, " +
+                    "`completedAt` INTEGER NOT NULL, `puzzleKey` TEXT NOT NULL DEFAULT '', " +
+                    "`difficulty` TEXT NOT NULL DEFAULT '', `coachLevel` INTEGER NOT NULL DEFAULT 0, `epochDay` INTEGER)",
+            )
+            execSQL("CREATE INDEX IF NOT EXISTS `index_game_results_puzzleKey` ON `game_results` (`puzzleKey`)")
+            execSQL(
+                "CREATE TABLE IF NOT EXISTS `saved_games` (`puzzleKey` TEXT NOT NULL, `kind` TEXT NOT NULL, " +
+                    "`difficulty` TEXT NOT NULL, `number` INTEGER, `epochDay` INTEGER, `solved` INTEGER NOT NULL, " +
+                    "`updatedAt` INTEGER NOT NULL, `givens` TEXT NOT NULL DEFAULT '', `grid` TEXT NOT NULL DEFAULT '', " +
+                    "`json` TEXT NOT NULL, PRIMARY KEY(`puzzleKey`))",
+            )
+            execSQL("CREATE INDEX IF NOT EXISTS `index_saved_games_kind_epochDay` ON `saved_games` (`kind`, `epochDay`)")
+            execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_saved_games_kind_solved_updatedAt` " +
+                    "ON `saved_games` (`kind`, `solved`, `updatedAt`)",
+            )
+            for (game in listOf(opened, begun, noted)) {
+                execSQL(
+                    "INSERT INTO saved_games VALUES (?, ?, ?, ?, ?, 0, 7, ?, ?, ?)",
+                    arrayOf<Any?>(
+                        game.spec.key, game.spec.kind.name, game.spec.difficulty.name, game.spec.number,
+                        game.spec.epochDay, game.spec.givens.digits(), game.values.digits(), game.encode(),
+                    ),
+                )
+            }
+        }
+        val database = SudokuDatabase.create(context, name)
+        try {
+            val store = RoomGameStore(database)
+            assertNull(store.load(opened.spec.key))
+            assertEquals(begun, store.load(begun.spec.key))
+            // Pencil marks alone are a begun page, though no digit is written.
+            assertEquals(noted, store.load(noted.spec.key))
+            assertEquals(listOf(noted.spec.key, begun.spec.key), store.dailies(0).first().map { it.key })
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
     fun storeQueries() = runBlocking {
         val database = SudokuDatabase.create(context, name)
         try {

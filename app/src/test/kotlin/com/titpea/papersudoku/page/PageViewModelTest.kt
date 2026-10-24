@@ -713,18 +713,4 @@ class PageViewModelTest {
         advanceUntilIdle()
         assertEquals(com.titpea.papersudoku.game.model.PuzzleKind.Classic, gone.game().spec.kind)
     }
-
-    @Test
-    fun `pages saved only for being opened are forgotten`() = test {
-        store.save(GameState.new(Catalog.daily(today.toEpochDay() - 3)), 0)
-        val begun = GameState.new(Catalog.daily(today.toEpochDay() - 2)).let { g ->
-            val empty = g.spec.givens.indexOfFirst { it == 0 }
-            g.select(empty).input(g.spec.solution[empty], true)
-        }
-        store.save(begun, 0)
-        viewModel()
-        advanceUntilIdle()
-        assertFalse(store.saved.containsKey(Catalog.dailyKey(today.toEpochDay() - 3)))
-        assertTrue(store.saved.containsKey(begun.spec.key))
-    }
 }
