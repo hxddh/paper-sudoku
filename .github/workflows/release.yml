@@ -1,61 +1,102 @@
 name: Release
 
 # Push a tag to publish a GitHub release:
-# - v7.0.0           → AAB signed with the private upload key, for Google Play only. No APK is
+# - v9.0.0           → AAB signed with the private upload key, for Google Play only. No APK is
 #                      published: under Play App Signing, Play re-signs the app with its own key,
 #                      so an upload-key APK could never update from Play, nor Play update it.
 #                      Requires the secrets PAPER_SUDOKU_KEYSTORE_BASE64,
 #                      PAPER_SUDOKU_STORE_PASSWORD, PAPER_SUDOKU_KEY_ALIAS,
 #                      PAPER_SUDOKU_KEY_PASSWORD (see docs/release.md).
-# - v7.0.0-sideload  → APK signed with the runner's debug key, for sideload testing only.
-# Either way the APK built is checked (permissions, Baseline Profile) before anything is published.
+# - v9.0.0-sideload  → APK for sideload testing, signed with the fixed sideload key when the
+#                      secrets PAPER_SUDOKU_SIDELOAD_KEYSTORE_BASE64,
+#                      PAPER_SUDOKU_SIDELOAD_STORE_PASSWORD, PAPER_SUDOKU_SIDELOAD_KEY_ALIAS and
+#                      PAPER_SUDOKU_SIDELOAD_KEY_PASSWORD are set, else with the runner's debug
+#                      key. The notes give the signing certificate's SHA-256 either way.
+# Either way the APK built is checked (permissions, Baseline Profile, alignment) before anything
+# is published.
 #
 # It can also be started from the Actions tab (or the API) with a tag name; the release then
-# creates that tag on the commit being built.
+# creates that tag on the commit being built. With "dry run" ticked it builds, signs and verifies
+# everything but publishes nothing: the files are kept as the run's "paper-sudoku-release"
+# artifact instead. A dry run of a plain tag without the upload-key secrets signs with a
+# throwaway key made on the runner.
 #
 # Before anything is built (tools/ci/release-preflight.sh): the tag must be v<versionName> or
-# v<versionName>-sideload, CHANGELOG.md must have notes for that version, and the commit must be
-# on main with a passing "Android CI" run (push to main) for that exact commit.
+# v<versionName>-sideload, versionCode must match versionName, and CHANGELOG.md must have notes
+# for that version; unless this is a dry run, the tag must not be released yet, and the commit
+# must be on main with a passing "Android CI" run (push to main) for that exact commit.
+#
+# Jobs: preflight (read-only token) → build (the `release` environment: the only job that
+# sees the signing secrets; read-only token) → publish (write token, no secrets; skipped in a
+# dry run).
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag, e.g. v7.0.0-sideload"
+        description: "Release tag, e.g. v9.0.0-sideload"
         required: true
         type: string
+      dry_run:
+        description: "Dry run: build, sign and verify, but publish nothing (files kept as a workflow artifact)"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
-  contents: write # to create the release
-  actions: read # to read the Android CI runs in the preflight
+  contents: read
+
+# One release at a time; a release started meanwhile waits rather than cancelling this one.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+  DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
 
 jobs:
-  release:
+  preflight:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      TAG: ${{ inputs.tag || github.ref_name }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read # to read the Android CI runs
     steps:
-      # The write token stays out of .git/config: only the release step receives it.
       - name: Check out
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Preflight (tag, version, notes, main, CI)
+      - name: Preflight (tag, version, notes, release, main, CI)
         env:
           GH_TOKEN: ${{ github.token }}
         run: sh tools/ci/release-preflight.sh "$TAG" "$GITHUB_SHA"
 
+  build:
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    # Add required reviewers to this environment (Settings → Environments → release) to approve
+    # each release before the signing secrets are used.
+    environment: release
+    permissions:
+      contents: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Set up JDK 17
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
 
       - name: Install Android SDK 37
         run: |
@@ -65,64 +106,154 @@ jobs:
       - name: Test and lint
         run: ./gradlew --no-daemon :core:engine:test :core:game:test :app:testDebugUnitTest :app:lintDebug
 
+      - name: Lint findings
+        if: always()
+        run: python3 tools/ci/lint-summary.py app/build/reports/lint-results-debug.sarif
+
       - name: Build sideload APK
         if: endsWith(env.TAG, '-sideload')
+        env:
+          KEYSTORE_BASE64: ${{ secrets.PAPER_SUDOKU_SIDELOAD_KEYSTORE_BASE64 }}
+          PAPER_SUDOKU_SIDELOAD_STORE_PASSWORD: ${{ secrets.PAPER_SUDOKU_SIDELOAD_STORE_PASSWORD }}
+          PAPER_SUDOKU_SIDELOAD_KEY_ALIAS: ${{ secrets.PAPER_SUDOKU_SIDELOAD_KEY_ALIAS }}
+          PAPER_SUDOKU_SIDELOAD_KEY_PASSWORD: ${{ secrets.PAPER_SUDOKU_SIDELOAD_KEY_PASSWORD }}
         run: |
-          ./gradlew --no-daemon :app:assembleRelease -PpaperSudoku.sideload=true
           version="${TAG#v}"
+          given=0
+          for value in "$KEYSTORE_BASE64" "$PAPER_SUDOKU_SIDELOAD_STORE_PASSWORD" \
+            "$PAPER_SUDOKU_SIDELOAD_KEY_ALIAS" "$PAPER_SUDOKU_SIDELOAD_KEY_PASSWORD"; do
+            if [ -n "$value" ]; then given=$((given + 1)); fi
+          done
+          if [ "$given" = 4 ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/sideload.jks"
+            # Read by app/build.gradle.kts, with the three variables above.
+            export PAPER_SUDOKU_SIDELOAD_KEYSTORE="$RUNNER_TEMP/sideload.jks"
+            key=fixed
+            echo "Signing with the sideload key."
+          elif [ "$given" = 0 ]; then
+            echo "::warning::The PAPER_SUDOKU_SIDELOAD_* secrets are not set: signing with this runner's debug key (see docs/release.md)"
+            key=debug
+          else
+            echo "::error::Only $given of the 4 PAPER_SUDOKU_SIDELOAD_* secrets are set; see docs/release.md"
+            exit 1
+          fi
+          ./gradlew --no-daemon :app:assembleRelease -PpaperSudoku.sideload=true
           cp app/build/outputs/apk/release/app-release.apk "paper-sudoku-$version.apk"
           {
-            echo "**Sideload build.** Signed with a build-machine debug key for testing outside Google Play."
-            echo "To update from an earlier sideload build (including 1.0), uninstall it first."
+            if [ "$key" = fixed ]; then
+              echo "**Sideload build**, for testing outside Google Play. Signed with the Paper Sudoku sideload key: later sideload builds install over this one and keep the notebook."
+              echo "If a sideload build from 8.0 or earlier (signed with a build-machine debug key) is installed, uninstall it once first; Android backup does not restore its data across the change of key."
+            else
+              echo "**Sideload build.** Signed with a build-machine debug key for testing outside Google Play."
+              echo "To update from an earlier sideload build (including 1.0), uninstall it first."
+            fi
             echo
             sh tools/ci/changelog-section.sh "${version%-sideload}" CHANGELOG.md
           } > release-notes.md
 
-      - name: Restore upload key
-        if: ${{ !endsWith(env.TAG, '-sideload') }}
-        env:
-          KEYSTORE_BASE64: ${{ secrets.PAPER_SUDOKU_KEYSTORE_BASE64 }}
-        run: |
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error::PAPER_SUDOKU_KEYSTORE_BASE64 is not set; see docs/release.md, or tag vX.Y.Z-sideload"
-            exit 1
-          fi
-          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
-          echo "PAPER_SUDOKU_KEYSTORE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
-
       - name: Build signed AAB
         if: ${{ !endsWith(env.TAG, '-sideload') }}
         env:
+          KEYSTORE_BASE64: ${{ secrets.PAPER_SUDOKU_KEYSTORE_BASE64 }}
           PAPER_SUDOKU_STORE_PASSWORD: ${{ secrets.PAPER_SUDOKU_STORE_PASSWORD }}
           PAPER_SUDOKU_KEY_ALIAS: ${{ secrets.PAPER_SUDOKU_KEY_ALIAS }}
           PAPER_SUDOKU_KEY_PASSWORD: ${{ secrets.PAPER_SUDOKU_KEY_PASSWORD }}
         run: |
+          version="${TAG#v}"
+          given=0
+          for value in "$KEYSTORE_BASE64" "$PAPER_SUDOKU_STORE_PASSWORD" \
+            "$PAPER_SUDOKU_KEY_ALIAS" "$PAPER_SUDOKU_KEY_PASSWORD"; do
+            if [ -n "$value" ]; then given=$((given + 1)); fi
+          done
+          throwaway=0
+          if [ "$given" = 4 ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+          elif [ "$given" = 0 ] && [ "$DRY_RUN" = 1 ]; then
+            # Dry run without the upload key: a key that lives only on this runner, so the signed
+            # AAB path still runs end to end. Its AAB could never be uploaded to Play.
+            echo "::notice::Dry run without the upload-key secrets: signing with a throwaway key"
+            PAPER_SUDOKU_STORE_PASSWORD=$(openssl rand -hex 24)
+            echo "::add-mask::$PAPER_SUDOKU_STORE_PASSWORD"
+            PAPER_SUDOKU_KEY_PASSWORD="$PAPER_SUDOKU_STORE_PASSWORD"
+            PAPER_SUDOKU_KEY_ALIAS=dry-run
+            keytool -genkeypair -noprompt -storetype PKCS12 -keystore "$RUNNER_TEMP/upload.jks" \
+              -storepass "$PAPER_SUDOKU_STORE_PASSWORD" -keypass "$PAPER_SUDOKU_KEY_PASSWORD" \
+              -alias "$PAPER_SUDOKU_KEY_ALIAS" -keyalg RSA -keysize 2048 -validity 2 \
+              -dname "CN=Paper Sudoku dry run (throwaway)"
+            export PAPER_SUDOKU_STORE_PASSWORD PAPER_SUDOKU_KEY_ALIAS PAPER_SUDOKU_KEY_PASSWORD
+            throwaway=1
+          else
+            echo "::error::$given of the 4 PAPER_SUDOKU_* upload-key secrets are set; all 4 are needed (see docs/release.md), or tag vX.Y.Z-sideload"
+            exit 1
+          fi
+          # Read by app/build.gradle.kts, with the three variables above.
+          export PAPER_SUDOKU_KEYSTORE="$RUNNER_TEMP/upload.jks"
           # The APK is built only to check it; it is not published.
           ./gradlew --no-daemon :app:assembleRelease :app:bundleRelease
-          version="${TAG#v}"
           cp app/build/outputs/bundle/release/app-release.aab "paper-sudoku-$version.aab"
-          sh tools/ci/changelog-section.sh "$version" CHANGELOG.md > release-notes.md
+          {
+            if [ "$throwaway" = 1 ]; then
+              echo "**Dry run:** signed with a throwaway key, not the upload key."
+              echo
+            fi
+            sh tools/ci/changelog-section.sh "$version" CHANGELOG.md
+          } > release-notes.md
 
-      - name: Check the build (permissions, Baseline Profile)
+      - name: Check the build (permissions, Baseline Profile, alignment, size)
         run: sh tools/ci/check-apk.sh app/build/outputs/apk/release/app-release.apk
 
+      # bundletool is published to Google's Maven repository and GitHub, not Maven Central, so
+      # the AAB is not run through `bundletool validate` here; Play validates it on upload.
       - name: Verify signature
         run: |
           version="${TAG#v}"
           if [ -f "paper-sudoku-$version.apk" ]; then
-            "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "paper-sudoku-$version.apk"
+            certs=$("$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose --print-certs "paper-sudoku-$version.apk")
+            echo "$certs"
+            digest=$(echo "$certs" | sed -n 's/^Signer.* certificate SHA-256 digest: *//p' | head -n 1)
+            [ -n "$digest" ] || { echo "::error::apksigner printed no certificate digest"; exit 1; }
+            # So testers can check that an update comes from the same key.
+            { echo; echo "Signing certificate SHA-256: \`$digest\`"; } >> release-notes.md
           else
             # jarsigner exits 0 even for an unsigned jar; require its "verified" verdict. (-strict
             # would also fail on the self-signed upload certificate's chain warnings.)
             out=$(jarsigner -verify "paper-sudoku-$version.aab")
             echo "$out"
             echo "$out" | grep -q "^jar verified" || { echo "::error::The AAB is not signed"; exit 1; }
+            keytool -printcert -jarfile "paper-sudoku-$version.aab" | grep -E "Owner:|SHA256:" || true
           fi
+          cat release-notes.md >> "$GITHUB_STEP_SUMMARY"
+
+      # The publish job (or, in a dry run, whoever runs it) takes the files from here.
+      - name: Keep the release files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: paper-sudoku-release
+          path: |
+            paper-sudoku-*.apk
+            paper-sudoku-*.aab
+            release-notes.md
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: build
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # to create the release (and its tag)
+    steps:
+      - name: Fetch the release files
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: paper-sudoku-release
+          path: release
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${TAG#v}"
-          gh release create "$TAG" paper-sudoku-"$version".* --target "$GITHUB_SHA" \
-            --title "Paper Sudoku $version" --notes-file release-notes.md
+          gh release create "$TAG" release/paper-sudoku-"$version".* --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --title "Paper Sudoku $version" --notes-file release/release-notes.md

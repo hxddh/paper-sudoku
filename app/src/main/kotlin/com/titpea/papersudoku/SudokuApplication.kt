@@ -3,6 +3,7 @@ package com.titpea.papersudoku
 import android.app.Application
 import android.content.Context
 import android.os.SystemClock
+import android.util.Log
 import com.titpea.papersudoku.data.CachedPuzzleSource
 import com.titpea.papersudoku.data.DataStoreSettings
 import com.titpea.papersudoku.data.GameStore
@@ -11,6 +12,11 @@ import com.titpea.papersudoku.data.SettingsStore
 import com.titpea.papersudoku.data.SudokuDatabase
 import com.titpea.papersudoku.game.model.PuzzleSource
 import com.titpea.papersudoku.widget.TodayWidget
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import java.io.File
 import java.time.Clock
 import java.time.Instant
@@ -46,6 +52,27 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     }
     override val ticker: () -> Long = { SystemClock.elapsedRealtime() }
     override val onDailySaved: () -> Unit = { TodayWidget.requestUpdate(context) }
+
+    /**
+     * Starts the first DataStore read and opens Room (running any migration) off the main thread,
+     * so both overlap the Activity's start instead of following it: the splash waits for the
+     * settings, and the first page for the database. Later reads share the open database and
+     * DataStore's cached data; a failure here is only logged, and the real read retries it.
+     */
+    fun warmUp(scope: CoroutineScope) {
+        scope.launch {
+            runCatching { settingsStore.settings.first() }
+                .onFailure { Log.w(TAG, "Settings warm-up failed", it) }
+        }
+        scope.launch {
+            runCatching { database.openHelper.writableDatabase }
+                .onFailure { Log.w(TAG, "Database warm-up failed", it) }
+        }
+    }
+
+    private companion object {
+        const val TAG = "AppContainer"
+    }
 }
 
 /** The system clock in whatever time zone the device is in now, so "today" follows travel. */
@@ -61,6 +88,8 @@ class SudokuApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        container = DefaultAppContainer(this)
+        container = DefaultAppContainer(this).also {
+            it.warmUp(CoroutineScope(SupervisorJob() + Dispatchers.IO))
+        }
     }
 }
