@@ -360,22 +360,20 @@ private fun Controls(at: Int, count: Int, onMove: (Int) -> Unit) {
             if (count > 1) {
                 // One step per move, so accessibility swipes go a move at a time; the ticks
                 // themselves would crowd a long page, so they are not drawn.
-                val slider = remember(count) {
-                    SliderState(value = at.toFloat(), steps = (count - 2).coerceAtLeast(0), valueRange = 0f..(count - 1).toFloat())
-                }
+                // The slider runs 0..1; move i of count sits at i / (count - 1).
+                val last = (count - 1).toFloat()
+                val slider = remember(count) { SliderState(value = at / last, steps = (count - 2).coerceAtLeast(0)) }
                 // The move shown is the source of truth: the arrows move it as well as the slider.
-                SideEffect { if (slider.value.roundToInt() != at) slider.value = at.toFloat() }
+                SideEffect { if ((slider.value * last).roundToInt() != at) slider.value = at / last }
                 Slider(
                     state = slider,
-                    onValueChange = { onMove(it.roundToInt().coerceIn(0, count - 1)) },
+                    onValueChange = { onMove((it * last).roundToInt().coerceIn(0, count - 1)) },
                     // Ink, not a control's colour: terracotta is the Coach's, blue the player's pen.
                     thumb = {
                         Box(Modifier.size(12.dp).background(ink, CircleShape))
                     },
                     track = { state ->
-                        val range = state.valueRange
-                        val span = (range.endInclusive - range.start).takeIf { it > 0f } ?: 1f
-                        val fraction = ((state.value - range.start) / span).coerceIn(0f, 1f)
+                        val fraction = state.value.coerceIn(0f, 1f)
                         Canvas(Modifier.fillMaxWidth().height(2.dp)) {
                             val y = size.height / 2f
                             val x = if (layoutDirection == LayoutDirection.Rtl) size.width * (1f - fraction) else size.width * fraction
