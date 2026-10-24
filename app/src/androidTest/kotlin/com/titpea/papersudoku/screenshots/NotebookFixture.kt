@@ -36,6 +36,7 @@ fun notebookState(): NotebookUiState {
         todayPage = pages.getValue(today),
         practice = PracticeEntry(Difficulty.Steady, 2, PageSummary.of(Fixtures.practice())),
         firstDay = today - 20,
+        weekOf = Catalog.weekOf(today),
         unfinished = listOf(today - 6),
         stampedDays = listOf(today - 1, today - 2, today - 4),
         pages = pages,
