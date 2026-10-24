@@ -1,5 +1,51 @@
 # Changelog
 
+## 9.0.0
+
+Room to grow: a fourth level, a handbook that shows what you know, a way to read a page back, and
+pages of your own.
+
+**Added**
+- A fourth practice level, Deep, after three clean Tricky pages. It teaches naked and hidden
+  triples, Swordfish and XY-Wing; the Coach explains each one the way it explains the others, and
+  the handbook has a worked example for each. Earlier pages and levels are exactly as they were.
+- The handbook shows how well you know each technique: met, practised (with how many clean pages
+  needed it) and known (three). Each technique has "Practise this", which deals a page that needs
+  it, outside the practice levels.
+- Read back a solved page: every digit you wrote, one move at a time, with the technique that
+  justified it then, the slips, and where the Coach helped. Pages written before 9.0 have no moves
+  to read.
+- Type in a page from a book or newspaper. It is checked for one solution, graded, and the Coach
+  helps with it as with any page (or says when it needs more than the Coach's techniques).
+- A 9×9 page for each week, dealt on Sunday and open all week, beside the 6×6 dailies.
+- Traditional Chinese (繁體中文).
+
+**Fixed**
+- Taking back a wrong digit the Coach found returns exactly the pencil marks that digit took away.
+- A blank daily left open overnight turns to the new day, also after Android closed the app.
+- "Today's page is waiting" shows only right after finishing an earlier day, and only while today
+  is not stamped.
+- Tidying unbegun pages at start can no longer remove a page begun at the same moment.
+- A page whose save was damaged no longer shows as stamped with a blank page behind it.
+- The Coach's bracket sits beside the box it means, and beside a column in landscape too.
+
+**Changed**
+- Crossed-out pencil marks have a firm slash, readable at arm's length.
+- TalkBack names each cell's box ("the top-right box"), as the Coach does.
+- The notebook's title bar is smaller, so the first screen shows more of the notebook. A begun day
+  in the contents is a dash, told apart from a stamp by shape.
+- Words: the month reads "3 daily · 2 practice pages stamped"; the pencil "removes" marks; in
+  Chinese, 换一页练习？, 难度提高了 and 擦掉.
+
+**Under the hood**
+- Version code 90000 (major × 10000 + minor × 100 + patch).
+- CI: every action pinned to a commit, read-only jobs (only the job that publishes captures can
+  write), weekly Dependabot updates, and a lint summary printed in the log.
+- Releases: a dry run that publishes nothing, an approval step, and an optional fixed signing key
+  for sideload builds (its certificate fingerprint is in the release notes).
+- Faster start (settings and database warmed in the background), a tiled paper grain, and less
+  redrawing while aiming.
+
 ## 8.0.0
 
 Quiet, and it keeps what matters: a page you only looked at stays fresh, the notebook lists only

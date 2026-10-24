@@ -12,8 +12,9 @@ Source: [github.com/hxddh/paper-sudoku](https://github.com/hxddh/paper-sudoku)
 
 [**下载 / Download the latest APK**](https://github.com/hxddh/paper-sudoku/releases/latest) — Android 8.0+, no `INTERNET` permission.
 
-GitHub builds are *sideload* builds, signed with a CI debug key: uninstall an earlier sideload
-build before installing a new one. A Play-signed build comes from a plain `vX.Y.Z` tag once the
+GitHub builds are *sideload* builds. From 9.0 they can be signed with a fixed sideload key (set up
+as repository secrets; the release notes give its certificate fingerprint), so later builds update
+in place; moving from an earlier build signed with a CI debug key needs one last uninstall. A Play-signed build comes from a plain `vX.Y.Z` tag once the
 signing secrets exist (see [docs/release.md](docs/release.md)).
 
 `applicationId`: `com.titpea.papersudoku`.
@@ -26,7 +27,9 @@ signing secrets exist (see [docs/release.md](docs/release.md)).
   time. There is no streak.
 - **Practice that follows you.** One never-ending stack of 9×9 pages whose difficulty rises after
   three pages solved without the Coach's answer — singles, then pointing and pairs, then hidden
-  pairs and X-Wings.
+  pairs and X-Wings, then (Deep) triples, Swordfish and XY-Wing.
+- **A page for the week and pages of your own.** A 9×9 page each week, dealt on Sunday; type in a
+  puzzle from a book or newspaper and it is checked for one solution, graded and coached.
 - **A Coach in the margin.** Look → Why → Answer, with an ink line to the part of the board it is
   talking about; when a placement needs several eliminations, Why walks through each one. It fills
   exactly the space of the tools, so the page never moves.
@@ -34,12 +37,15 @@ signing secrets exist (see [docs/release.md](docs/release.md)).
   pencil in every candidate). Press and slide to aim at a cell (a loupe shows where you are);
   lift to write. Tap a digit with nothing selected to pick it up and write it across the page.
 - **A handbook that teaches.** Using the pen, then every technique with a worked example from a
-  real page, drawn the way the Coach draws it.
+  real page, drawn the way the Coach draws it. Each technique shows how well you know it (met,
+  practised, known: from clean pages that needed it) and deals a page to practise it.
+- **Read a page back.** Every digit of a solved page in order, with the technique that justified
+  it then, the slips, and where the Coach helped.
 - **Quiet.** The clock is hidden while you play and pauses itself when you leave. No ads,
   accounts, analytics or network.
 
 Also: print a blank copy of any page or save it as PDF, share a spoiler-free result, a home-screen widget with
-today's page, English and 简体中文, TalkBack, hardware keyboard, tablets and foldables (notebook
+today's page, English, 简体中文 and 繁體中文, TalkBack, hardware keyboard, tablets and foldables (notebook
 and page side by side).
 
 ## Build and verify
