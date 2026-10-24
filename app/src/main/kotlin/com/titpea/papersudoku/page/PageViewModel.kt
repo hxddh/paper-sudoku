@@ -383,8 +383,8 @@ class PageViewModel(
     private fun CoachUi.outlives(before: GameState, after: GameState): Boolean {
         if (after.values != before.values) return false
         if (after.notes == before.notes) return true
-        return when (val hint = hint) {
-            is CoachHint.MissingMark -> !DigitMask.contains(after.notes[hint.index], hint.digit)
+        return when (val about = hint) {
+            is CoachHint.MissingMark -> !DigitMask.contains(after.notes[about.index], about.digit)
             null -> false
             else -> true
         }

@@ -244,7 +244,7 @@ fun PageScreen(
                     // The keys keep clear of the screen edge and its back gesture.
                     Column(Modifier.width(panel).fillMaxHeight().padding(end = Space.S, bottom = Space.L)) {
                         header()
-                        workArea(Modifier.weight(1f).fillMaxWidth().heightIn(min = work))
+                        workArea(Modifier.weight(1f).fillMaxWidth())
                     }
                 }
             } else Column(Modifier.fillMaxSize()) {
