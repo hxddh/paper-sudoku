@@ -231,14 +231,13 @@ class PageViewModel(
     }
 
     fun onEvent(event: PageEvent) {
-        val settings = _state.value.settings
         when (event) {
-            is PageEvent.Tap -> mutate { it.tap(event.index, settings.autoClearNotes) }
+            is PageEvent.Tap -> mutate { it.tap(event.index, TIDY_NOTES) }
             is PageEvent.Select -> mutate { it.select(event.index) }
             is PageEvent.Digit -> digit(event.digit)
             is PageEvent.TypeDigit -> mutate { g ->
                 val selected = g.selected
-                if (selected != null && g.isEditable(selected)) g.input(event.digit, settings.autoClearNotes) else g
+                if (selected != null && g.isEditable(selected)) g.input(event.digit, TIDY_NOTES) else g
             }
             PageEvent.ClearLock -> mutate(PageEffect.Toggled) { g -> g.lockedDigit?.let { g.toggleLock(it) } ?: g }
             PageEvent.Erase -> mutate { it.erase() }
@@ -270,12 +269,11 @@ class PageViewModel(
      */
     private fun digit(digit: Int) {
         val game = _state.value.game ?: return
-        val autoClear = _state.value.settings.autoClearNotes
         val selected = game.selected
         when {
             // Holding a digit: tapping it again puts it down, another digit swaps it.
             game.lockedDigit != null -> mutate(PageEffect.Toggled) { it.toggleLock(digit) }
-            selected != null && game.isEditable(selected) -> mutate { it.input(digit, autoClear) }
+            selected != null && game.isEditable(selected) -> mutate { it.input(digit, TIDY_NOTES) }
             else -> mutate(PageEffect.Toggled) { it.toggleLock(digit) }
         }
     }
@@ -372,9 +370,8 @@ class PageViewModel(
     private fun applyCoach() {
         val coach = _state.value.coach ?: return
         if (coach.level < 3) return
-        val autoClear = _state.value.settings.autoClearNotes
         when (val hint = coach.hint) {
-            is CoachHint.Next -> mutate { it.placeHint(hint.placement.index, hint.placement.digit, autoClear) }
+            is CoachHint.Next -> mutate { it.placeHint(hint.placement.index, hint.placement.digit, TIDY_NOTES) }
             is CoachHint.Mistake -> mutate { it.eraseMistake(hint.index) }
             is CoachHint.MissingMark -> mutate { it.restoreMark(hint.index, hint.digit) }
             null -> Unit
@@ -687,6 +684,9 @@ class PageViewModel(
 
     companion object {
         private const val SAVE_DEBOUNCE_MILLIS = 400L
+
+        /** Writing a digit always tidies it out of the pencil marks it sees (a setting before 11.0). */
+        private const val TIDY_NOTES = true
         private const val OPEN_PAGE = "open_page"
         private const val TAG = "PageViewModel"
 
