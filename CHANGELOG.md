@@ -21,6 +21,9 @@ page, and every page opens at once.
   you began from them are still in the notebook.
 
 **Faster**
+- On CI's emulator a cold start shows today's page about a quarter sooner than 9.0 (first frame
+  1.2 s against 1.6 s, the page drawn 2.0 s against 2.7 s), and writing on it draws each frame about
+  a fifth faster.
 - Every page, today's included, is dealt in one step from a precomputed table (the same puzzles
   as before), so nothing waits on the generator.
 - Saves are about a seventh of their size; the board redraws only the cells that change; fonts are
