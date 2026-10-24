@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MediumTopAppBar
@@ -56,14 +57,13 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.titpea.papersudoku.R
 import com.titpea.papersudoku.data.PageSummary
 import com.titpea.papersudoku.game.model.Catalog
+import com.titpea.papersudoku.game.model.PuzzleKind
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.TextButton
@@ -74,20 +74,21 @@ import com.titpea.papersudoku.designsystem.SectionHeader
 import com.titpea.papersudoku.designsystem.PaperType
 import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.engine.Technique
-import com.titpea.papersudoku.game.model.Mastery
 import com.titpea.papersudoku.page.difficultyName
 import com.titpea.papersudoku.page.formatElapsed
 import com.titpea.papersudoku.page.monthDay
 import com.titpea.papersudoku.page.techniqueName
-import com.titpea.papersudoku.page.techniqueSummary
 import com.titpea.papersudoku.page.weekday
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
- * The notebook: today's page on top, the practice stack, the technique handbook, then every
- * earlier day. Tapping a page opens it.
+ * The notebook: today's page on top, the practice stack, the contents, then every page written
+ * on: unfinished first, then stamped days and finished 9×9 pages by month. Typing in a page is
+ * one quiet row at the end; the handbook is a word in the top bar and the practice card's "Next".
+ * Tapping a page opens it.
  *
  * One left edge runs down the page: card text, section titles, the summary and the rows all
  * start [TextInset] in from the cards' edge.
@@ -107,10 +108,11 @@ fun NotebookScreen(
     onOpenHandbook: (Int) -> Unit = {},
     selectedKey: String? = null,
     boardTransition: @Composable (key: String) -> Modifier = { Modifier },
-    onOpenWeekly: () -> Unit = {},
-    /** Opens a saved page by key: a page the player typed in. */
+    /** Opens a saved page by key: a page the player typed in, or a finished 9×9 page. */
     onOpenSaved: (String) -> Unit = {},
     onTypeIn: () -> Unit = {},
+    /** The open page's own key, for rows of pages that open under another key (practice). */
+    selectedPageKey: String? = null,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     Scaffold(
@@ -123,6 +125,12 @@ fun NotebookScreen(
                 windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
+                    // The handbook is a page of the notebook, reached in words beside Settings.
+                    TextButton(
+                        onClick = { onOpenHandbook(0) },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                        modifier = Modifier.heightIn(min = 48.dp).testTag("open-handbook"),
+                    ) { Text(stringResource(R.string.notebook_techniques)) }
                     IconButton(onClick = onOpenSettings, modifier = Modifier.testTag("open-settings")) {
                         Icon(painterResource(R.drawable.ic_settings), contentDescription = stringResource(R.string.settings_title))
                     }
@@ -164,25 +172,28 @@ fun NotebookScreen(
             item(key = "practice", contentType = "card") {
                 PracticeCard(
                     practice = state.practice,
+                    next = state.nextTechnique,
                     selected = selectedKey == "practice",
                     onClick = onOpenPractice,
+                    onOpenNext = { technique -> onOpenHandbook(HandbookTopic.indexOf(technique)) },
                     thumbnailModifier = boardTransition("practice"),
                 )
             }
-            item(key = "weekly", contentType = "card") {
-                val key = Catalog.weeklyKey(state.weekOf)
-                WeeklyCard(
-                    sunday = state.weekOf,
-                    saved = state.weekly,
-                    selected = selectedKey == key,
-                    onClick = onOpenWeekly,
-                    thumbnailModifier = boardTransition(key),
-                )
-            }
             // Pages begun and not finished come straight after the cards: they are the next thing to do.
-            if (state.unfinished.isNotEmpty()) {
+            if (state.unfinished.isNotEmpty() || state.unfinishedPages.isNotEmpty()) {
                 item(key = "unfinished") { SectionTitle(stringResource(R.string.notebook_unfinished)) }
-                items(state.unfinished, key = { it }, contentType = { "row" }) { day -> DayRow(state, day, selectedKey, onOpenDay, boardTransition) }
+                items(state.unfinished, key = { "unfinished-daily-$it" }, contentType = { "row" }) { day ->
+                    state.pages[day]?.let { page -> DayRow(page, selected = selectedKey == "daily-$day", onOpenDay, boardTransition) }
+                }
+                items(state.unfinishedPages, key = { "unfinished-${it.key}" }, contentType = { "row" }) { page ->
+                    SavedRow(
+                        page = page,
+                        date = null,
+                        selected = page.key == selectedKey || page.key == selectedPageKey,
+                        onClick = { onOpenSaved(page.key) },
+                        thumbnailModifier = boardTransition(page.key),
+                    )
+                }
             }
             if (state.stamped == 0) {
                 item(key = "summary") {
@@ -205,19 +216,30 @@ fun NotebookScreen(
                     onOpenDay = onOpenDay,
                 )
             }
-            // The handbook sits above the pages, so it never drifts to the end of a long notebook.
-            item(key = "techniques") { SectionTitle(stringResource(R.string.notebook_techniques)) }
-            item(key = "handbook") { Handbook(state.techniquesMet, state.cleanPages, onOpenHandbook) }
-            // The player's own pages, and the way to type one in.
-            if (state.imported.isNotEmpty()) {
-                item(key = "imported-title") { SectionTitle(stringResource(R.string.imported_section)) }
+            // Only pages with something on them: blank days are reached through the contents.
+            if (state.journal.isNotEmpty()) {
+                item(key = "earlier") { SectionTitle(stringResource(R.string.notebook_earlier)) }
             }
-            items(state.imported, key = { it.key }, contentType = { "row" }) { page ->
-                ImportedRow(page, selected = selectedKey == page.key, onClick = { onOpenSaved(page.key) }, thumbnailModifier = boardTransition(page.key))
+            // Stamped days and finished 9×9 pages together, grouped by month (in the ViewModel),
+            // each month under a header that stays while its pages scroll past.
+            state.journal.forEach { (month, rows) ->
+                stickyHeader(key = "month-$month", contentType = "month") { MonthHeader(month) }
+                items(rows, key = { "journal-${it.key}" }, contentType = { "row" }) { row ->
+                    when (row) {
+                        is JournalRow.Day -> DayRow(row.page, selected = selectedKey == row.key, onOpenDay, boardTransition)
+                        is JournalRow.Page -> SavedRow(
+                            page = row.page,
+                            date = row.date,
+                            selected = row.key == selectedKey || row.key == selectedPageKey,
+                            onClick = { onOpenSaved(row.page.key) },
+                            thumbnailModifier = boardTransition(row.page.key),
+                        )
+                    }
+                }
             }
-            item(key = "imported-add") {
-                // A quiet row in ink at the notebook's text edge, not a red button.
-                Box(Modifier.widthIn(max = 640.dp).fillMaxWidth()) {
+            // One quiet row at the end, in ink at the notebook's text edge, not a red button.
+            item(key = "type-in") {
+                Box(Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(top = 8.dp)) {
                     TextButton(
                         onClick = onTypeIn,
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
@@ -226,33 +248,22 @@ fun NotebookScreen(
                     ) { Text(stringResource(R.string.imported_add)) }
                 }
             }
-            // Only pages with something on them: blank days are reached through the contents.
-            if (state.stampedDays.isNotEmpty()) {
-                item(key = "earlier") { SectionTitle(stringResource(R.string.notebook_earlier)) }
-            }
-            // Grouped by month, each under a header that stays while its days scroll past.
-            state.stampedDays.groupBy { YearMonth.from(LocalDate.ofEpochDay(it)) }.forEach { (month, days) ->
-                stickyHeader(key = "month-$month", contentType = "month") { MonthHeader(month) }
-                items(days, key = { "stamped-$it" }, contentType = { "row" }) { day -> DayRow(state, day, selectedKey, onOpenDay, boardTransition) }
-            }
         }
     }
 }
 
 @Composable
 private fun DayRow(
-    state: NotebookUiState,
-    day: Long,
-    selectedKey: String?,
+    page: PageEntry,
+    selected: Boolean,
     onOpenDay: (Long) -> Unit,
     boardTransition: @Composable (String) -> Modifier,
 ) {
-    val page = state.pages[day] ?: return
     PageRow(
         page = page,
-        selected = selectedKey == "daily-$day",
-        onClick = { onOpenDay(day) },
-        thumbnailModifier = boardTransition("daily-$day"),
+        selected = selected,
+        onClick = { onOpenDay(page.epochDay) },
+        thumbnailModifier = boardTransition("daily-${page.epochDay}"),
     )
 }
 
@@ -360,19 +371,25 @@ private fun TodayCard(
     }
 }
 
+/**
+ * The practice stack: the level, how far to the next, what a tap does, and one line under it,
+ * "Next: X-Wing", that opens the handbook at the technique the next pages teach.
+ */
 @Composable
 private fun PracticeCard(
     practice: PracticeEntry,
+    next: Technique?,
     selected: Boolean,
     onClick: () -> Unit,
+    onOpenNext: (Technique) -> Unit,
     thumbnailModifier: Modifier,
 ) {
-    val next = practice.toNextLevel
-    val progress = if (next == null) {
+    val nextLevelIn = practice.toNextLevel
+    val progress = if (nextLevelIn == null) {
         stringResource(R.string.practice_top_level)
     } else {
         val nextLevel = Difficulty.entries.getOrElse(practice.level.ordinal + 1) { practice.level }
-        pluralStringResource(R.plurals.practice_to_next, next, next, difficultyName(nextLevel))
+        pluralStringResource(R.plurals.practice_to_next, nextLevelIn, nextLevelIn, difficultyName(nextLevel))
     }
     val status = if (practice.saved != null) {
         stringResource(R.string.practice_continue, (practice.saved.number ?: 0) + 1)
@@ -381,90 +398,91 @@ private fun PracticeCard(
     }
     val label = spoken(stringResource(R.string.practice), difficultyName(practice.level), status, progress)
     Surface(
-        onClick = onClick,
         shape = MaterialTheme.shapes.extraLarge,
         color = cardColor(selected),
         border = cardBorder(),
-        modifier = Modifier
-            .widthIn(max = 640.dp)
-            .fillMaxWidth()
-            .testTag("notebook-practice")
-            .semantics {
-                contentDescription = label
-                this.selected = selected
-            },
+        modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth(),
     ) {
-        val thumbnail = thumbnailSize()
-        // The same build as today's card: label, the big line, what it means, what a tap does.
-        Row(Modifier.padding(TextInset), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f).clearAndSetSemantics {}) {
-                CardLabel(stringResource(R.string.practice))
-                Text(difficultyName(practice.level), style = MaterialTheme.typography.headlineMedium)
-                CardSupport(progress)
-                Spacer(Modifier.height(8.dp))
-                CardAction(status)
+        Column {
+            val thumbnail = thumbnailSize()
+            // The same build as today's card: label, the big line, what it means, what a tap does.
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(role = Role.Button, onClick = onClick)
+                    .padding(TextInset)
+                    .testTag("notebook-practice")
+                    .semantics {
+                        contentDescription = label
+                        this.selected = selected
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f).clearAndSetSemantics {}) {
+                    CardLabel(stringResource(R.string.practice))
+                    Text(difficultyName(practice.level), style = MaterialTheme.typography.headlineMedium)
+                    CardSupport(progress)
+                    Spacer(Modifier.height(8.dp))
+                    CardAction(status)
+                }
+                Spacer(Modifier.width(12.dp))
+                PageThumbnail(practice.saved, size = 9, modifier = thumbnailModifier.size(thumbnail))
             }
-            Spacer(Modifier.width(12.dp))
-            PageThumbnail(practice.saved, size = 9, modifier = thumbnailModifier.size(thumbnail))
+            if (next != null) {
+                // Its own target, in ink: the way into the handbook, at what practice teaches next.
+                HorizontalDivider(Modifier.padding(horizontal = TextInset), color = MaterialTheme.colorScheme.outlineVariant)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .clickable(role = Role.Button, onClick = { onOpenNext(next) })
+                        .padding(start = TextInset, end = TextInset - 8.dp, top = 4.dp, bottom = 4.dp)
+                        .testTag("practice-next"),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(R.string.practice_next, techniqueName(next)),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(
+                        painterResource(R.drawable.ic_chevron_right),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }
 
-/** This week's 9×9 page: the same build as the practice card. */
+/**
+ * A page that is not a day's, laid out like a day's row: practice, a technique page, a weekly
+ * page or one typed in. A finished one leads with the day it was finished.
+ */
 @Composable
-private fun WeeklyCard(
-    sunday: Long,
-    saved: PageSummary?,
+private fun SavedRow(
+    page: PageSummary,
+    date: LocalDate?,
     selected: Boolean,
     onClick: () -> Unit,
     thumbnailModifier: Modifier,
 ) {
     val locale = LocalConfiguration.current.locales[0]
-    val title = stringResource(R.string.weekly_title, monthDay(LocalDate.ofEpochDay(sunday), locale))
-    val status = stringResource(
-        when {
-            saved?.solved == true -> R.string.weekly_card_done
-            saved != null -> R.string.weekly_card_continue
-            else -> R.string.weekly_card_new
-        },
-    )
-    val level = difficultyName(saved?.difficulty ?: Catalog.WEEKLY_LEVEL)
-    val label = spoken(stringResource(R.string.weekly), title, level, status)
-    Surface(
-        onClick = onClick,
-        shape = MaterialTheme.shapes.extraLarge,
-        color = cardColor(selected),
-        border = cardBorder(),
-        modifier = Modifier
-            .widthIn(max = 640.dp)
-            .fillMaxWidth()
-            .testTag("notebook-weekly")
-            .semantics {
-                contentDescription = label
-                this.selected = selected
-            },
-    ) {
-        Row(Modifier.padding(TextInset), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f).clearAndSetSemantics {}) {
-                CardLabel(stringResource(R.string.weekly))
-                Text(level, style = MaterialTheme.typography.headlineMedium)
-                CardSupport(title)
-                Spacer(Modifier.height(8.dp))
-                CardAction(status)
-            }
-            Spacer(Modifier.width(12.dp))
-            PageThumbnail(saved, size = 9, modifier = thumbnailModifier.size(thumbnailSize()))
-        }
-    }
-}
-
-/** A page the player typed in, laid out like a day's row. */
-@Composable
-private fun ImportedRow(page: PageSummary, selected: Boolean, onClick: () -> Unit, thumbnailModifier: Modifier) {
-    val status = if (page.solved) stringResource(R.string.widget_stamped) else difficultyName(page.difficulty)
+    val status = stringResource(if (page.solved) R.string.widget_stamped else R.string.page_in_progress)
     ListItem(
-        headlineContent = { Text(stringResource(R.string.imported)) },
-        supportingContent = { Text(status) },
+        leadingContent = {
+            // Blank when there is no date, so the titles keep the days' edge.
+            Text(
+                date?.dayOfMonth?.toString().orEmpty(),
+                style = PaperType.figure,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.width(44.dp),
+            )
+        },
+        headlineContent = { Text(savedTitle(page, locale)) },
+        supportingContent = { Text(difficultyName(page.difficulty) + DOT + status) },
         trailingContent = { PageThumbnail(page, size = 9, modifier = thumbnailModifier.size(48.dp)) },
         colors = ListItemDefaults.colors(
             containerColor = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
@@ -475,8 +493,18 @@ private fun ImportedRow(page: PageSummary, selected: Boolean, onClick: () -> Uni
             .padding(horizontal = TextInset - 16.dp)
             .clickable(onClick = onClick)
             .semantics { this.selected = selected }
-            .testTag("imported-${page.key}"),
+            .testTag("page-row-${page.key}"),
     )
+}
+
+/** What a page that is not a day's is called in the notebook: what it is, then which. */
+@Composable
+private fun savedTitle(page: PageSummary, locale: Locale): String = when (page.kind) {
+    PuzzleKind.Daily -> page.epochDay?.let { monthDay(LocalDate.ofEpochDay(it), locale) }.orEmpty()
+    PuzzleKind.Classic -> stringResource(R.string.practice) + DOT + stringResource(R.string.practice_page, (page.number ?: 0) + 1)
+    PuzzleKind.Weekly -> stringResource(R.string.weekly_title, page.epochDay?.let { monthDay(LocalDate.ofEpochDay(it), locale) }.orEmpty())
+    PuzzleKind.Focus -> Catalog.focusTechnique(page.key)?.let { techniqueName(it) } ?: stringResource(R.string.focus)
+    PuzzleKind.Imported -> stringResource(R.string.imported)
 }
 
 @Composable
@@ -553,88 +581,3 @@ private fun StampMark(clean: Boolean, modifier: Modifier, size: androidx.compose
         )
     }
 }
-
-/**
- * The handbook on one card: using the pen, then the techniques in learning order. A technique is
- * checked once a stamped page needed it or the Coach explained it; only those say how well they
- * are known (met, practised, known), so the rest stay quiet. Every row opens its handbook page.
- */
-@Composable
-private fun Handbook(met: Set<Technique>, cleanPages: Map<Technique, Int>, onOpen: (Int) -> Unit) {
-    Surface(
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = cardBorder(),
-        modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth().testTag("handbook"),
-    ) {
-        Column(Modifier.padding(vertical = 8.dp)) {
-            HandbookRow(
-                name = stringResource(R.string.handbook_pen),
-                summary = stringResource(R.string.handbook_pen_summary),
-                stage = null,
-                tag = "technique-pen",
-                onClick = { onOpen(0) },
-            )
-            Technique.entries.forEachIndexed { i, technique ->
-                HandbookRow(
-                    name = techniqueName(technique),
-                    summary = techniqueSummary(technique),
-                    stage = when (Mastery.of(technique in met, cleanPages[technique] ?: 0)) {
-                        Mastery.Unmet -> null
-                        Mastery.Met -> stringResource(R.string.mastery_met)
-                        Mastery.Practised -> stringResource(R.string.mastery_practised)
-                        Mastery.Mastered -> stringResource(R.string.mastery_mastered)
-                    },
-                    tag = "technique-${technique.name}",
-                    onClick = { onOpen(i + 1) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun HandbookRow(name: String, summary: String, stage: String?, tag: String, onClick: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    val met = stage != null
-    val label = spoken(name, stage.orEmpty(), summary)
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = TextInset, vertical = 10.dp)
-            .testTag(tag)
-            .clearAndSetSemantics {
-                contentDescription = label
-                role = Role.Button
-                onClick { onClick(); true }
-            },
-        verticalAlignment = Alignment.Top,
-    ) {
-        // Met: a moss check. Not yet: nothing (an empty ring read as a to-do to tick).
-        Box(Modifier.padding(top = 2.dp).size(20.dp), contentAlignment = Alignment.Center) {
-            if (met) {
-                Box(Modifier.size(20.dp).background(colors.tertiaryContainer, CircleShape), contentAlignment = Alignment.Center) {
-                    Icon(painterResource(R.drawable.ic_check), contentDescription = null, tint = colors.onTertiaryContainer, modifier = Modifier.size(14.dp))
-                }
-            }
-        }
-        Spacer(Modifier.width(16.dp))
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    name,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = if (met) colors.onSurface else colors.onSurfaceVariant,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                if (met) {
-                    Spacer(Modifier.width(8.dp))
-                    Text(stage.orEmpty(), style = MaterialTheme.typography.labelSmall, color = colors.tertiary)
-                }
-            }
-            Text(summary, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-        }
-    }
-}
-

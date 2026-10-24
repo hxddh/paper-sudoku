@@ -209,9 +209,7 @@ fun PageScreen(
                     state = state,
                     onBack = onBack,
                     onPrint = onPrint,
-                    onShare = onShare,
                     onRestart = { confirmRestart = true },
-                    onReadBack = onReadBack,
                     onNextPractice = {
                         if (game != null && !game.solved && game.history.isNotEmpty()) {
                             confirmNextPractice = true
@@ -680,9 +678,7 @@ private fun PageHeader(
     state: PageUiState,
     onBack: (() -> Unit)?,
     onPrint: (GameState) -> Unit,
-    onShare: (GameState) -> Unit,
     onRestart: () -> Unit,
-    onReadBack: ((GameState) -> Unit)?,
     onNextPractice: () -> Unit,
 ) {
     val game = state.game
@@ -719,13 +715,17 @@ private fun PageHeader(
             }
         },
         actions = {
-            if (game != null) {
+            // A solved page's note already offers share, print and read back: the menu keeps only
+            // what the note does not (a new practice page). With nothing left, there is no menu.
+            val unsolved = game != null && !game.solved
+            val practice = game?.spec?.kind == PuzzleKind.Classic
+            if (game != null && (unsolved || practice)) {
                 Box {
                     IconButton(onClick = { menuOpen = true }, modifier = Modifier.testTag("page-menu")) {
                         Icon(painterResource(R.drawable.ic_more), contentDescription = stringResource(R.string.more_options))
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        if (!game.solved) {
+                        if (unsolved) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.menu_restart)) },
                                 onClick = {
@@ -734,7 +734,7 @@ private fun PageHeader(
                                 },
                             )
                         }
-                        if (game.spec.kind == PuzzleKind.Classic) {
+                        if (practice) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.menu_next_practice)) },
                                 onClick = {
@@ -743,31 +743,13 @@ private fun PageHeader(
                                 },
                             )
                         }
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.action_print)) },
-                            leadingIcon = { Icon(painterResource(R.drawable.ic_print), contentDescription = null) },
-                            onClick = {
-                                menuOpen = false
-                                onPrint(game)
-                            },
-                        )
-                        if (onReadBack != null && game.solved && game.moves.isNotEmpty()) {
+                        if (unsolved) {
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.menu_read_back)) },
+                                text = { Text(stringResource(R.string.action_print)) },
+                                leadingIcon = { Icon(painterResource(R.drawable.ic_print), contentDescription = null) },
                                 onClick = {
                                     menuOpen = false
-                                    onReadBack(game)
-                                },
-                                modifier = Modifier.testTag("menu-read-back"),
-                            )
-                        }
-                        if (game.solved) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.action_share)) },
-                                leadingIcon = { Icon(painterResource(R.drawable.ic_share), contentDescription = null) },
-                                onClick = {
-                                    menuOpen = false
-                                    onShare(game)
+                                    onPrint(game)
                                 },
                             )
                         }

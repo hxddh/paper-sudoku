@@ -68,7 +68,7 @@ import com.titpea.papersudoku.page.PageEvent
 import com.titpea.papersudoku.page.PageKeys
 import com.titpea.papersudoku.page.ImportScreen
 import com.titpea.papersudoku.page.ReviewScreen
-import com.titpea.papersudoku.game.model.Catalog
+import com.titpea.papersudoku.game.model.Mastery
 import com.titpea.papersudoku.page.PageScreen
 import com.titpea.papersudoku.page.PageViewModel
 import com.titpea.papersudoku.settings.LicencesScreen
@@ -200,17 +200,14 @@ fun PaperSudokuApp(
                             )
                             Screen.Handbook -> {
                                 val state by pageViewModel.state.collectAsStateWithLifecycle()
+                                val met = state.settings.techniquesMet
+                                val clean = state.settings.cleanPages
                                 HandbookScreen(
                                     start = handbookStart,
-                                    techniquesMet = state.settings.techniquesMet,
-                                    cleanPages = state.settings.cleanPages,
+                                    techniquesMet = met,
                                     onBack = { if (backStack.lastOrNull() == Screen.Handbook) backStack.removeAt(backStack.lastIndex) },
-                                    onPractise = { technique ->
-                                        if (backStack.lastOrNull() == Screen.Handbook) {
-                                            pageViewModel.onEvent(PageEvent.PractiseTechnique(technique))
-                                            backToNotebookWith(Catalog.focusPrefix(technique))
-                                        }
-                                    },
+                                    // From clean pages for now; the Learner's mastery takes its place.
+                                    mastery = { technique -> Mastery.of(technique in met, clean[technique] ?: 0) },
                                 )
                             }
                             Screen.Review -> {
@@ -349,18 +346,13 @@ private fun NotebookHome(
                         },
                         onOpenSettings = onOpenSettings,
                         onOpenHandbook = onOpenHandbook,
-                        onOpenWeekly = {
-                            pageViewModel.onEvent(PageEvent.OpenWeekly)
-                            scope.launch {
-                                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, Catalog.weeklyKey(Catalog.weekOf(pageViewModel.state.value.today)))
-                            }
-                        },
                         onOpenSaved = { key ->
                             pageViewModel.onEvent(PageEvent.OpenSaved(key))
                             scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, key) }
                         },
                         onTypeIn = onTypeIn,
                         selectedKey = if (twoPane) openKey else null,
+                        selectedPageKey = if (twoPane) page.game?.spec?.key else null,
                         boardTransition = { key ->
                             Modifier.sharedBounds(rememberSharedContentState("board-$key"), paneScope)
                         },

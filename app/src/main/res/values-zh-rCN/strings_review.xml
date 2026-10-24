@@ -29,6 +29,8 @@
     <string name="review_previous">上一步</string>
     <string name="review_next">下一步</string>
     <string name="review_slider">步数</string>
+    <string name="review_this_page">这一页</string>
+    <string name="review_show_moves">每一步</string>
 
     <!-- 抄题 -->
     <string name="import_title">抄一页题目</string>

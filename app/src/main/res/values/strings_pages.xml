@@ -3,21 +3,15 @@
     <!-- The Sunday 9×9 page, open all week. -->
     <string name="weekly">This week</string>
     <string name="weekly_title">Week of %1$s</string>
-    <string name="weekly_card_new">Start this week’s page</string>
-    <string name="weekly_card_continue">Continue this week’s page</string>
-    <string name="weekly_card_done">Stamped this week</string>
     <!-- A page for practising one technique, from the handbook. -->
     <string name="focus">Technique practice</string>
-    <string name="focus_practise">Practise this</string>
     <string name="solved_focus">%1$s: %2$s</string>
     <string name="solved_weekly_close">A new weekly page on Sunday.</string>
     <string name="focus_another">Another page</string>
     <!-- Pages the player typed in. -->
     <string name="imported">Your page</string>
     <string name="imported_beyond_coach">Beyond the Coach</string>
-    <string name="imported_section">Your pages</string>
     <string name="imported_add">Type in a page</string>
-    <string name="menu_read_back">Read back</string>
     <string name="solved_read_back">Read back</string>
     <string name="mastery_met">Seen</string>
     <string name="mastery_practised">Practised</string>
@@ -27,4 +21,10 @@
         <item quantity="other">%1$d clean pages</item>
     </plurals>
     <string name="mastery_next">Next to learn: %1$s</string>
+    <!-- 10.0: the practice card's one line into the handbook, e.g. "Next: X-Wing". -->
+    <string name="practice_next">Next: %1$s</string>
+    <!-- Where a handbook page is: "8 of 14". -->
+    <string name="handbook_position">%1$d of %2$d</string>
+    <string name="handbook_previous">Previous page</string>
+    <string name="handbook_next">Next page</string>
 </resources>
