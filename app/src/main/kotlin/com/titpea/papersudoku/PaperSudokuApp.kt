@@ -205,12 +205,6 @@ fun PaperSudokuApp(
                                     techniquesMet = state.settings.techniquesMet,
                                     cleanPages = state.settings.learner.found,
                                     onBack = { if (backStack.lastOrNull() == Screen.Handbook) backStack.removeAt(backStack.lastIndex) },
-                                    onPractise = { technique ->
-                                        if (backStack.lastOrNull() == Screen.Handbook) {
-                                            pageViewModel.onEvent(PageEvent.PractiseTechnique(technique))
-                                            backToNotebookWith(Catalog.focusPrefix(technique))
-                                        }
-                                    },
                                 )
                             }
                             Screen.Review -> {
@@ -349,11 +343,11 @@ private fun NotebookHome(
                         },
                         onOpenSettings = onOpenSettings,
                         onOpenHandbook = onOpenHandbook,
+                        // This week's page from 9.0 is a page like any other now: opened by its key.
                         onOpenWeekly = {
-                            pageViewModel.onEvent(PageEvent.OpenWeekly)
-                            scope.launch {
-                                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, Catalog.weeklyKey(Catalog.weekOf(pageViewModel.state.value.today)))
-                            }
+                            val key = Catalog.weeklyKey(Catalog.weekOf(pageViewModel.state.value.today))
+                            pageViewModel.onEvent(PageEvent.OpenSaved(key))
+                            scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, key) }
                         },
                         onOpenSaved = { key ->
                             pageViewModel.onEvent(PageEvent.OpenSaved(key))

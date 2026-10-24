@@ -58,6 +58,36 @@ object PageKeys {
         if (game.spec.kind == PuzzleKind.Classic) PRACTICE else game.spec.key
 }
 
+/** A page to open: what the notebook, the widget or a restored session asks for. */
+sealed interface PageTarget {
+    data class Daily(val epochDay: Long) : PageTarget
+
+    /** The practice page to continue, or the next one on the path. */
+    data object Practice : PageTarget
+
+    /** A page by its saved key: a page typed in, a finished page in the notebook, a restored one. */
+    data class Saved(val key: String) : PageTarget
+
+    /** A page typed in just now (kept once it opens). */
+    data class New(val spec: PuzzleSpec) : PageTarget
+
+    /** True when [game] is this page, so asking for it again carries on with it. */
+    fun isShowing(game: GameState): Boolean = when (this) {
+        is Daily -> game.spec.key == Catalog.dailyKey(epochDay)
+        Practice -> game.spec.kind == PuzzleKind.Classic && !game.solved
+        is Saved -> game.spec.key == key
+        is New -> game.spec.key == spec.key
+    }
+
+    companion object {
+        /** Every practice page's key starts with this. */
+        const val PRACTICE_KEYS = "classic-"
+
+        /** What a key saved for the open page asks for after process death. */
+        fun fromKey(key: String): PageTarget = if (key == PageKeys.PRACTICE) Practice else Saved(key)
+    }
+}
+
 /**
  * A Coach session: what it found and how far the player has asked it to go (1 look, 2 why,
  * 3 answer). When a placement needs eliminations first, Why walks through each of them in turn
@@ -125,12 +155,6 @@ sealed interface PageEvent {
     data object OpenToday : PageEvent
     data object OpenPractice : PageEvent
     data object NextPractice : PageEvent
-
-    /** This week's Sunday 9×9 page. */
-    data object OpenWeekly : PageEvent
-
-    /** A new page for practising one technique, from the handbook. */
-    data class PractiseTechnique(val technique: Technique) : PageEvent
 
     /** A page the player typed in, checked and graded. */
     data class OpenImported(val spec: PuzzleSpec) : PageEvent
@@ -200,18 +224,7 @@ class PageViewModel(
             }
         }
         // After process death, reopen the page that was on the desk.
-        val open = savedState.get<String>(OPEN_PAGE)
-        when {
-            // A daily never begun is not kept, so after a night away its key finds nothing: the
-            // page of the new day is the one to open, as it would have been in [onForeground].
-            open != null && PageKeys.dayOf(open) != null -> load { store.load(open) ?: dailyFor(today()) }
-            open != null && open.startsWith(CLASSIC_PREFIX) -> load { store.load(open) ?: openablePractice() }
-            open != null && Catalog.dayOfWeekly(open) != null -> openWeekly(Catalog.dayOfWeekly(open)!!)
-            open == PageKeys.PRACTICE -> openPractice()
-            // A page typed in or a technique page lives only in its save.
-            open != null -> load { store.load(open) ?: dailyFor(today()) }
-            else -> openDaily(today())
-        }
+        open(savedState.get<String>(OPEN_PAGE)?.let(PageTarget::fromKey) ?: PageTarget.Daily(today()))
     }
 
     fun onEvent(event: PageEvent) {
@@ -236,16 +249,12 @@ class PageViewModel(
             PageEvent.Foreground -> onForeground()
             PageEvent.Background -> onBackground()
             PageEvent.Restart -> restart()
-            is PageEvent.OpenDaily -> openDaily(event.epochDay)
-            PageEvent.OpenToday -> openDaily(today())
-            PageEvent.OpenPractice -> openPractice()
+            is PageEvent.OpenDaily -> open(PageTarget.Daily(event.epochDay))
+            PageEvent.OpenToday -> open(PageTarget.Daily(today()))
+            PageEvent.OpenPractice -> open(PageTarget.Practice)
             PageEvent.NextPractice -> nextPractice()
-            PageEvent.OpenWeekly -> openWeekly(Catalog.weekOf(today()))
-            is PageEvent.PractiseTechnique -> load { focusPage(event.technique) }
-            is PageEvent.OpenImported -> load { store.load(event.spec.key) ?: GameState.new(event.spec) }
-            is PageEvent.OpenSaved -> if (_state.value.game?.spec?.key == event.key) resumeCurrent() else load {
-                store.load(event.key) ?: dailyFor(today())
-            }
+            is PageEvent.OpenImported -> open(PageTarget.New(event.spec))
+            is PageEvent.OpenSaved -> open(PageTarget.Saved(event.key))
             PageEvent.StampLanded -> _state.update { it.copy(justSolved = false) }
         }
     }
@@ -386,7 +395,7 @@ class PageViewModel(
         val finished = game != null && game.solved && (game.spec.epochDay == previous.today || solvedOn == previous.today)
         val blank = game != null && game.untouched && game.spec.epochDay == previous.today
         if (today > previous.today && game != null && game.spec.kind == PuzzleKind.Daily && (finished || blank)) {
-            openDaily(today)
+            open(PageTarget.Daily(today))
             return
         }
         _state.update {
@@ -431,43 +440,32 @@ class PageViewModel(
         saveNow()
     }
 
-    private fun openDaily(epochDay: Long) {
+    /**
+     * The one way a page is opened: the page asked for is the one in memory (carry on with it),
+     * or it is resolved (its save, else a new page) while the current one is put away.
+     */
+    private fun open(target: PageTarget) {
         // Choosing a page is the reference point for the midnight turn in [onForeground].
         _state.update { it.copy(today = today()) }
         val current = _state.value.game
-        if (current != null && current.spec.key == Catalog.dailyKey(epochDay)) {
+        if (current != null && target.isShowing(current)) {
             resumeCurrent()
             return
         }
-        load {
-            store.load(Catalog.dailyKey(epochDay)) ?: GameState.new(puzzles.daily(epochDay))
-        }
+        load { resolve(target) }
     }
 
-    private fun openPractice() {
-        _state.update { it.copy(today = today()) }
-        val current = _state.value.game
-        if (current != null && current.spec.kind == PuzzleKind.Classic && !current.solved) {
-            resumeCurrent()
-            return
+    private suspend fun resolve(target: PageTarget): GameState = when (target) {
+        is PageTarget.Daily -> dailyFor(target.epochDay)
+        PageTarget.Practice -> openablePractice()
+        is PageTarget.New -> store.load(target.spec.key) ?: GameState.new(target.spec)
+        // A daily never begun is not kept, so after a night away its key finds nothing: the page
+        // of the new day is the one to open. A practice page dropped meanwhile gives way to the
+        // practice page to continue; anything else lives only in its save.
+        is PageTarget.Saved -> store.load(target.key) ?: when {
+            target.key.startsWith(PageTarget.PRACTICE_KEYS) -> openablePractice()
+            else -> dailyFor(today())
         }
-        load { openablePractice() }
-    }
-
-    private fun openWeekly(sunday: Long) {
-        _state.update { it.copy(today = today()) }
-        if (_state.value.game?.spec?.key == Catalog.weeklyKey(sunday)) {
-            resumeCurrent()
-            return
-        }
-        load { store.load(Catalog.weeklyKey(sunday)) ?: GameState.new(puzzles.weekly(sunday)) }
-    }
-
-    /** The technique's last page if it is still unfinished, else a new one. */
-    private suspend fun focusPage(technique: Technique): GameState {
-        val number = store.nextFocusNumber(technique)
-        val last = if (number > 0) store.load(Catalog.focusPrefix(technique) + (number - 1)) else null
-        return last?.takeIf { !it.solved } ?: GameState.new(puzzles.focus(technique, number))
     }
 
     private suspend fun dailyFor(epochDay: Long): GameState =
@@ -570,10 +568,6 @@ class PageViewModel(
             puzzles.daily(today() + 1)
             val (level, number, target) = nextPracticeSpec()
             puzzles.practice(level, number, target)
-            // On a technique page, its next page too: a rare technique can take seconds to deal.
-            _state.value.game?.spec?.key?.let(Catalog::focusTechnique)?.let { technique ->
-                puzzles.focus(technique, store.nextFocusNumber(technique))
-            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -684,7 +678,6 @@ class PageViewModel(
     companion object {
         private const val SAVE_DEBOUNCE_MILLIS = 400L
         private const val OPEN_PAGE = "open_page"
-        private const val CLASSIC_PREFIX = "classic-"
         private const val TAG = "PageViewModel"
 
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {

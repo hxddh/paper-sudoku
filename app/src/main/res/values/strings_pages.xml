@@ -11,7 +11,6 @@
     <string name="focus_practise">Practise this</string>
     <string name="solved_focus">%1$s: %2$s</string>
     <string name="solved_weekly_close">A new weekly page on Sunday.</string>
-    <string name="focus_another">Another page</string>
     <!-- Pages the player typed in. -->
     <string name="imported">Your page</string>
     <string name="imported_beyond_coach">Beyond the Coach</string>

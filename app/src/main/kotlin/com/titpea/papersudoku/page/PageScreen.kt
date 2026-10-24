@@ -466,7 +466,6 @@ private fun WorkArea(
                 )
             } ?: Spacer(Modifier)
             WorkMode.Solved -> {
-                val focused = Catalog.focusTechnique(game.spec.key)
                 SolvedNote(
                     game = game,
                     outlook = solvedOutlook(game, state),
@@ -476,14 +475,12 @@ private fun WorkArea(
                     onNext = {
                         when {
                             game.spec.kind == PuzzleKind.Classic -> onEvent(PageEvent.NextPractice)
-                            focused != null -> onEvent(PageEvent.PractiseTechnique(focused))
                             onBack != null -> onBack()
                             else -> onEvent(PageEvent.OpenPractice)
                         }
                     },
                     nextLabel = when {
                         game.spec.kind == PuzzleKind.Classic -> stringResource(R.string.solved_next_practice)
-                        focused != null -> stringResource(R.string.focus_another)
                         onBack != null -> stringResource(R.string.solved_back_to_notebook)
                         else -> stringResource(R.string.solved_open_practice)
                     },
