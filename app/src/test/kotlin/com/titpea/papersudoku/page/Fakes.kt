@@ -7,7 +7,6 @@ import com.titpea.papersudoku.data.SettingsStore
 import com.titpea.papersudoku.data.PageSummary
 import com.titpea.papersudoku.data.UserSettings
 import com.titpea.papersudoku.engine.Difficulty
-import com.titpea.papersudoku.engine.Technique
 import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.PuzzleKind
 import kotlinx.coroutines.flow.Flow
@@ -50,11 +49,6 @@ class FakeGameStore : GameStore {
 
     override suspend fun nextClassicNumber(difficulty: Difficulty): Int {
         val prefix = com.titpea.papersudoku.game.model.Catalog.classicPrefix(difficulty)
-        return (saved.keys.filter { it.startsWith(prefix) }.mapNotNull { it.removePrefix(prefix).takeWhile(Char::isDigit).toIntOrNull() }.maxOrNull() ?: -1) + 1
-    }
-
-    override suspend fun nextFocusNumber(technique: Technique): Int {
-        val prefix = com.titpea.papersudoku.game.model.Catalog.focusPrefix(technique)
         return (saved.keys.filter { it.startsWith(prefix) }.mapNotNull { it.removePrefix(prefix).takeWhile(Char::isDigit).toIntOrNull() }.maxOrNull() ?: -1) + 1
     }
 

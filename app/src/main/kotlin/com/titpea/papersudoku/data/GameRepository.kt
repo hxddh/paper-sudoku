@@ -4,7 +4,6 @@ import android.os.Trace
 import android.util.Log
 import androidx.room.withTransaction
 import com.titpea.papersudoku.engine.Difficulty
-import com.titpea.papersudoku.engine.Technique
 import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.PuzzleKind
@@ -83,9 +82,6 @@ interface GameStore {
     suspend fun saveSolved(state: GameState, result: GameResult, now: Long): Boolean
 
     suspend fun nextClassicNumber(difficulty: Difficulty): Int
-
-    /** The next page number for practising [technique]. */
-    suspend fun nextFocusNumber(technique: Technique): Int
 
     /** Drops unfinished practice pages other than [except]; numbering continues past them. */
     suspend fun discardUnsolvedPractice(except: String)
@@ -187,9 +183,6 @@ class RoomGameStore(
     // so a page that came out easier can never be dealt twice.
     override suspend fun nextClassicNumber(difficulty: Difficulty): Int =
         (savedGames.maxNumber(PuzzleKind.Classic.name, Catalog.classicPrefix(difficulty)) ?: -1) + 1
-
-    override suspend fun nextFocusNumber(technique: Technique): Int =
-        (savedGames.maxNumber(PuzzleKind.Focus.name, Catalog.focusPrefix(technique)) ?: -1) + 1
 
     override suspend fun discardUnsolvedPractice(except: String) =
         savedGames.discardUnsolvedPractice(except)

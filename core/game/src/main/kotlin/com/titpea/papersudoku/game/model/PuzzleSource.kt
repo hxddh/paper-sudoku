@@ -11,13 +11,6 @@ interface PuzzleSource {
     suspend fun daily(epochDay: Long): PuzzleSpec
     suspend fun classic(difficulty: Difficulty, number: Int): PuzzleSpec
 
-    /** The weekly 9×9 page of the week starting [sunday]. */
-    suspend fun weekly(sunday: Long): PuzzleSpec = withContext(Dispatchers.Default) { Catalog.weekly(sunday) }
-
-    /** Page [number] for practising [technique]. */
-    suspend fun focus(technique: Technique, number: Int): PuzzleSpec =
-        withContext(Dispatchers.Default) { Catalog.focus(technique, number) }
-
     /** Practice page [number] at [difficulty], dealt to need [target] (10.0: see [Catalog.practice]). */
     suspend fun practice(difficulty: Difficulty, number: Int, target: Technique?): PuzzleSpec =
         if (target == null) classic(difficulty, number) else withContext(Dispatchers.Default) { Catalog.practice(difficulty, number, target) }
@@ -31,11 +24,6 @@ class GeneratingPuzzleSource(
 
     override suspend fun classic(difficulty: Difficulty, number: Int): PuzzleSpec =
         withContext(dispatcher) { Catalog.classic(difficulty, number) }
-
-    override suspend fun weekly(sunday: Long): PuzzleSpec = withContext(dispatcher) { Catalog.weekly(sunday) }
-
-    override suspend fun focus(technique: Technique, number: Int): PuzzleSpec =
-        withContext(dispatcher) { Catalog.focus(technique, number) }
 
     override suspend fun practice(difficulty: Difficulty, number: Int, target: Technique?): PuzzleSpec =
         withContext(dispatcher) { Catalog.practice(difficulty, number, target) }

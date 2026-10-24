@@ -699,7 +699,11 @@ class PageViewModelTest {
 
     @Test
     fun `a page restored by its key opens from its save, and a dropped practice page gives way`() = test {
-        val weekly = GameState.new(Catalog.weekly(Catalog.weekOf(today.toEpochDay())))
+        // A 9.0 weekly page: no longer dealt, still opened from its save.
+        val sunday = Catalog.weekOf(today.toEpochDay())
+        val weekly = GameState.new(
+            Catalog.classic(Difficulty.Steady, 0).copy(key = Catalog.weeklyKey(sunday), kind = PuzzleKind.Weekly, number = null, epochDay = sunday),
+        )
         store.save(weekly, 0)
         val handle = SavedStateHandle(mapOf("open_page" to weekly.spec.key))
         val vm = viewModel(savedState = handle)
