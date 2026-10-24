@@ -161,9 +161,29 @@ class PageScreenTest {
     fun coachNoteTeachesStepByStep() {
         val events = mutableListOf<PageEvent>()
         show(Fixtures.page(coach = Fixtures.coach(1)), events)
-        composeRule.onNodeWithText("Show me why").assertIsDisplayed()
-        composeRule.onNodeWithTag("coach-next").performClick()
+        // At rest the note is one line, where to look; it opens into why.
+        composeRule.onNodeWithTag("coach-next").assertDoesNotExist()
+        composeRule.onNodeWithTag("coach-why").assertIsDisplayed().performClick()
         assertEquals(listOf<PageEvent>(PageEvent.CoachDeeper), events)
+    }
+
+    @Test
+    fun theKeysStayInUseUnderTheCoachsNote() {
+        val events = mutableListOf<PageEvent>()
+        show(Fixtures.page(coach = Fixtures.coach(2)), events)
+        composeRule.onNodeWithTag("coach-panel").assertIsDisplayed()
+        composeRule.onNodeWithTag("keypad-1").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("coach-close").performClick()
+        assertEquals(listOf(PageEvent.Digit(1), PageEvent.DismissCoach), events)
+    }
+
+    @Test
+    fun pencilOnANineByNinePageOffersEveryCandidate() {
+        val events = mutableListOf<PageEvent>()
+        val pencil = GameState.new(Fixtures.practice().spec).toggleNotesMode()
+        show(Fixtures.page(game = pencil), events)
+        composeRule.onNodeWithTag("fill-candidates").assertIsDisplayed().performClick()
+        assertEquals(listOf<PageEvent>(PageEvent.FillCandidates), events)
     }
 
     @Test
