@@ -455,6 +455,7 @@ private fun WorkArea(
                     coach = coach,
                     geometry = game.spec.geometry,
                     onEvent = onEvent,
+                    learner = state.settings.learner,
                     // The tools' height at normal sizes; with large text the note grows to show it all.
                     modifier = Modifier.fillMaxWidth().heightIn(min = height).graphicsLayer {
                         val s = 1f - 0.06f * coachBack.value
@@ -607,6 +608,9 @@ private data class Outlook(val text: String, val news: Boolean = false)
 
 @Composable
 private fun solvedOutlook(game: GameState, state: PageUiState): Outlook? = when {
+    // A level up is news; next to it, the one true sentence about this page: what the player found.
+    state.practiceAfter?.leveledUp != true && state.foundYourself != null ->
+        Outlook(stringResource(R.string.solved_found_yourself, techniqueName(state.foundYourself)), news = true)
     game.spec.kind == PuzzleKind.Classic -> state.practiceAfter?.let { after ->
         val remaining = after.remaining
         when {
@@ -620,7 +624,7 @@ private fun solvedOutlook(game: GameState, state: PageUiState): Outlook? = when 
     }
     // A technique page says how far that technique is known now (counted once the solve is recorded).
     game.spec.kind == PuzzleKind.Focus -> Catalog.focusTechnique(game.spec.key)?.let { technique ->
-        val clean = state.settings.cleanPages[technique] ?: 0
+        val clean = state.settings.learner.found(technique)
         if (clean > 0) {
             Outlook(stringResource(R.string.solved_focus, techniqueName(technique), pluralStringResource(R.plurals.mastery_pages, clean, clean)))
         } else {

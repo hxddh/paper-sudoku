@@ -27,4 +27,10 @@
         <item quantity="other">%1$d clean pages</item>
     </plurals>
     <string name="mastery_next">Next to learn: %1$s</string>
+    <string name="solved_found_yourself">%1$s: you found it yourself.</string>
+    <string name="coach_missing_mark_title">A pencil mark is missing.</string>
+    <string name="coach_missing_mark_look">Check your pencil marks in %1$s.</string>
+    <string name="coach_missing_mark_why">Row %1$d, column %2$d can still be %3$d, but your marks there leave it out.</string>
+    <string name="coach_missing_mark_answer">Add %3$d back to the marks at row %1$d, column %2$d.</string>
+    <string name="coach_add_mark">Add the mark</string>
 </resources>

@@ -41,6 +41,9 @@ class CachedPuzzleSource(
     override suspend fun focus(technique: Technique, number: Int): PuzzleSpec =
         cached(Catalog.focusPrefix(technique) + number) { Catalog.focus(technique, number) }
 
+    override suspend fun practice(difficulty: Difficulty, number: Int, target: Technique?): PuzzleSpec =
+        cached(Catalog.practiceKey(difficulty, number, target)) { Catalog.practice(difficulty, number, target) }
+
     private suspend fun cached(key: String, generate: () -> PuzzleSpec): PuzzleSpec = withContext(dispatcher) {
         if (pruned.compareAndSet(false, true)) prune()
         // One generation per page at a time: a prefetch and an open of the same page share the

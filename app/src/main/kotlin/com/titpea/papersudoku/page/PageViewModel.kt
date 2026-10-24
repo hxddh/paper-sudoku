@@ -22,10 +22,15 @@ import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.GeneratingPuzzleSource
 import com.titpea.papersudoku.game.model.Practice
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import com.titpea.papersudoku.game.model.Review
+import com.titpea.papersudoku.game.model.Path
 import com.titpea.papersudoku.game.model.PuzzleKind
 import com.titpea.papersudoku.game.model.PuzzleSource
 import com.titpea.papersudoku.game.model.PuzzleSpec
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -85,6 +90,8 @@ data class PageUiState(
     val practiceAfter: PracticeOutcome? = null,
     /** An earlier day's daily was just finished and today's page is still unstamped. */
     val todayWaiting: Boolean = false,
+    /** The hardest technique the player wrote with themselves on the page just solved (10.0). */
+    val foundYourself: Technique? = null,
 ) {
     val boardLocked: Boolean get() = loading || game?.solved != false
 }
@@ -157,6 +164,8 @@ class PageViewModel(
     private val savedState: SavedStateHandle = SavedStateHandle(),
     /** Called when today's daily is saved at a moment worth redrawing the widget for. */
     private val onDailySaved: () -> Unit = {},
+    /** Where CPU work off the page runs: the Coach's search, reading a page back. */
+    private val compute: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(PageUiState(today = today()))
@@ -171,6 +180,7 @@ class PageViewModel(
     private var saveJob: Job? = null
     private var loadJob: Job? = null
     private var recordJob: Job? = null
+    private var coachJob: Job? = null
     private var discardedKey: String? = null
     /** Deals the next practice page; outlives a load that is cancelled by opening another page. */
     private var practiceDeal: Deferred<GameState>? = null
@@ -303,14 +313,25 @@ class PageViewModel(
 
     // region Coach
 
+    /**
+     * The Coach reads the page as the player has it: their digits, their pencil marks and where
+     * they are. The search runs off the main thread; if the page changes meanwhile, it is dropped.
+     */
     private fun openCoach() {
         val current = _state.value
         val game = current.game ?: return
         if (current.boardLocked) return
-        val hint = engineFor(game).hint(game.values.toIntArray())
-        val updated = if (hint != null) game.coachAsked() else game
-        _state.update { it.copy(game = updated, coach = CoachUi(hint, level = 1)) }
-        scheduleSave()
+        val engine = engineFor(game)
+        coachJob?.cancel()
+        coachJob = viewModelScope.launch {
+            val hint = withContext(compute) { engine.hint(game.values.toIntArray(), game.notes.toIntArray(), game.selected) }
+            val now = _state.value
+            val live = now.game ?: return@launch
+            if (now.boardLocked || live.values != game.values || live.notes != game.notes) return@launch
+            val updated = if (hint != null) live.coachAsked() else live
+            _state.update { it.copy(game = updated, coach = CoachUi(hint, level = 1)) }
+            scheduleSave()
+        }
     }
 
     private fun deepenCoach() {
@@ -321,9 +342,12 @@ class PageViewModel(
         val hint = coach.hint
         // Why goes through each elimination before the answer is offered.
         val next = if (coach.level == 2 && !coach.lastStep) coach.copy(step = coach.step + 1) else coach.copy(level = coach.level + 1)
-        // Being shown which digit is wrong is not being given an answer: the page stays clean.
-        val recorded = if (hint is CoachHint.Mistake) minOf(next.level, 2) else next.level
-        _state.update { it.copy(game = game.coachReached(recorded), coach = next) }
+        // Being shown which digit is wrong, or which mark is missing, is not being given an
+        // answer: the page stays clean.
+        val recorded = if (hint is CoachHint.Next) next.level else minOf(next.level, 2)
+        // How far the Coach went for the technique it is teaching, for what the player knows.
+        val technique = (hint as? CoachHint.Next)?.let { next.lesson?.technique ?: it.technique }
+        _state.update { it.copy(game = game.coachReached(recorded, technique), coach = next) }
         val lesson = next.lesson
         if (next.level == 2 && lesson != null) {
             viewModelScope.launch {
@@ -340,6 +364,7 @@ class PageViewModel(
         when (val hint = coach.hint) {
             is CoachHint.Next -> mutate { it.placeHint(hint.placement.index, hint.placement.digit, autoClear) }
             is CoachHint.Mistake -> mutate { it.eraseMistake(hint.index) }
+            is CoachHint.MissingMark -> mutate { it.restoreMark(hint.index, hint.digit) }
             null -> Unit
         }
     }
@@ -497,12 +522,17 @@ class PageViewModel(
         load(keepPrevious = false) { deal.await() }
     }
 
-    private suspend fun nextPracticeSpec() =
-        Practice.level(store.cleanPractice.first()).let { level -> level to store.nextClassicNumber(level) }
+    /** The next practice page on the path: its level, number and the technique it is dealt to need. */
+    private suspend fun nextPracticeSpec(): Triple<Difficulty, Int, Technique?> {
+        val level = Practice.level(store.cleanPractice.first())
+        val number = store.nextClassicNumber(level)
+        val learner = settingsStore.settings.first().learner
+        return Triple(level, number, Path.target(learner, level, number))
+    }
 
     private suspend fun newPractice(): GameState {
-        val (level, number) = nextPracticeSpec()
-        return GameState.new(puzzles.classic(level, number))
+        val (level, number, target) = nextPracticeSpec()
+        return GameState.new(puzzles.practice(level, number, target))
     }
 
     private fun load(keepPrevious: Boolean = true, source: suspend () -> GameState) {
@@ -527,6 +557,7 @@ class PageViewModel(
                 justSolved = false,
                 practiceAfter = null,
                 todayWaiting = false,
+                foundYourself = null,
             ).withDerived()
         }
         savedState[OPEN_PAGE] = next.spec.key
@@ -537,8 +568,8 @@ class PageViewModel(
     private suspend fun prepareAhead() {
         try {
             puzzles.daily(today() + 1)
-            val (level, number) = nextPracticeSpec()
-            puzzles.classic(level, number)
+            val (level, number, target) = nextPracticeSpec()
+            puzzles.practice(level, number, target)
             // On a technique page, its next page too: a rare technique can take seconds to deal.
             _state.value.game?.spec?.key?.let(Catalog::focusTechnique)?.let { technique ->
                 puzzles.focus(technique, store.nextFocusNumber(technique))
@@ -581,21 +612,18 @@ class PageViewModel(
                 val outcome = PracticeOutcome(level, Practice.remainingToAdvance(clean), leveledUp = level > spec.difficulty)
                 _state.update { if (it.game?.spec?.key == spec.key) it.copy(practiceAfter = outcome) else it }
             }
-            // Every technique the page needed, not only its hardest. A page finished without the
-            // answer counts once towards knowing each of them (the handbook's ink).
+            // Every technique the page needed has been met. What the player found themselves is
+            // read from the page itself: each digit they wrote, judged by what it needed then.
             // A page typed in that the Coach can't finish has no techniques on record.
             if (spec.beyondCoach) return@launch
-            val clean = first && game.coach.deepest < 3
+            val steps = if (first) withContext(compute) { Review.of(spec, game.moves) } else emptyList()
+            var found: Technique? = null
             updateSettings { settings ->
-                settings.copy(
-                    techniquesMet = settings.techniquesMet + spec.techniquesUsed,
-                    cleanPages = if (clean) {
-                        settings.cleanPages + spec.techniquesUsed.associateWith { (settings.cleanPages[it] ?: 0) + 1 }
-                    } else {
-                        settings.cleanPages
-                    },
-                )
+                val learner = if (first) settings.learner.record(steps, game.coach) else settings.learner
+                found = Technique.entries.filter { it.tier >= 2 && learner.found(it) > settings.learner.found(it) }.maxByOrNull { it.tier }
+                settings.copy(techniquesMet = settings.techniquesMet + spec.techniquesUsed, learner = learner)
             }
+            found?.let { technique -> _state.update { if (it.game?.spec?.key == spec.key) it.copy(foundYourself = technique) else it } }
         }
     }
 

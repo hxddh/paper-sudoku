@@ -23,4 +23,10 @@
         <item quantity="other">%1$d 页干净完成</item>
     </plurals>
     <string name="mastery_next">下一个可以学：%1$s</string>
+    <string name="solved_found_yourself">这次的%1$s，是你自己找到的。</string>
+    <string name="coach_missing_mark_title">少了一个铅笔记号。</string>
+    <string name="coach_missing_mark_look">看看%1$s里的铅笔记号。</string>
+    <string name="coach_missing_mark_why">第 %1$d 行第 %2$d 列还可能是 %3$d，但你的记号里没有它。</string>
+    <string name="coach_missing_mark_answer">把 %3$d 补回第 %1$d 行第 %2$d 列的记号里。</string>
+    <string name="coach_add_mark">补上记号</string>
 </resources>

@@ -23,4 +23,10 @@
         <item quantity="other">%1$d 頁乾淨完成</item>
     </plurals>
     <string name="mastery_next">下一個可以學：%1$s</string>
+    <string name="solved_found_yourself">這次的%1$s，是你自己找到的。</string>
+    <string name="coach_missing_mark_title">少了一個鉛筆記號。</string>
+    <string name="coach_missing_mark_look">看看%1$s裡的鉛筆記號。</string>
+    <string name="coach_missing_mark_why">第 %1$d 列第 %2$d 行還可能是 %3$d，但你的記號裡沒有它。</string>
+    <string name="coach_missing_mark_answer">把 %3$d 補回第 %1$d 列第 %2$d 行的記號裡。</string>
+    <string name="coach_add_mark">補上記號</string>
 </resources>

@@ -203,7 +203,7 @@ fun PaperSudokuApp(
                                 HandbookScreen(
                                     start = handbookStart,
                                     techniquesMet = state.settings.techniquesMet,
-                                    cleanPages = state.settings.cleanPages,
+                                    cleanPages = state.settings.learner.found,
                                     onBack = { if (backStack.lastOrNull() == Screen.Handbook) backStack.removeAt(backStack.lastIndex) },
                                     onPractise = { technique ->
                                         if (backStack.lastOrNull() == Screen.Handbook) {

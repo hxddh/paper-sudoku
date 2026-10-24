@@ -42,6 +42,12 @@ fun coachMarks(geometry: Geometry, values: List<Int>, coach: CoachUi?): CoachMar
             anchor = geometry.rows[geometry.row(hint.index)].toSet(),
             target = hint.index.takeIf { level >= 2 },
         )
+        is CoachHint.MissingMark -> CoachMarks(
+            focus = geometry.rows[geometry.row(hint.index)].toSet(),
+            focusUnits = listOf(UnitRef(UnitKind.Row, geometry.row(hint.index))),
+            anchor = geometry.rows[geometry.row(hint.index)].toSet(),
+            target = hint.index.takeIf { level >= 2 },
+        )
         is CoachHint.Next -> {
             val lesson = coach.lesson ?: return CoachMarks.None
             val placement = hint.placement

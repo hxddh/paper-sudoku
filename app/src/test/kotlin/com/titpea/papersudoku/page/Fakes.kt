@@ -48,12 +48,12 @@ class FakeGameStore : GameStore {
 
     override suspend fun nextClassicNumber(difficulty: Difficulty): Int {
         val prefix = com.titpea.papersudoku.game.model.Catalog.classicPrefix(difficulty)
-        return (saved.keys.filter { it.startsWith(prefix) }.mapNotNull { it.removePrefix(prefix).toIntOrNull() }.maxOrNull() ?: -1) + 1
+        return (saved.keys.filter { it.startsWith(prefix) }.mapNotNull { it.removePrefix(prefix).takeWhile(Char::isDigit).toIntOrNull() }.maxOrNull() ?: -1) + 1
     }
 
     override suspend fun nextFocusNumber(technique: Technique): Int {
         val prefix = com.titpea.papersudoku.game.model.Catalog.focusPrefix(technique)
-        return (saved.keys.filter { it.startsWith(prefix) }.mapNotNull { it.removePrefix(prefix).toIntOrNull() }.maxOrNull() ?: -1) + 1
+        return (saved.keys.filter { it.startsWith(prefix) }.mapNotNull { it.removePrefix(prefix).takeWhile(Char::isDigit).toIntOrNull() }.maxOrNull() ?: -1) + 1
     }
 
     override suspend fun discardUnsolvedPractice(except: String) {

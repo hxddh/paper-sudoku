@@ -61,6 +61,7 @@ class PageViewModelTest {
         puzzles = GeneratingPuzzleSource(generator),
         savedState = savedState,
         onDailySaved = { dailySaves++ },
+        compute = dispatcher,
     )
 
     private fun test(block: suspend TestScope.() -> Unit) = runTest(dispatcher) { block() }
@@ -672,13 +673,28 @@ class PageViewModelTest {
     }
 
     @Test
-    fun `a clean page counts once towards each technique it needed`() = test {
+    fun `a solved page records what the player wrote with themselves`() = test {
         val vm = viewModel()
         advanceUntilIdle()
-        val used = vm.game().spec.techniquesUsed
         vm.solveFully()
         advanceUntilIdle()
-        assertEquals(used.associateWith { 1 }, settings.flow.value.cleanPages)
+        val learner = settings.flow.value.learner
+        assertEquals(1, learner.pages)
+        assertTrue(learner.found(com.titpea.papersudoku.engine.Technique.HiddenSingle) + learner.found(com.titpea.papersudoku.engine.Technique.NakedSingle) > 0)
+    }
+
+    @Test
+    fun `practice deals the next technique to learn`() = test {
+        // Gentle is passed: the next page is Steady, dealt to need pointing.
+        store.clean.value = mapOf(Difficulty.Gentle to 3)
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onEvent(PageEvent.OpenPractice)
+        advanceUntilIdle()
+        val spec = vm.game().spec
+        assertEquals(Difficulty.Steady, spec.difficulty)
+        assertEquals(com.titpea.papersudoku.engine.Technique.Pointing, Catalog.practiceTarget(spec.key))
+        assertTrue(com.titpea.papersudoku.engine.Technique.Pointing in spec.techniques)
     }
 
     @Test
