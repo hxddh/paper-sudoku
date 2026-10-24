@@ -18,31 +18,29 @@ class SmokeTest {
     private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
 
     @Test
-    fun pageNotebookSettingsLicences() {
+    fun pageNotebookLicences() {
         device.executeShellCommand("am force-stop $PACKAGE")
         device.pressHome()
         device.launchToTodaysPage()
         device.writeInEmptyCells(1)
 
         device.backToNotebook()
-        device.findTag("open-settings", "The notebook's Settings button").click()
-        val settings = device.findTag("settings", "Settings")
-
-        // Licences is the last entry: scroll down to it.
+        // There are no settings (11.0): the licences are at the notebook's foot. Scroll down to them.
+        val notebook = device.findTag("notebook-list", "The notebook's pages")
         var licences = device.findObject(By.res("open-licences"))
         var scrolls = 0
         while (licences == null && scrolls < 10) {
-            settings.scroll(Direction.DOWN, 0.8f)
+            notebook.scroll(Direction.DOWN, 0.8f)
             licences = device.findObject(By.res("open-licences"))
             scrolls++
         }
-        checkNotNull(licences) { "Settings has no licences entry" }.click()
+        checkNotNull(licences) { "The notebook has no licences link" }.click()
         device.findTag("licences", "The licences")
 
         device.pressBack()
-        device.findTag("settings", "Settings, after leaving the licences")
-        device.pressBack()
-        device.findTag("notebook", "The notebook, after leaving Settings")
+        device.findTag("notebook", "The notebook, after leaving the licences")
+        // Found again: the list on screen now is not the one scrolled before.
+        repeat(3) { device.findTag("notebook-list", "The notebook's pages").scroll(Direction.UP, 1f) }
 
         device.findTag("notebook-today", "The notebook's today entry").click()
         device.findTag("sudoku-board", "Today's page, reopened from the notebook")
