@@ -20,16 +20,16 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
@@ -61,7 +61,7 @@ jobs:
 
       - name: Upload lint report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: paper-sudoku-lint
           path: |
@@ -72,14 +72,14 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload debug APK
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: paper-sudoku-debug
           path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload test reports
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: paper-sudoku-unit-test-reports
           path: |
@@ -99,25 +99,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 50
     if: github.event_name == 'push' || github.event_name == 'pull_request'
+    # Read-only: the captures are pushed by publish-captures below, which runs none of this code.
     permissions:
-      contents: write # only to publish the captures branch below
+      contents: read
 
     steps:
-      # The write token stays out of .git/config: only the publish step below receives it, so
-      # nothing the emulator step runs (Gradle scripts, third-party actions) can push.
       - name: Check out
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Install Android SDK 37
         run: |
@@ -135,7 +136,7 @@ jobs:
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost
 
       - name: Run Compose UI and accessibility tests
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 36
           target: default
@@ -201,40 +202,19 @@ jobs:
           pip install --quiet pillow
           python3 tools/compare_screenshots.py app/build/outputs/screenshots app/src/androidTest/screenshots
 
-      # The reduced captures (the goldens' format) and the live-app captures go to a throwaway
-      # branch per PR, so a reviewer can fetch them with git, look, and commit them as goldens.
-      - name: Publish captures for review
-        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH: captures/pr-${{ github.event.pull_request.number }}
-        run: |
-          src=app/build/outputs/screenshots/reduced
-          [ -d "$src" ] || { echo "No captures"; exit 0; }
-          out=$(mktemp -d)
-          mkdir -p "$out/goldens" "$out/app" "$out/store"
-          cp "$src"/*.png "$out/goldens/"
-          cp app/build/outputs/paper-sudoku-*.png "$out/app/" 2>/dev/null || true
-          # The Play listing's screenshots (artwork, not compared with goldens).
-          cp app/build/outputs/screenshots/store/*.png "$out/store/" 2>/dev/null || true
-          cd "$out"
-          git init -q -b "$BRANCH"
-          git add .
-          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" \
-            commit -q -m "Captures for $GITHUB_SHA"
-          git push -q -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$BRANCH"
-          echo "Published to $BRANCH"
-
       - name: Upload instrumentation report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: paper-sudoku-instrumentation
           path: app/build/reports/androidTests/
 
+      # Also what publish-captures pushes: the live-app captures (paper-sudoku-*.png) and
+      # screenshots/ with the matrix, its reduced copies (screenshots/reduced, written by
+      # compare_screenshots.py) and the store shots (screenshots/store).
       - name: Upload device screenshots
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: paper-sudoku-screenshots
           path: |
@@ -250,7 +230,55 @@ jobs:
 
       - name: Upload benchmark results
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: paper-sudoku-benchmark
           path: benchmark/build/outputs/
+
+  # The reduced captures (the goldens' format), the live-app captures and the store shots go to a
+  # throwaway branch per PR (captures/pr-<number>: goldens/, app/, store/), so a reviewer can fetch
+  # them with git, look, and commit them as goldens. This job only downloads the screenshots
+  # artifact: no checkout of the PR's code and no Gradle, so the write token never meets them.
+  publish-captures:
+    needs: instrumentation
+    # Also when the device tests failed: the captures show why. Not for forks (read-only token).
+    if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # to push the captures branch
+
+    steps:
+      - name: Fetch the device screenshots
+        # The emulator job may have stopped before uploading any; the next step says so.
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: paper-sudoku-screenshots
+          path: captures
+
+      - name: Publish captures for review
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: captures/pr-${{ github.event.pull_request.number }}
+        run: |
+          # The artifact holds app/build/outputs/{paper-sudoku-*.png,screenshots/}; with no
+          # live-app captures it is rooted at screenshots/ itself.
+          root="$GITHUB_WORKSPACE/captures"
+          shots="$root/screenshots"
+          [ -d "$shots" ] || shots="$root"
+          src="$shots/reduced"
+          [ -d "$src" ] || { echo "No captures"; exit 0; }
+          out=$(mktemp -d)
+          mkdir -p "$out/goldens" "$out/app" "$out/store"
+          cp "$src"/*.png "$out/goldens/"
+          cp "$root"/paper-sudoku-*.png "$out/app/" 2>/dev/null || true
+          # The Play listing's screenshots (artwork, not compared with goldens).
+          cp "$shots"/store/*.png "$out/store/" 2>/dev/null || true
+          cd "$out"
+          git init -q -b "$BRANCH"
+          git add .
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" \
+            commit -q -m "Captures for $GITHUB_SHA"
+          git push -q -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$BRANCH"
+          echo "Published to $BRANCH"
