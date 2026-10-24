@@ -8,10 +8,15 @@ import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.game.model.PuzzleKind
 import androidx.lifecycle.SavedStateHandle
 import com.titpea.papersudoku.game.model.GeneratingPuzzleSource
+import com.titpea.papersudoku.engine.Technique
+import com.titpea.papersudoku.game.model.PuzzleSource
+import com.titpea.papersudoku.game.model.PuzzleSpec
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -712,5 +717,60 @@ class PageViewModelTest {
         val gone = viewModel(savedState = SavedStateHandle(mapOf("open_page" to Catalog.classicKey(Difficulty.Steady, 7))))
         advanceUntilIdle()
         assertEquals(com.titpea.papersudoku.game.model.PuzzleKind.Classic, gone.game().spec.kind)
+    }
+
+    @Test
+    fun `today's page read as the app started is the one opened, once`() = test {
+        val read = GameState.new(Catalog.daily(today.toEpochDay())).let { g ->
+            val empty = g.spec.givens.indexOfFirst { it == 0 }
+            g.select(empty).input(g.spec.solution[empty], true)
+        }
+        val vm = PageViewModel(
+            store, settings, clock,
+            ticker = { now },
+            puzzles = GeneratingPuzzleSource(dispatcher),
+            compute = dispatcher,
+            earlyDaily = CompletableDeferred(read),
+        )
+        advanceUntilIdle()
+        assertEquals(read.values, vm.game().values)
+        // A restored page is opened from its own key; the early read is not used for it.
+        val restored = PageViewModel(
+            store, settings, clock,
+            ticker = { now },
+            puzzles = GeneratingPuzzleSource(dispatcher),
+            savedState = SavedStateHandle(mapOf("open_page" to PageKeys.PRACTICE)),
+            compute = dispatcher,
+            earlyDaily = CompletableDeferred(read),
+        )
+        advanceUntilIdle()
+        assertEquals(PuzzleKind.Classic, restored.game().spec.kind)
+        restored.onEvent(PageEvent.OpenToday)
+        advanceUntilIdle()
+        assertEquals(store.saved.getValue(read.spec.key).first.values, restored.game().values)
+    }
+
+    @Test
+    fun `the loading indicator shows only for a slow page`() = test {
+        val gate = CompletableDeferred<Unit>()
+        val slow = object : PuzzleSource {
+            override suspend fun daily(epochDay: Long): PuzzleSpec {
+                gate.await()
+                return Catalog.daily(epochDay)
+            }
+            override suspend fun classic(difficulty: Difficulty, number: Int): PuzzleSpec = Catalog.classic(difficulty, number)
+            override suspend fun practice(difficulty: Difficulty, number: Int, target: Technique?): PuzzleSpec =
+                Catalog.practice(difficulty, number, target)
+        }
+        val vm = PageViewModel(store, settings, clock, ticker = { now }, puzzles = slow, compute = dispatcher)
+        advanceTimeBy(PageViewModel.LOADING_INDICATOR_DELAY_MILLIS - 100)
+        assertTrue(vm.state.value.loading)
+        assertFalse(vm.state.value.loadingIndicator)
+        advanceTimeBy(200)
+        assertTrue(vm.state.value.loadingIndicator)
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertFalse(vm.state.value.loading)
+        assertFalse(vm.state.value.loadingIndicator)
     }
 }

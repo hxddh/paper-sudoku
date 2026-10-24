@@ -109,6 +109,11 @@ data class CoachUi(val hint: CoachHint?, val level: Int, val step: Int = 0) {
 
 data class PageUiState(
     val loading: Boolean = true,
+    /**
+     * True once a page has been loading for [PageViewModel.LOADING_INDICATOR_DELAY_MILLIS]: only
+     * then is it worth showing that it is. Most pages open within a frame or two.
+     */
+    val loadingIndicator: Boolean = false,
     val game: GameState? = null,
     val coach: CoachUi? = null,
     val conflicts: Set<Int> = emptySet(),
@@ -192,6 +197,8 @@ class PageViewModel(
     private val onDailySaved: () -> Unit = {},
     /** Where CPU work off the page runs: the Coach's search, reading a page back. */
     private val compute: CoroutineDispatcher = Dispatchers.Default,
+    /** Today's daily, already being read as the app started ([AppContainer.takeEarlyDaily]). */
+    earlyDaily: Deferred<GameState?>? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(PageUiState(today = today()))
@@ -211,13 +218,18 @@ class PageViewModel(
     private var discardedKey: String? = null
     /** Deals the next practice page; outlives a load that is cancelled by opening another page. */
     private var practiceDeal: Deferred<GameState>? = null
+    /** Today's daily read at start-up, until the first open of a daily takes it. */
+    private var early: Deferred<GameState?>? = null
 
     init {
         viewModelScope.launch {
             settingsStore.settings.collect { settings -> _state.update { it.copy(settings = settings) } }
         }
-        // After process death, reopen the page that was on the desk.
-        open(savedState.get<String>(OPEN_PAGE)?.let(PageTarget::fromKey) ?: PageTarget.Daily(today()))
+        // After process death, reopen the page that was on the desk; otherwise today's, which the
+        // app began reading as it started.
+        val restored = savedState.get<String>(OPEN_PAGE)?.let(PageTarget::fromKey)
+        if (restored == null) early = earlyDaily
+        open(restored ?: PageTarget.Daily(today()))
     }
 
     fun onEvent(event: PageEvent) {
@@ -461,8 +473,12 @@ class PageViewModel(
         }
     }
 
-    private suspend fun dailyFor(epochDay: Long): GameState =
-        store.load(Catalog.dailyKey(epochDay)) ?: GameState.new(puzzles.daily(epochDay))
+    private suspend fun dailyFor(epochDay: Long): GameState {
+        // Taken once: nothing but this view model writes the page, so the read is still current.
+        val read = early?.also { early = null }?.await()
+        if (read != null && read.spec.key == Catalog.dailyKey(epochDay)) return read
+        return store.load(Catalog.dailyKey(epochDay)) ?: GameState.new(puzzles.daily(epochDay))
+    }
 
     private suspend fun openablePractice(): GameState {
         // A page still being dealt is the one to continue: wait for it, so the page it replaces
@@ -490,6 +506,7 @@ class PageViewModel(
             val game = it.game
             it.copy(
                 loading = false,
+                loadingIndicator = false,
                 runningSince = if (foreground && game != null && !game.solved) ticker() else null,
             )
         }
@@ -533,12 +550,19 @@ class PageViewModel(
         loadJob = viewModelScope.launch {
             val cookie = ++openings
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) Trace.beginAsyncSection("ps.openPage", cookie)
+            val indicator = launch {
+                delay(LOADING_INDICATOR_DELAY_MILLIS)
+                _state.update { if (it.loading) it.copy(loadingIndicator = true) else it }
+            }
             val next = try {
                 source()
             } finally {
+                indicator.cancel()
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) Trace.endAsyncSection("ps.openPage", cookie)
             }
             show(next, keepPrevious)
+            // The page's first frames and first taps come first; opening another page cancels it.
+            delay(PREPARE_AHEAD_DELAY_MILLIS)
             prepareAhead()
         }
     }
@@ -548,6 +572,7 @@ class PageViewModel(
         _state.update {
             it.copy(
                 loading = false,
+                loadingIndicator = false,
                 game = next,
                 coach = null,
                 runningSince = if (foreground && !next.solved) ticker() else null,
@@ -680,6 +705,8 @@ class PageViewModel(
 
     companion object {
         private const val SAVE_DEBOUNCE_MILLIS = 400L
+        const val LOADING_INDICATOR_DELAY_MILLIS = 400L
+        private const val PREPARE_AHEAD_DELAY_MILLIS = 2_000L
         private const val OPEN_PAGE = "open_page"
         private const val TAG = "PageViewModel"
 
@@ -693,6 +720,7 @@ class PageViewModel(
                     puzzles = container.puzzles,
                     savedState = createSavedStateHandle(),
                     onDailySaved = container.onDailySaved,
+                    earlyDaily = container.takeEarlyDaily(LocalDate.now(container.clock).toEpochDay()),
                 )
             }
         }
