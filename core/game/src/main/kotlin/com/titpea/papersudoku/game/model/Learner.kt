@@ -72,7 +72,7 @@ data class Learner(
 /**
  * Practice is one path (10.0): the level still follows clean solves ([Practice]), and within it
  * each page is dealt to need what the player is about to learn, the first technique of the level
- * not yet known. Every [REVISIT_EVERY]th page goes back to the technique found longest ago, if
+ * not yet known, taking turns with the one after it. Every [REVISIT_EVERY]th page goes back to the technique found longest ago, if
  * that was [FADING_AFTER] pages or more back. With nothing to learn or revisit, a plain page.
  */
 object Path {
@@ -88,7 +88,10 @@ object Path {
                 ?.takeIf { learner.pages - (learner.lastFound[it] ?: 0) >= FADING_AFTER }
                 ?.let { return it }
         }
-        return next(learner, level)
+        // The next two techniques to learn take turns: a rare one (a hidden triple is on fewer
+        // than half the pages that try for it) never holds up the one after it.
+        val learning = open.filter { learner.found(it) < Mastery.MASTERED }.take(2)
+        return learning.getOrNull(number % 2) ?: learning.firstOrNull()
     }
 
     /** The next technique to learn at [level], for "Next: X-Wing"; null once all are known. */

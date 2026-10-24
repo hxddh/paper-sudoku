@@ -63,6 +63,8 @@ class LearnerTest {
     fun `the path deals what is next to learn, and revisits what fades`() {
         assertNull(Path.target(Learner(), Difficulty.Gentle, 0))
         assertEquals(Technique.Pointing, Path.target(Learner(), Difficulty.Steady, 0))
+        // The next two to learn take turns.
+        assertEquals(Technique.Claiming, Path.target(Learner(), Difficulty.Steady, 1))
         val knowsSteady = Learner(
             found = mapOf(Technique.Pointing to 3, Technique.Claiming to 3, Technique.NakedPair to 3),
             lastFound = mapOf(Technique.Pointing to 1, Technique.Claiming to 9, Technique.NakedPair to 10),
@@ -73,7 +75,7 @@ class LearnerTest {
         // Every fourth page goes back to the technique found longest ago.
         assertEquals(Technique.Pointing, Path.target(knowsSteady, Difficulty.Tricky, 3))
         // Not if it was found recently.
-        assertEquals(Technique.HiddenPair, Path.target(knowsSteady.copy(pages = 5), Difficulty.Tricky, 3))
+        assertEquals(Technique.XWing, Path.target(knowsSteady.copy(pages = 5), Difficulty.Tricky, 3))
     }
 
     @Test
