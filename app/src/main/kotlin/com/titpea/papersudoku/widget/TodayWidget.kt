@@ -320,7 +320,7 @@ class Numeral(val bitmap: Bitmap, val width: Dp, val height: Dp) {
         fun render(context: Context, text: String): Numeral {
             val density = context.resources.displayMetrics.density
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                typeface = ResourcesCompat.getFont(context, R.font.fraunces) ?: Typeface.SERIF
+                typeface = ResourcesCompat.getFont(context, R.font.fraunces_display) ?: Typeface.SERIF
                 setFontVariationSettings(FrauncesAxes.DISPLAY)
                 textSize = SIZE_DP * density
                 fontFeatureSettings = "lnum"
