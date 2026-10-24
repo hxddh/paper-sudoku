@@ -254,6 +254,7 @@ fun PageScreen(
                             WorkArea(
                                 state, onEvent, onBack, onPrint, onShare, coachBack,
                                 Modifier.onGloballyPositioned { noteBounds = it.boundsInRoot() },
+                                onReadBack = onReadBack,
                             )
                         }
                     }
@@ -282,6 +283,7 @@ fun PageScreen(
                             .padding(horizontal = 12.dp)
                             .padding(bottom = 12.dp)
                             .onGloballyPositioned { noteBounds = it.boundsInRoot() },
+                        onReadBack = onReadBack,
                     )
                 }
             }
@@ -399,6 +401,7 @@ private fun WorkArea(
     onShare: (GameState) -> Unit,
     coachBack: Animatable<Float, AnimationVector1D>,
     modifier: Modifier = Modifier,
+    onReadBack: ((GameState) -> Unit)? = null,
 ) {
     val game = state.game ?: return
     // The note leaving keeps its words while it fades, though the session has already ended.

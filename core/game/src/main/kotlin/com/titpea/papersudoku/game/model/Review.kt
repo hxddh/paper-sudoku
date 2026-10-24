@@ -55,7 +55,7 @@ object Review {
         repeat(MAX_ELIMINATIONS + 1) {
             single(board, move)?.let { return listOfNotNull(hardest, it).maxBy { t -> t.tier } }
             val step = solver.nextElimination(board) ?: return null
-            if (hardest == null || step.technique.tier > hardest!!.tier) hardest = step.technique
+            if (hardest == null || step.technique.tier > hardest.tier) hardest = step.technique
             board.eliminate(step.removals)
         }
         return null
