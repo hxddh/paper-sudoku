@@ -14,13 +14,18 @@ import com.titpea.papersudoku.data.DayResult
 import com.titpea.papersudoku.data.PageSummary
 import com.titpea.papersudoku.designsystem.SudokuTheme
 import com.titpea.papersudoku.engine.Difficulty
+import com.titpea.papersudoku.engine.Technique
 import com.titpea.papersudoku.game.model.Catalog
+import com.titpea.papersudoku.game.model.GameState
 import com.titpea.papersudoku.page.Fixtures
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.time.LocalDate
+import java.time.YearMonth
 
 class NotebookScreenTest {
 
@@ -52,6 +57,9 @@ class NotebookScreenTest {
             firstDay = today - 30,
             stampedDays = listOf(today - 1),
             pages = pages,
+            journal = listOf(
+                JournalMonth(YearMonth.from(LocalDate.ofEpochDay(today - 1)), listOf(JournalRow.Day(pages.getValue(today - 1)))),
+            ),
             stamped = 1,
         )
     }
@@ -88,14 +96,14 @@ class NotebookScreenTest {
                 NotebookScreen(state = state(), onOpenDay = {}, onOpenPractice = {}, onOpenSettings = {})
             }
         }
-        // Earlier days come after the handbook: scroll the list to them.
+        // Earlier days come after the contents: scroll the list to them.
         composeRule.onNodeWithTag("notebook-list").performScrollToNode(hasTestTag("page-row-${today - 1}"))
         composeRule.onNodeWithTag("page-row-${today - 1}").assertExists()
         composeRule.onNodeWithText("Stamped · 2:14", substring = true).assertExists()
     }
 
     @Test
-    fun blankDaysAreReachedThroughTheContentsAndHandbookRowsOpenTheirTopic() {
+    fun blankDaysAreReachedThroughTheContentsAndTheHandbookFromTheTopBar() {
         val opened = mutableListOf<Long>()
         val topics = mutableListOf<Int>()
         composeRule.setContent {
@@ -113,11 +121,79 @@ class NotebookScreenTest {
         composeRule.onNodeWithTag("page-row-${today - 5}").assertDoesNotExist()
         composeRule.onNodeWithTag("notebook-list").performScrollToNode(hasTestTag("contents-day-${today - 5}"))
         composeRule.onNodeWithTag("contents-day-${today - 5}").performClick()
-        composeRule.onNodeWithTag("notebook-list").performScrollToNode(hasTestTag("technique-XWing"))
-        composeRule.onNodeWithTag("technique-XWing").performClick()
-        composeRule.onNodeWithTag("notebook-list").performScrollToNode(hasTestTag("technique-pen"))
-        composeRule.onNodeWithTag("technique-pen").performClick()
+        composeRule.onNodeWithTag("open-handbook").performClick()
         assertEquals(listOf(today - 5), opened)
-        assertEquals(listOf(7, 0), topics)
+        assertEquals(listOf(0), topics)
+        // The notebook keeps only its pages: no weekly card, no handbook card.
+        composeRule.onNodeWithTag("notebook-weekly").assertDoesNotExist()
+        composeRule.onNodeWithTag("handbook").assertDoesNotExist()
+    }
+
+    @Test
+    fun thePracticeCardSaysWhatComesNextAndOpensItsHandbookPage() {
+        val topics = mutableListOf<Int>()
+        var practice = false
+        composeRule.setContent {
+            SudokuTheme(darkTheme = false) {
+                NotebookScreen(
+                    state = state().copy(nextTechnique = Technique.XWing),
+                    onOpenDay = {},
+                    onOpenPractice = { practice = true },
+                    onOpenSettings = {},
+                    onOpenHandbook = { topics += it },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("practice-next").assertIsDisplayed()
+        composeRule.onNodeWithText("Next: X-Wing").assertIsDisplayed()
+        composeRule.onNodeWithTag("practice-next").performClick()
+        assertEquals(listOf(HandbookTopic.indexOf(Technique.XWing)), topics)
+        // The line is its own target: tapping it does not open a practice page.
+        assertFalse(practice)
+    }
+
+    @Test
+    fun withNothingNextThePracticeCardHasNoNextLine() {
+        composeRule.setContent {
+            SudokuTheme(darkTheme = false) {
+                NotebookScreen(state = state(), onOpenDay = {}, onOpenPractice = {}, onOpenSettings = {})
+            }
+        }
+        composeRule.onNodeWithTag("practice-next").assertDoesNotExist()
+    }
+
+    @Test
+    fun finishedPracticePagesAreInTheJournalAndTypingInIsTheLastRow() {
+        val page = PageSummary.of(Fixtures.solved(GameState.new(Catalog.classic(Difficulty.Steady, 3))))
+        val base = state()
+        val journal = listOf(
+            JournalMonth(
+                YearMonth.from(LocalDate.ofEpochDay(today)),
+                listOf(
+                    JournalRow.Page(page, LocalDate.ofEpochDay(today)),
+                    JournalRow.Day(base.pages.getValue(today - 1)),
+                ),
+            ),
+        )
+        val opened = mutableListOf<String>()
+        var typeIn = false
+        composeRule.setContent {
+            SudokuTheme(darkTheme = false) {
+                NotebookScreen(
+                    state = base.copy(journal = journal),
+                    onOpenDay = {},
+                    onOpenPractice = {},
+                    onOpenSettings = {},
+                    onOpenSaved = { opened += it },
+                    onTypeIn = { typeIn = true },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("notebook-list").performScrollToNode(hasTestTag("page-row-${page.key}"))
+        composeRule.onNodeWithTag("page-row-${page.key}").performClick()
+        composeRule.onNodeWithTag("notebook-list").performScrollToNode(hasTestTag("notebook-type-in"))
+        composeRule.onNodeWithTag("notebook-type-in").performClick()
+        assertEquals(listOf(page.key), opened)
+        assertTrue(typeIn)
     }
 }

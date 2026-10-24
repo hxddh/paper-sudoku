@@ -2,13 +2,11 @@ package com.titpea.papersudoku.page
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollToNode
 import androidx.test.platform.app.InstrumentationRegistry
 import com.titpea.papersudoku.R
 import com.titpea.papersudoku.designsystem.SudokuTheme
@@ -22,7 +20,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
-/** The 9.0 screens: reading a page back, and typing in a page of your own. */
+/** Reading a page back (a page with its moves), and typing in a page of your own. */
 class NewScreensTest {
 
     @get:Rule
@@ -57,10 +55,10 @@ class NewScreensTest {
         }
         // Read back off the main thread: wait for it.
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithTag("review-summary").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithTag("review-position").fetchSemanticsNodes().isNotEmpty()
         }
-        val list = composeRule.onNodeWithTag("review")
-        list.performScrollToNode(hasTestTag("review-slider"))
+        // One page, no scrolling: the board and the controls are on screen together.
+        composeRule.onNodeWithTag("review-board").assertIsDisplayed()
         composeRule.onNodeWithTag("review-slider").assertIsDisplayed()
         composeRule.onNodeWithTag("review-position")
             .assertTextEquals(context.getString(R.string.review_position, 5, 5))
@@ -68,13 +66,30 @@ class NewScreensTest {
         composeRule.onNodeWithTag("review-previous").performClick()
         composeRule.onNodeWithTag("review-position")
             .assertTextEquals(context.getString(R.string.review_position, 4, 5))
-        list.performScrollToNode(hasTestTag("review-why"))
         composeRule.onNodeWithTag("review-why").assertTextEquals(context.getString(R.string.review_why_erased))
 
-        list.performScrollToNode(hasTestTag("review-previous"))
         composeRule.onNodeWithTag("review-previous").performClick()
-        list.performScrollToNode(hasTestTag("review-why"))
         composeRule.onNodeWithTag("review-why").assertTextEquals(context.getString(R.string.review_why_mistake))
+    }
+
+    @Test
+    fun thisPageSwapsTheMoveForThePagesCounts() {
+        val spec = Catalog.daily(20_000)
+        val moves = played(spec)
+        composeRule.setContent {
+            SudokuTheme(darkTheme = false) { ReviewScreen(spec = spec, moves = moves, onBack = {}) }
+        }
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag("review-this-page").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("review-summary").assertDoesNotExist()
+        composeRule.onNodeWithTag("review-this-page").performClick()
+        composeRule.onNodeWithTag("review-summary").assertIsDisplayed()
+        composeRule.onNodeWithTag("review-step").assertDoesNotExist()
+        // The slider stays: the counts are of the whole page, the moves still turn.
+        composeRule.onNodeWithTag("review-slider").assertIsDisplayed()
+        composeRule.onNodeWithTag("review-this-page").performClick()
+        composeRule.onNodeWithTag("review-step").assertIsDisplayed()
     }
 
     @Test

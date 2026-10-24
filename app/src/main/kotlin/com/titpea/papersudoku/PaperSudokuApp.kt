@@ -68,7 +68,6 @@ import com.titpea.papersudoku.page.PageEvent
 import com.titpea.papersudoku.page.PageKeys
 import com.titpea.papersudoku.page.ImportScreen
 import com.titpea.papersudoku.page.ReviewScreen
-import com.titpea.papersudoku.game.model.Catalog
 import com.titpea.papersudoku.page.PageScreen
 import com.titpea.papersudoku.page.PageViewModel
 import com.titpea.papersudoku.settings.LicencesScreen
@@ -200,11 +199,13 @@ fun PaperSudokuApp(
                             )
                             Screen.Handbook -> {
                                 val state by pageViewModel.state.collectAsStateWithLifecycle()
+                                val met = state.settings.techniquesMet
                                 HandbookScreen(
                                     start = handbookStart,
-                                    techniquesMet = state.settings.techniquesMet,
-                                    cleanPages = state.settings.learner.found,
+                                    techniquesMet = met,
                                     onBack = { if (backStack.lastOrNull() == Screen.Handbook) backStack.removeAt(backStack.lastIndex) },
+                                    // What the player has shown they know, not what pages needed.
+                                    mastery = { technique -> state.settings.learner.mastery(technique, technique in met) },
                                 )
                             }
                             Screen.Review -> {
@@ -343,18 +344,13 @@ private fun NotebookHome(
                         },
                         onOpenSettings = onOpenSettings,
                         onOpenHandbook = onOpenHandbook,
-                        // This week's page from 9.0 is a page like any other now: opened by its key.
-                        onOpenWeekly = {
-                            val key = Catalog.weeklyKey(Catalog.weekOf(pageViewModel.state.value.today))
-                            pageViewModel.onEvent(PageEvent.OpenSaved(key))
-                            scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, key) }
-                        },
                         onOpenSaved = { key ->
                             pageViewModel.onEvent(PageEvent.OpenSaved(key))
                             scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, key) }
                         },
                         onTypeIn = onTypeIn,
                         selectedKey = if (twoPane) openKey else null,
+                        selectedPageKey = if (twoPane) page.game?.spec?.key else null,
                         boardTransition = { key ->
                             Modifier.sharedBounds(rememberSharedContentState("board-$key"), paneScope)
                         },

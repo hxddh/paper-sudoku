@@ -34,6 +34,7 @@ import com.titpea.papersudoku.notebook.NotebookScreen
 import com.titpea.papersudoku.page.Fixtures
 import com.titpea.papersudoku.page.PageScreen
 import com.titpea.papersudoku.page.PageUiState
+import com.titpea.papersudoku.page.ReviewScreen
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -64,6 +65,11 @@ class ScreenshotMatrixTest {
         HandbookScreen(start = 7, techniquesMet = setOf(Technique.HiddenSingle, Technique.XWing), onBack = {})
     }
 
+    private val review: @Composable () -> Unit = {
+        val solved = Fixtures.solved()
+        ReviewScreen(spec = solved.spec, moves = solved.moves, onBack = {})
+    }
+
     private val shots: List<Shot> = buildList {
         for (dark in listOf(false, true)) {
             val t = if (dark) "night" else "paper"
@@ -75,6 +81,7 @@ class ScreenshotMatrixTest {
             add(Shot("$t-notebook", dark, Frame.Phone, notebook))
             add(Shot("$t-wide-practice", dark, Frame.Wide, page(Fixtures.page(game = Fixtures.practice()))))
             add(Shot("$t-handbook", dark, Frame.Phone, handbook))
+            add(Shot("$t-review", dark, Frame.Phone, review))
         }
         add(Shot("paper-large-text-page", false, Frame.LargeText, page(Fixtures.page(coach = Fixtures.coach(2)))))
         add(Shot("paper-large-text-notebook", false, Frame.LargeText, notebook))

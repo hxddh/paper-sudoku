@@ -211,7 +211,17 @@ class PageScreenTest {
         show(Fixtures.page(game = Fixtures.solved()))
         composeRule.onNodeWithTag("solved-panel")
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        // Share, print and read back are on the solved note; a solved day has nothing else to offer.
+        composeRule.onNodeWithTag("page-menu").assertDoesNotExist()
+    }
+
+    @Test
+    fun aSolvedPracticePageMenuOffersOnlyANewPage() {
+        show(Fixtures.page(game = Fixtures.solved(GameState.new(Fixtures.practice().spec))))
         composeRule.onNodeWithTag("page-menu").performClick()
-        composeRule.onNodeWithText("Restart this puzzle").assertDoesNotExist()
+        composeRule.onNodeWithText("New practice page").assertIsDisplayed()
+        composeRule.onNodeWithText("Start this page over").assertDoesNotExist()
+        composeRule.onNodeWithText("Print a blank copy").assertDoesNotExist()
+        composeRule.onNodeWithText("Share").assertDoesNotExist()
     }
 }
