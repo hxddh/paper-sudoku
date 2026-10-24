@@ -17,7 +17,8 @@ android {
         minSdk = 28
         targetSdk = 36
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        // CI measures on an emulator; numbers there are for trend, not for the 400 ms budget.
+        // CI measures on an emulator and holds the results to tools/ci/speed-budget.json (budgets
+        // set from that emulator's own numbers; a phone's targets are in docs/android-standards.md).
         testInstrumentationRunnerArguments["androidx.benchmark.suppressErrors"] = "EMULATOR,LOW-BATTERY"
         // Macrobenchmarks (and the plain SmokeTest) by default; BaselineProfileGenerator runs only
         // with -PpaperSudoku.benchmarkRules=BaselineProfile (see that class).

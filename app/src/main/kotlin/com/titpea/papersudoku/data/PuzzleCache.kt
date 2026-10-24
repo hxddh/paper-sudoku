@@ -41,8 +41,14 @@ class CachedPuzzleSource(
     override suspend fun focus(technique: Technique, number: Int): PuzzleSpec =
         cached(Catalog.focusPrefix(technique) + number) { Catalog.focus(technique, number) }
 
+    // Kept under the key asked for: a path page that falls back to the plain page is cached
+    // under the path key too, so it is never searched for again.
     override suspend fun practice(difficulty: Difficulty, number: Int, target: Technique?): PuzzleSpec =
-        cached(Catalog.practiceKey(difficulty, number, target)) { Catalog.practice(difficulty, number, target) }
+        if (target == null) {
+            classic(difficulty, number)
+        } else {
+            cached(Catalog.practiceKey(difficulty, number, target)) { Catalog.practice(difficulty, number, target) }
+        }
 
     private suspend fun cached(key: String, generate: () -> PuzzleSpec): PuzzleSpec = withContext(dispatcher) {
         if (pruned.compareAndSet(false, true)) prune()

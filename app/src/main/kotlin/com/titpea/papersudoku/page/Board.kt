@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Alignment
@@ -125,10 +126,19 @@ fun Board(
     var loupeAt by remember { mutableStateOf<Offset?>(null) }
     val currentOnTap by rememberUpdatedState(onTap)
     val currentOnAimMove by rememberUpdatedState(onAimMove)
+    val currentOnCellAction by rememberUpdatedState(onCellAction)
 
-    // The aimed cell is read only inside the cells' highlight lambdas (and the loupe's): aiming
-    // at another cell recomposes the cells whose highlight changes, not the whole board.
-    val selected = { aimed ?: game.selected }
+    // The game is read by the cells through this State, never captured: a tap makes a new
+    // GameState, and a lambda capturing it would be a new argument for all 81 cells. Each cell
+    // gets primitives (its digit, notes, marks) plus one remembered highlight lambda, so a tap
+    // recomposes only the cells whose look changes.
+    val currentGame = rememberUpdatedState(game)
+    val currentShowContent = rememberUpdatedState(showContent)
+    // Stable for the board's lifetime: the cells skip on them.
+    val tapCell = remember { { index: Int -> currentOnTap(index) } }
+    val cellAction = remember { { index: Int, action: BoardAction -> currentOnCellAction(index, action) } }
+    val boxRows = game.spec.boxRows
+    val boxCols = game.spec.boxCols
 
     // A sudoku is never mirrored: row 1 column 1 is top left in every language. Hit-testing, the
     // loupe and the cells all use the same left-to-right layout (RTL used to flip only the cells).
@@ -209,6 +219,16 @@ fun Board(
                     Row(Modifier.weight(1f).fillMaxWidth()) {
                         for (column in 0 until size) {
                             val index = row * size + column
+                            // The aimed cell and the selection are read only inside this lambda
+                            // (and the loupe): moving them recomposes the cells whose highlight
+                            // changes, not the whole board.
+                            val highlight = remember(index) {
+                                {
+                                    val now = currentGame.value
+                                    cellHighlight(index, aimed ?: now.selected, now, currentShowContent.value)
+                                }
+                            }
+                            val isTarget = marks.target == index
                             Cell(
                                 index = index,
                                 row = row,
@@ -218,12 +238,15 @@ fun Board(
                                 given = game.isGiven(index),
                                 size = size,
                                 cellSize = cellSize,
-                                highlight = { cellHighlight(index, selected(), game, showContent) },
+                                highlight = highlight,
                                 conflict = index in conflicts && showContent,
-                                marks = marks,
+                                isTarget = isTarget,
+                                inPattern = index in marks.pattern,
+                                removed = marks.removals[index]?.let(DigitMask::of) ?: 0,
+                                ghost = marks.ghost.takeIf { isTarget },
                                 enabled = enabled,
-                                onTap = onTap,
-                                onCellAction = onCellAction,
+                                onTap = tapCell,
+                                onCellAction = cellAction,
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                             )
                         }
@@ -233,8 +256,8 @@ fun Board(
             Canvas(Modifier.fillMaxSize()) {
                 val cell = this.size.width / size
                 for (i in 1 until size) {
-                    val verticalBox = i % game.spec.boxCols == 0
-                    val horizontalBox = i % game.spec.boxRows == 0
+                    val verticalBox = i % boxCols == 0
+                    val horizontalBox = i % boxRows == 0
                     drawLine(
                         color = if (verticalBox) ink.boxLine else ink.gridLine,
                         start = Offset(i * cell, 0f),
@@ -278,7 +301,7 @@ fun Board(
             // Read through lambdas: following the finger only moves the loupe (its offset is read
             // at layout), and the loupe recomposes only when it appears, disappears or changes cell.
             Loupe(
-                game = game,
+                current = currentGame,
                 index = { aimed },
                 finger = { loupeAt },
                 boardPx = with(density) { side.toPx() },
@@ -290,10 +313,11 @@ fun Board(
 
 /** A magnified view of the aimed cell, held above the finger so the finger never hides it. */
 @Composable
-private fun Loupe(game: GameState, index: () -> Int?, finger: () -> Offset?, boardPx: Float) {
+private fun Loupe(current: State<GameState>, index: () -> Int?, finger: () -> Offset?, boardPx: Float) {
     val visible by remember(finger) { derivedStateOf { finger() != null } }
     val target = index() ?: return
     if (!visible) return
+    val game = current.value
     val density = LocalDensity.current
     val diameter = 76.dp
     val lift = 96.dp
@@ -362,7 +386,13 @@ private fun Cell(
     /** Read in a derived state: the cell recomposes only when its own highlight changes. */
     highlight: () -> CellHighlight,
     conflict: Boolean,
-    marks: CoachMarks,
+    /** The Coach's marks on this cell: its answer goes here, part of the pattern, and the
+     * candidates it crosses out (a digit mask). */
+    isTarget: Boolean,
+    inPattern: Boolean,
+    removed: Int,
+    /** The Coach's answer, shown faintly in the target cell. */
+    ghost: Int?,
     enabled: Boolean,
     onTap: (Int) -> Unit,
     onCellAction: (Int, BoardAction) -> Unit,
@@ -375,9 +405,7 @@ private fun Cell(
     val noteHighlight = shown.noteHighlight
     val colors = MaterialTheme.colorScheme
     val ink = PaperTheme.ink
-    val isTarget = marks.target == index
-    val inPattern = index in marks.pattern
-    val removed = marks.removals[index].orEmpty()
+    val removedDigits = remember(removed) { DigitMask.digits(removed).toSet() }
 
     val night = colors.background.luminance() < 0.5f
     val background = when {
@@ -416,8 +444,8 @@ private fun Cell(
     val description = cellDescription(
         row, column, boxName(geometryOf(size), geometryOf(size).box(index)),
         value, notes, given, conflict,
-        ghost = marks.ghost.takeIf { isTarget && value == 0 },
-        removed = removed,
+        ghost = ghost.takeIf { value == 0 },
+        removed = removedDigits,
     )
     val eraseLabel = stringResource(R.string.erase)
     val outline = if (isTarget) colors.primary else colors.secondary
@@ -491,15 +519,15 @@ private fun Cell(
                         },
                     ),
             )
-            isTarget && marks.ghost != null -> Text(
-                text = marks.ghost.toString(),
+            ghost != null -> Text(
+                text = ghost.toString(),
                 color = colors.primary.copy(alpha = 0.78f),
                 textAlign = TextAlign.Center,
                 style = TextStyle(fontFamily = FrauncesPen, fontSize = digitSize),
             )
-            notes != 0 || removed.isNotEmpty() -> NoteGrid(
+            notes != 0 || removed != 0 -> NoteGrid(
                 notes = notes,
-                removed = removed,
+                removed = removedDigits,
                 size = size,
                 noteSize = noteSize,
                 highlightDigit = noteHighlight,
