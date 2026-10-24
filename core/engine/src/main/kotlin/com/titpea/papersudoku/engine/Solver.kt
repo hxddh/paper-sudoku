@@ -12,6 +12,12 @@ class BacktrackingSolver(private val geometry: Geometry) {
         return state.count(limit)
     }
 
+    /** One solution of [values], or null if there is none. */
+    fun solve(values: IntArray): IntArray? {
+        val state = State.from(geometry, values) ?: return null
+        return if (state.fill(SplitMix64(0))) state.values else null
+    }
+
     /** A random complete grid. Deterministic for a given [random] state. */
     fun randomGrid(random: SplitMix64): IntArray {
         val state = checkNotNull(State.from(geometry, IntArray(geometry.cellCount)))

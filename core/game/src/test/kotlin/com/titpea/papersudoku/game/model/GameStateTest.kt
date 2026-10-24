@@ -113,6 +113,69 @@ class GameStateTest {
         assertFalse(DigitMask.contains(erased.notes[marked], digit))
     }
 
+    /** A wrong digit for [cell]'s peer [peer] that nothing printed rules out there. */
+    private fun slip(spec: PuzzleSpec): Triple<Int, Int, Int> {
+        val g = spec.geometry
+        for (cell in spec.givens.indices.filter { spec.givens[it] == 0 }) {
+            for (peer in g.peers[cell].filter { spec.givens[it] == 0 }) {
+                val d = spec.solution[peer]
+                if (d != spec.solution[cell] && g.peers[cell].none { it != peer && spec.givens[it] == d } &&
+                    g.peers[peer].none { spec.givens[it] == d }
+                ) return Triple(cell, peer, d)
+            }
+        }
+        error("no slip")
+    }
+
+    @Test
+    fun `candidates pencilled in after a slip come back when the Coach takes the slip back`() {
+        val classic = Catalog.classic(Difficulty.Steady, 0)
+        val (cell, peer, d) = slip(classic)
+        // The peer's own answer d is written, wrongly, in a cell it sees; then candidates go in.
+        val filled = GameState.new(classic).select(cell).input(d, true).pencilInCandidates()
+        assertFalse(DigitMask.contains(filled.notes[peer], d))
+        val erased = filled.eraseMistake(cell)
+        assertTrue("the peer's answer is back in its marks", DigitMask.contains(erased.notes[peer], d))
+    }
+
+    @Test
+    fun `two slips of the same digit give the mark back once both are taken back`() {
+        val classic = Catalog.classic(Difficulty.Steady, 0)
+        val g = classic.geometry
+        val (cell, peer, d) = slip(classic)
+        val second = g.peers[peer].firstOrNull { it != cell && classic.givens[it] == 0 && !g.sees(it, cell) && classic.solution[it] != d &&
+            g.peers[it].none { p -> classic.givens[p] == d } } ?: return
+        var s = GameState.new(classic).select(peer).toggleNotesMode().input(d, true).toggleNotesMode()
+        s = s.select(cell).input(d, true).select(second).input(d, true)
+        s = s.eraseMistake(cell)
+        assertFalse(DigitMask.contains(s.notes[peer], d))
+        s = s.eraseMistake(second)
+        assertTrue(DigitMask.contains(s.notes[peer], d))
+    }
+
+    @Test
+    fun `the mark comes back however many moves ago the slip was`() {
+        val classic = Catalog.classic(Difficulty.Steady, 0)
+        val (cell, peer, d) = slip(classic)
+        var s = GameState.new(classic).select(peer).toggleNotesMode().input(d, true).toggleNotesMode()
+        s = s.select(cell).input(d, true)
+        // 250 note toggles elsewhere: more than the undo history keeps.
+        val other = classic.givens.indices.first { classic.givens[it] == 0 && it != cell && it != peer }
+        s = s.select(other).toggleNotesMode()
+        repeat(250) { s = s.input(1, true) }
+        s = s.toggleNotesMode()
+        assertEquals(GameState.MAX_HISTORY, s.history.size)
+        assertTrue(DigitMask.contains(s.eraseMistake(cell).notes[peer], d))
+    }
+
+    @Test
+    fun `every digit written, erased or undone is logged in order`() {
+        val s0 = GameState.new(spec).select(empty)
+        val s = s0.input(answer, true).undo().select(empty).input(answer, true).placeHint(empty, answer, true)
+        assertEquals(listOf(Move(empty, answer), Move(empty, 0), Move(empty, answer)), s.moves.take(3))
+        assertTrue(GameState.decode(s.encode())!!.moves == s.moves)
+    }
+
     @Test
     fun `pencilling in candidates fills only unmarked empty cells, and undoes in one step`() {
         val classic = Catalog.classic(Difficulty.Steady, 0)

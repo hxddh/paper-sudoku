@@ -55,7 +55,7 @@ class Board private constructor(
 /**
  * Finds the next human-style step, simplest technique first.
  */
-class LogicalSolver(private val geometry: Geometry) {
+class LogicalSolver(val geometry: Geometry) {
 
     fun nextStep(board: Board): Step? =
         hiddenSingle(board, UnitKind.Box)
