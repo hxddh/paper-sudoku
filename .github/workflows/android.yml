@@ -186,13 +186,13 @@ jobs:
             adb shell settings put global transition_animation_scale 1
             adb shell settings put global animator_duration_scale 1
             ./gradlew --no-daemon :benchmark:connectedBenchmarkAndroidTest || touch app/build/benchmark-failed
-            # Keep the Macrobenchmark results (the profile run below writes to the same outputs)
-            # and hold them to tools/ci/speed-budget.json: above 1.25 x a budget fails the job.
+            # Keep the Macrobenchmark results (the profile run below writes to the same outputs).
             mkdir -p app/build/outputs/benchmark
             cp -r benchmark/build/outputs/. app/build/outputs/benchmark/ || true
-            python3 tools/ci/speed-budget.py app/build/outputs/benchmark || touch app/build/over-budget
             # Then main's benchmark on the same emulator (PRs only; main has a lower versionCode, so the PR's app goes first).
             if [ -d ../paper-sudoku-base ]; then adb uninstall com.titpea.papersudoku || true; ../paper-sudoku-base/gradlew --no-daemon -p ../paper-sudoku-base :benchmark:connectedBenchmarkAndroidTest || true; mkdir -p app/build/outputs/benchmark-base; cp -r ../paper-sudoku-base/benchmark/build/outputs/. app/build/outputs/benchmark-base/ || true; adb uninstall com.titpea.papersudoku || true; fi
+            # Hold the results to tools/ci/speed-budget.json: on a PR, to main measured just now; on main, to its fixed budgets.
+            if [ -d app/build/outputs/benchmark-base ]; then python3 tools/ci/speed-budget.py app/build/outputs/benchmark --against app/build/outputs/benchmark-base || touch app/build/over-budget; else python3 tools/ci/speed-budget.py app/build/outputs/benchmark || touch app/build/over-budget; fi
             # Record the Baseline Profile of the real journey on this emulator. The release ships
             # the committed app/src/main/baseline-prof.txt; this prints what the journey ran
             # outside it, to extend it from (the generated file is uploaded below).
@@ -245,7 +245,7 @@ jobs:
         if: always()
         run: |
           python3 tools/ci/benchmark-summary.py app/build/outputs/benchmark || true
-          python3 tools/ci/speed-budget.py app/build/outputs/benchmark || true
+          if [ -d app/build/outputs/benchmark-base ]; then python3 tools/ci/speed-budget.py app/build/outputs/benchmark --against app/build/outputs/benchmark-base || true; else python3 tools/ci/speed-budget.py app/build/outputs/benchmark || true; fi
           find app/build/outputs/benchmark -name "*benchmarkData.json" -exec cat {} \; || true
           find benchmark/build/outputs/androidTest-results -name "*.xml" -exec cat {} \; || true
 

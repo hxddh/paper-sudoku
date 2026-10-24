@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Compares Macrobenchmark results with tools/ci/speed-budget.json; exits 1 when one is over.
 
-Usage: speed-budget.py <benchmark outputs dir> [budget.json]
+Usage: speed-budget.py <benchmark outputs dir> [--against <main's outputs dir>] [budget.json]
 
 A metric fails above `tolerance` x its budget. A budgeted metric missing from the results also
 fails, so a renamed benchmark or metric cannot drop out of the budget unnoticed.
+
+With --against (a PR, with main benchmarked on the same emulator in the same job), each budgeted
+metric is held to main's own value instead, within `relative_tolerance`: runners differ from one
+another by far more than a change does, so a fixed number mostly measures the runner.
 """
 import json
 import pathlib
@@ -26,9 +30,10 @@ def results(root):
     return found
 
 
-def main(root, budget_path):
+def main(root, budget_path, against=None):
     budget = json.loads(pathlib.Path(budget_path).read_text())
-    tolerance = float(budget.get("tolerance", 1.25))
+    base = results(against) if against else {}
+    tolerance = float(budget.get("relative_tolerance" if base else "tolerance", 1.25))
     measured = results(root)
     failures = 0
     for bench, metrics in budget["metrics"].items():
@@ -36,23 +41,36 @@ def main(root, budget_path):
             for stat, limit in stats.items():
                 value = measured.get(bench, {}).get(metric, {}).get(stat)
                 label = f"{bench} {metric} {stat}"
+                if base:
+                    limit = base.get(bench, {}).get(metric, {}).get(stat)
+                    if limit is None:
+                        print(f"::error::{label}: not measured on main")
+                        failures += 1
+                        continue
                 if value is None:
                     print(f"::error::{label}: not measured (budget {limit})")
                     failures += 1
                     continue
                 ratio = value / limit
                 verdict = "OVER" if ratio > tolerance else "ok"
-                print(f"{label:70} {value:9.1f}  budget {limit:7.1f}  x{ratio:4.2f}  {verdict}")
+                against_what = "main" if base else "budget"
+                print(f"{label:70} {value:9.1f}  {against_what} {limit:7.1f}  x{ratio:4.2f}  {verdict}")
                 if ratio > tolerance:
-                    print(f"::error::{label} is {value:.1f}, above {tolerance} x its budget of {limit}")
+                    print(f"::error::{label} is {value:.1f}, above {tolerance} x {against_what}'s {limit:.1f}")
                     failures += 1
     if failures:
         print(f"{failures} over budget (tools/ci/speed-budget.json)")
         return 1
-    print(f"Every budgeted metric within {tolerance} x its budget.")
+    print(f"Every budgeted metric within {tolerance} x {'main on this emulator' if base else 'its budget'}.")
     return 0
 
 
 if __name__ == "__main__":
     here = pathlib.Path(__file__).resolve().parent
-    sys.exit(main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else here / "speed-budget.json"))
+    args = sys.argv[1:]
+    against = None
+    if "--against" in args:
+        i = args.index("--against")
+        against = args[i + 1]
+        del args[i:i + 2]
+    sys.exit(main(args[0], args[1] if len(args) > 1 else here / "speed-budget.json", against))

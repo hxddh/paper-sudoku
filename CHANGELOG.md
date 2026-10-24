@@ -25,8 +25,8 @@ page, and every page opens at once.
   as before), so nothing waits on the generator.
 - Saves are about a seventh of their size; the board redraws only the cells that change; fonts are
   static cuts, 80 KB smaller.
-- CI fails when start-up or writing on the page is slower than its budget, or the app grows more
-  than 5%.
+- CI benchmarks every change against main on the same emulator and fails when start-up or writing
+  on the page is slower by more than 15%, or the app grows more than 5%.
 
 ## 9.0.0
 

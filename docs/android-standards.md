@@ -90,7 +90,7 @@
 - [x] 截图矩阵（Paper/Night × 页面状态 × 手册 × 单页宽屏；200% 字号仅 Paper）与已提交的基准图逐张比对；另有按 Play 尺寸生成的商店截图（不比对）
 - [x] 每日题与练习页固定样例、3.0 存档格式样例
 - [x] Macrobenchmark：冷启动到今日页（有/无 Baseline Profile 两组）、书写帧时间（每轮清空数据，只往空格写；CI 上开着动画跑，日志打印各项中位数）；混淆构建冒烟测试（页面 → 本子 → 设置 → 开源许可 → 回到今天）
-- [x] 速度预算（10.0）：`tools/ci/speed-budget.py` 把 Macrobenchmark 结果与 `tools/ci/speed-budget.json` 比较，任一项超过预算 1.25 倍 CI 即失败；预算取自 CI 模拟器自己的数字（8.0 main：首帧中位 1430 ms、完全绘制 2525 ms、书写帧 CPU P50 102 / P90 123 ms、超时 P90 170 ms），不是真机目标。`check-apk.sh` 另要求 release APK 不超过 9.0 大小的 1.05 倍
+- [x] 速度预算（10.0）：PR 的 CI 先测 PR，再在同一台模拟器上测 main，`tools/ci/speed-budget.py --against` 要求每项不超过 main 的 1.15 倍（不同 runner 之间能差 1.5 倍，远大于一次改动，所以只有同机对比有意义；`tools/ci/benchmark-compare.py` 和 `trace-compare.py` 并排列出两者的指标与 Perfetto 跟踪）。main 上没有可比的，退回 `tools/ci/speed-budget.json` 的固定预算，放宽到 1.6 倍（8.0 main：首帧中位 1430 ms、完全绘制 2525 ms、书写帧 CPU P50 102 / P90 123 ms、超时 P90 170 ms），不是真机目标。`check-apk.sh` 另要求 release APK 不超过 9.0 大小的 1.05 倍
 - [x] 出题表（10.0）：2026–2029 年每日题、各级练习 0–299 页、各级各技巧路径页 0–99 页在 `CatalogTable` 里记着命中的那一刻，一刀即成；`CatalogTableTest` 每 37 项抽查一次（及首尾）与搜索结果一致，并按刀数（不按时钟）断言每页一刀；生成器改动后用 `CatalogTableWriter` 重写
 - [x] Baseline Profile（手写规则覆盖 app、kotlinx.serialization、协程、Kotlin 标准库集合与文本、Room/SQLite/DataStore + profileinstaller），release 用已提交的文件，CI 检查已打进 release APK；CI 每次在模拟器上用 `BaselineProfileGenerator` 录制真实路径、上传，并由 `tools/ci/profile-coverage.py` 列出未被已提交文件覆盖的规则；`ReportDrawnWhen` 标记完全绘制
 - [ ] `androidx.baselineprofile` 插件与 Startup Profile（DEX 布局）：未接入，插件 1.3.4 与 AGP 9.4 的兼容性未在构建中验证
