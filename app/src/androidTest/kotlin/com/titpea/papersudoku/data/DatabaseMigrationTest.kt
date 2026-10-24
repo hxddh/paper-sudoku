@@ -54,7 +54,7 @@ class DatabaseMigrationTest {
         }
         val database = SudokuDatabase.create(context, name)
         try {
-            assertEquals(2, database.resultDao().count())
+            assertEquals(2, database.resultDao().observeCount().first())
             val stats = database.resultDao().observeStats().first()
             assertEquals(listOf("classic", "mini"), stats.map { it.mode })
             // The v1 mini used a hint (the old Coach revealed digits), so it is not a clean best.
@@ -134,7 +134,7 @@ class DatabaseMigrationTest {
         val database = SudokuDatabase.create(context, name)
         try {
             val store = RoomGameStore(database)
-            assertEquals(1, database.resultDao().count())
+            assertEquals(1, database.resultDao().observeCount().first())
             assertEquals(daily, store.load(daily.spec.key))
             assertEquals(practice, store.load(practice.spec.key))
             assertEquals(listOf(PageSummary.of(daily)), store.dailies(0).first())
@@ -192,7 +192,7 @@ class DatabaseMigrationTest {
             val result = GameResult(next.spec.key, PuzzleKind.Classic, Difficulty.Gentle, 300, 1, 3, 10, null)
             assertTrue(store.saveSolved(next, result, now = 9))
             assertFalse(store.saveSolved(next, result, now = 10))
-            assertEquals(1, database.resultDao().count())
+            assertEquals(1, database.resultDao().observeCount().first())
             assertEquals(emptyMap<Difficulty, Int>(), store.cleanPractice.first())
             val daily = GameResult(kept.spec.key, PuzzleKind.Daily, Difficulty.Gentle, 50, 0, 0, 11, 101)
             assertTrue(store.saveSolved(kept, daily, now = 11))
