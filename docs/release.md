@@ -4,7 +4,7 @@
 
 - App name: **Paper Sudoku** / **纸上数独**
 - `applicationId`: `com.titpea.papersudoku`
-- Version: `8.0.0` (`versionCode 8`)
+- Version: `9.0.0` (`versionCode 90000`: major × 10000 + minor × 100 + patch)
 - Minimum SDK: 26
 - Target SDK: 36
 - Compile SDK: 37 (required by Material 3 Expressive `1.5.0-beta01`)
@@ -41,12 +41,14 @@ upload key separate from the app-signing key.
 
 ## Tagged release (CI)
 
-**Sideload (no secrets needed):** `git tag v7.0.0-sideload && git push origin v7.0.0-sideload`
-publishes an APK signed with the CI runner's debug key. Each sideload build has a different key,
-so testers uninstall before updating. Not for Play.
+**Sideload:** `git tag v9.0.0-sideload && git push origin v9.0.0-sideload` publishes an APK for
+testing outside Play, signed with the fixed sideload key (see [Sideload key](#sideload-key)) when
+its four secrets are set, otherwise with the CI runner's debug key. Debug-key builds each have a
+different key, so testers uninstall before updating; the release notes say which key was used.
+Not for Play.
 
 Without tag-push access, run the **Release** workflow from the Actions tab with the tag name
-(for example `v7.0.0-sideload`); it creates the tag on the commit it builds.
+(for example `v9.0.0-sideload`); it creates the tag on the commit it builds.
 
 **Signed (Play-ready):**
 
@@ -55,23 +57,111 @@ Store the upload key as repository secrets, then push a tag:
 ```bash
 base64 -w0 paper-sudoku-upload.jks   # → PAPER_SUDOKU_KEYSTORE_BASE64
 # also: PAPER_SUDOKU_STORE_PASSWORD, PAPER_SUDOKU_KEY_ALIAS, PAPER_SUDOKU_KEY_PASSWORD
-git tag v7.0.0 && git push origin v7.0.0
+git tag v9.0.0 && git push origin v9.0.0
 ```
 
 `.github/workflows/release.yml` runs the tests and lint, builds the signed AAB and attaches it
 alone to a GitHub release with `CHANGELOG.md` as notes. No APK is published for a plain tag:
 under Play App Signing, Play re-signs the app, so an upload-key APK could neither update from Play
 nor be updated by it. Either kind of tag first checks the release APK with `tools/ci/check-apk.sh`
-(permissions exactly as `tools/ci/permissions.allowed`, Baseline Profile packaged). Without the secrets the workflow
-stops with an error instead of publishing an unsigned or debug-signed build.
+(permissions exactly as `tools/ci/permissions.allowed`, Baseline Profile packaged, zip alignment
+with `zipalign -c -P 16 -v 4`, size printed). Without all four upload-key secrets the workflow
+stops with an error instead of publishing an unsigned or debug-signed build. The AAB is not run
+through `bundletool validate`: bundletool is published on Google's Maven repository and GitHub,
+not Maven Central, so the workflow does not fetch it; Play validates the AAB on upload.
 
 Before it builds anything, `tools/ci/release-preflight.sh` checks that the tag is `v<versionName>`
-(or `-sideload`), that `CHANGELOG.md` has a non-empty section for that version, that the commit
-is on `main`, and that Android CI passed on that exact commit (wait for it after merging).
+(or `-sideload`), that `versionCode` matches `versionName` (below), that `CHANGELOG.md` has a
+non-empty section for that version, that no GitHub release exists for the tag yet, that the
+commit is on `main`, and that Android CI passed on that exact commit (wait for it after merging).
 
-Sideload builds are signed with each CI runner's own debug key, so every sideload update has to be
-installed after uninstalling the previous one (the notebook is lost unless Android backup restores
-it). A fixed sideload key, kept as repository secrets, would remove that step; it is not set up.
+**Version code:** `versionCode = major × 10000 + minor × 100 + patch` of `versionName`, so
+`9.0.0` is `90000` and `9.1.2` would be `90102` (minor and patch stay below 100, no leading
+zeros). Every 9.x code is above the 1–8 used before, so Play and sideload updates keep working.
+
+### Jobs, permissions and the `release` environment
+
+The workflow runs three jobs, one release at a time (`concurrency: release`; a release started
+meanwhile waits):
+
+1. **preflight**: read-only token (`contents: read`, `actions: read`); no secrets.
+2. **build**: tests, lint, build, signing, checks; runs in the GitHub environment `release` and
+   is the only job that reads the signing secrets. Its token is read-only. It keeps the files
+   (`paper-sudoku-<version>.apk` or `.aab`, and `release-notes.md`) as the run's
+   `paper-sudoku-release` artifact (14 days).
+3. **publish**: `contents: write` to create the release and its tag, from that artifact; no
+   secrets, no checkout. Skipped in a dry run.
+
+GitHub creates the `release` environment the first time the workflow runs. To approve each
+release by hand before the signing secrets are used, the owner opens **Settings → Environments →
+release** and adds **Required reviewers** (themselves), optionally with **Deployment branches and
+tags** limited to `v*` tags and `main` (dry runs from other branches are then refused). Every
+run then waits at the build job until approved (dry
+runs too). For the approval to guard the secrets themselves, move the eight `PAPER_SUDOKU_*`
+secrets from repository secrets to that environment's secrets (same names; the workflow reads
+them the same way); repository secrets are readable by any workflow.
+
+### Dry run
+
+Actions → **Release** → **Run workflow**, choose the branch, enter the tag (e.g. `v9.0.0` or
+`v9.0.0-sideload`) and tick **Dry run**. From the command line:
+
+```bash
+gh workflow run release.yml --ref <branch> -f tag=v9.0.0 -f dry_run=true
+```
+
+A dry run does everything a release does (preflight's tag, versionCode and changelog checks,
+tests, lint, build, signing, `check-apk.sh`, signature verification, release notes), then
+publishes nothing and creates no tag: download `paper-sudoku-release` from the run's page to
+look at the files, and the notes are also shown in the run's summary. It skips the checks that
+only matter for publishing (no existing release, commit on `main`, Android CI passed), so it can
+build a branch before it is merged. A dry run of a plain tag without the upload-key secrets
+signs with a throwaway key generated on the runner (`keytool`, PKCS12, alias `dry-run`, valid
+two days), so the signed-AAB path runs end to end; its notes start with "Dry run: signed with a
+throwaway key". That AAB can never be uploaded to Play. With the secrets set, a dry run signs
+with the real upload key.
+
+### Sideload key
+
+A fixed key for the `-sideload` APKs, separate from the Play upload key, lets one sideload build
+install over the next and keep the notebook. Create it once, locally, outside the repository, and
+keep it backed up with its passwords (losing it means testers uninstall once more):
+
+```bash
+keytool -genkeypair \
+  -keystore paper-sudoku-sideload.jks -storetype PKCS12 \
+  -alias paper-sudoku-sideload \
+  -keyalg RSA -keysize 4096 -validity 10000 \
+  -dname "CN=Paper Sudoku sideload"
+base64 -w0 paper-sudoku-sideload.jks > paper-sudoku-sideload.jks.b64   # macOS: base64 -i paper-sudoku-sideload.jks
+```
+
+(keytool asks for the store password; with PKCS12 the key password is the same.) Then in the
+repository's **Settings → Secrets and variables → Actions → New repository secret**, add:
+
+| Secret | Value |
+| --- | --- |
+| `PAPER_SUDOKU_SIDELOAD_KEYSTORE_BASE64` | the contents of `paper-sudoku-sideload.jks.b64` |
+| `PAPER_SUDOKU_SIDELOAD_STORE_PASSWORD` | the store password |
+| `PAPER_SUDOKU_SIDELOAD_KEY_ALIAS` | `paper-sudoku-sideload` |
+| `PAPER_SUDOKU_SIDELOAD_KEY_PASSWORD` | the key password (the store password for PKCS12) |
+
+Delete the `.b64` file afterwards. With all four set, the next `-sideload` tag is signed with this
+key (the workflow passes them to Gradle as `PAPER_SUDOKU_SIDELOAD_KEYSTORE`,
+`_STORE_PASSWORD`, `_KEY_ALIAS`, `_KEY_PASSWORD`; locally, exporting the same four and building
+with `-PpaperSudoku.sideload=true` does the same). With none set, it falls back to the runner's
+debug key exactly as before, with a warning in the log and the debug-key wording in the notes;
+with only some set, the build stops with an error.
+
+Every sideload release's notes end with `Signing certificate SHA-256: <digest>` (from
+`apksigner verify --print-certs`), so testers can check that an update comes from the same key:
+`apksigner verify --print-certs paper-sudoku-<version>.apk` prints the same digest. With the fixed
+key it stays the same from release to release.
+
+Switching from the debug-signed sideload builds (8.0 and earlier) to the fixed key needs one last
+uninstall: Android refuses an update signed with a different key. Android backup does not restore
+data across a signing-key change either, so the notebook of a debug-signed install is lost on
+that switch (the notes of every fixed-key build say so). Builds after that update in place.
 
 ## Preflight
 
@@ -111,7 +201,7 @@ substitute for a signed release check.
 
 - [ ] `PRIVACY.md` and Play Data Safety still match the build
 - [ ] No `INTERNET`/billing/analytics dependency was added
-- [ ] `versionCode` increased and `versionName` updated
+- [ ] `versionName` updated and `versionCode` = major × 10000 + minor × 100 + patch (preflight checks)
 - [ ] Signed AAB verified with the upload key
 - [ ] TalkBack, 200% font, dark theme, rotation, and process-death restore checked on a device
 - [ ] Engine/game/ViewModel tests pass; Room schema committed (CI checks)
