@@ -26,12 +26,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
@@ -123,8 +125,9 @@ fun Board(
     val currentOnTap by rememberUpdatedState(onTap)
     val currentOnAimMove by rememberUpdatedState(onAimMove)
 
-    val selected = aimed ?: game.selected
-    val highlightDigit = game.lockedDigit ?: selected?.let { game.values[it] }?.takeIf { it != 0 }
+    // The aimed cell is read only inside the cells' highlight lambdas (and the loupe's): aiming
+    // at another cell recomposes the cells whose highlight changes, not the whole board.
+    val selected = { aimed ?: game.selected }
 
     // A sudoku is never mirrored: row 1 column 1 is top left in every language. Hit-testing, the
     // loupe and the cells all use the same left-to-right layout (RTL used to flip only the cells).
@@ -205,7 +208,6 @@ fun Board(
                     Row(Modifier.weight(1f).fillMaxWidth()) {
                         for (column in 0 until size) {
                             val index = row * size + column
-                            val related = selected != null && selected != index && geometry.sees(selected, index)
                             Cell(
                                 index = index,
                                 row = row,
@@ -215,10 +217,7 @@ fun Board(
                                 given = game.isGiven(index),
                                 size = size,
                                 cellSize = cellSize,
-                                isSelected = selected == index,
-                                related = related && showContent,
-                                sameDigit = showContent && highlightDigit != null && game.values[index] == highlightDigit,
-                                noteHighlight = highlightDigit?.takeIf { showContent && DigitMask.contains(game.notes[index], it) },
+                                highlight = { cellHighlight(index, selected(), game, showContent) },
                                 conflict = index in conflicts && showContent,
                                 marks = marks,
                                 enabled = enabled,
@@ -275,7 +274,8 @@ fun Board(
                     }
                 }
             }
-            // Read through lambdas, so following the finger re-lays out only the loupe.
+            // Read through lambdas: following the finger only moves the loupe (its offset is read
+            // at layout), and the loupe recomposes only when it appears, disappears or changes cell.
             Loupe(
                 game = game,
                 index = { aimed },
@@ -290,7 +290,7 @@ fun Board(
 /** A magnified view of the aimed cell, held above the finger so the finger never hides it. */
 @Composable
 private fun Loupe(game: GameState, index: () -> Int?, finger: () -> Offset?, boardPx: Float) {
-    val visible = finger() != null
+    val visible by remember(finger) { derivedStateOf { finger() != null } }
     val target = index() ?: return
     if (!visible) return
     val density = LocalDensity.current
@@ -358,11 +358,8 @@ private fun Cell(
     given: Boolean,
     size: Int,
     cellSize: Dp,
-    isSelected: Boolean,
-    related: Boolean,
-    sameDigit: Boolean,
-    /** The highlighted digit, when this cell's notes contain it. */
-    noteHighlight: Int?,
+    /** Read in a derived state: the cell recomposes only when its own highlight changes. */
+    highlight: () -> CellHighlight,
     conflict: Boolean,
     marks: CoachMarks,
     enabled: Boolean,
@@ -370,6 +367,11 @@ private fun Cell(
     onCellAction: (Int, BoardAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val shown by remember(highlight) { derivedStateOf(structuralEqualityPolicy(), highlight) }
+    val isSelected = shown.selected
+    val related = shown.related
+    val sameDigit = shown.sameDigit
+    val noteHighlight = shown.noteHighlight
     val colors = MaterialTheme.colorScheme
     val ink = PaperTheme.ink
     val isTarget = marks.target == index
@@ -502,6 +504,25 @@ private fun Cell(
             )
         }
     }
+}
+
+/** How a cell echoes the selected (or aimed) cell. */
+private data class CellHighlight(
+    val selected: Boolean,
+    val related: Boolean,
+    val sameDigit: Boolean,
+    /** The highlighted digit, when this cell's notes contain it. */
+    val noteHighlight: Int?,
+)
+
+private fun cellHighlight(index: Int, selected: Int?, game: GameState, showContent: Boolean): CellHighlight {
+    val highlightDigit = game.lockedDigit ?: selected?.let { game.values[it] }?.takeIf { it != 0 }
+    return CellHighlight(
+        selected = selected == index,
+        related = showContent && selected != null && selected != index && game.spec.geometry.sees(selected, index),
+        sameDigit = showContent && highlightDigit != null && game.values[index] == highlightDigit,
+        noteHighlight = highlightDigit?.takeIf { showContent && DigitMask.contains(game.notes[index], it) },
+    )
 }
 
 @Composable
