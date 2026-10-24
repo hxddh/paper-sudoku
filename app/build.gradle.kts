@@ -19,8 +19,8 @@ android {
         targetSdk = 36
         // versionCode = major × 10000 + minor × 100 + patch of versionName (checked by
         // tools/ci/release-preflight.sh), so every release has a larger one.
-        versionCode = 100000
-        versionName = "10.0.0"
+        versionCode = 110000
+        versionName = "11.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
