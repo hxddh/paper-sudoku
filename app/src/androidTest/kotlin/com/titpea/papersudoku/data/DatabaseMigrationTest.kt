@@ -92,7 +92,7 @@ class DatabaseMigrationTest {
             val store = RoomGameStore(database)
             assertEquals(game, store.load(game.spec.key))
             val page = store.dailies(0).first().single()
-            assertEquals(PageSummary.of(game), page)
+            assertEquals(PageSummary.of(game), page.copy(updatedAt = 0)) // when it was saved is not compared
             assertNull(store.load("broken"))
         } finally {
             database.close()
@@ -137,8 +137,8 @@ class DatabaseMigrationTest {
             assertEquals(1, database.resultDao().observeCount().first())
             assertEquals(daily, store.load(daily.spec.key))
             assertEquals(practice, store.load(practice.spec.key))
-            assertEquals(listOf(PageSummary.of(daily)), store.dailies(0).first())
-            assertEquals(PageSummary.of(practice), store.unfinishedPractice.first())
+            assertEquals(listOf(PageSummary.of(daily)), store.dailies(0).first().map { it.copy(updatedAt = 0) })
+            assertEquals(PageSummary.of(practice), store.unfinishedPractice.first()?.copy(updatedAt = 0))
             assertEquals(practice.spec.key, store.latestUnsolvedPracticeKey())
 
             val sqlite = database.openHelper.readableDatabase
@@ -170,7 +170,7 @@ class DatabaseMigrationTest {
             val practice = GameState.new(Catalog.classic(Difficulty.Gentle, 0))
             store.save(practice, now = 5)
             assertEquals(practice, store.load(practice.spec.key))
-            assertEquals(PageSummary.of(practice), store.unfinishedPractice.first())
+            assertEquals(PageSummary.of(practice), store.unfinishedPractice.first()?.copy(updatedAt = 0))
             assertEquals(practice.spec.key, store.latestUnsolvedPracticeKey())
             assertEquals(1, store.nextClassicNumber(Difficulty.Gentle))
 

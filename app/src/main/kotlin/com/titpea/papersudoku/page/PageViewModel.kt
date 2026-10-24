@@ -1,5 +1,6 @@
 package com.titpea.papersudoku.page
 
+import android.os.Trace
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -205,6 +206,7 @@ class PageViewModel(
     private var loadJob: Job? = null
     private var recordJob: Job? = null
     private var coachJob: Job? = null
+    private var openings = 0
     private var discardedKey: String? = null
     /** Deals the next practice page; outlives a load that is cancelled by opening another page. */
     private var practiceDeal: Deferred<GameState>? = null
@@ -538,7 +540,14 @@ class PageViewModel(
         // Stop the current page's clock now: preparing the next page is not time spent on it.
         _state.update { it.copy(game = foldClock(it), runningSince = null, loading = true, coach = null) }
         loadJob = viewModelScope.launch {
-            show(source(), keepPrevious)
+            val cookie = ++openings
+            Trace.beginAsyncSection("ps.openPage", cookie)
+            val next = try {
+                source()
+            } finally {
+                Trace.endAsyncSection("ps.openPage", cookie)
+            }
+            show(next, keepPrevious)
             prepareAhead()
         }
     }

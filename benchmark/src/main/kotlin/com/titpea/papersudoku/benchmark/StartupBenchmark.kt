@@ -1,6 +1,8 @@
 package com.titpea.papersudoku.benchmark
 
 import androidx.benchmark.macro.CompilationMode
+import androidx.benchmark.macro.ExperimentalMetricApi
+import androidx.benchmark.macro.TraceSectionMetric
 import androidx.benchmark.macro.FrameTimingMetric
 import androidx.benchmark.macro.StartupMode
 import androidx.benchmark.macro.StartupTimingMetric
@@ -28,9 +30,15 @@ class StartupBenchmark {
     @Test
     fun coldStartWithoutCompilation() = coldStart(CompilationMode.None())
 
+    /**
+     * Beside the timings, the app's own trace sections: Application.onCreate, opening the page
+     * (its save or a new deal), dealing and decoding, so a slower start says where it went.
+     */
+    @OptIn(ExperimentalMetricApi::class)
     private fun coldStart(compilationMode: CompilationMode) = rule.measureRepeated(
         packageName = PACKAGE,
-        metrics = listOf(StartupTimingMetric()),
+        metrics = listOf(StartupTimingMetric()) +
+            listOf("ps.appCreate", "ps.openPage", "ps.deal", "ps.decode").map { TraceSectionMetric(it, TraceSectionMetric.Mode.Sum) },
         compilationMode = compilationMode,
         startupMode = StartupMode.COLD,
         iterations = 5,

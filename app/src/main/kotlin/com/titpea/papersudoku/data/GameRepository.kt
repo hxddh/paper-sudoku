@@ -1,5 +1,6 @@
 package com.titpea.papersudoku.data
 
+import android.os.Trace
 import android.util.Log
 import androidx.room.withTransaction
 import com.titpea.papersudoku.engine.Difficulty
@@ -127,7 +128,10 @@ class RoomGameStore(
 
     override suspend fun load(puzzleKey: String): GameState? {
         val json = savedGames.get(puzzleKey)?.json ?: return null
-        return withContext(Dispatchers.Default) { GameState.decode(json) } ?: null.also {
+        return withContext(Dispatchers.Default) {
+            Trace.beginSection("ps.decode")
+            try { GameState.decode(json) } finally { Trace.endSection() }
+        } ?: null.also {
             Log.w(TAG, "Unreadable saved page $puzzleKey; set aside, starting it afresh")
             // Its stamp goes with it: the day reads as not done, and finishing it again stamps it.
             database.withTransaction {

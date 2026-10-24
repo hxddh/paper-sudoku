@@ -3,6 +3,7 @@ package com.titpea.papersudoku
 import android.app.Application
 import android.content.Context
 import android.os.SystemClock
+import android.os.Trace
 import android.util.Log
 import com.titpea.papersudoku.data.CachedPuzzleSource
 import com.titpea.papersudoku.data.DataStoreSettings
@@ -20,7 +21,6 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.time.Clock
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 
 interface AppContainer {
@@ -69,13 +69,6 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
             runCatching { database.openHelper.writableDatabase }
                 .onFailure { Log.w(TAG, "Database warm-up failed", it) }
         }
-        // Today's daily is one carve (Catalog's table), but its first carve also loads and warms
-        // the engine: started here, it overlaps the Activity's start, and the page's own request
-        // finds it cached (or joins it: one generation per page at a time).
-        scope.launch(Dispatchers.Default) {
-            runCatching { puzzles.daily(LocalDate.now(clock).toEpochDay()) }
-                .onFailure { Log.w(TAG, "Daily warm-up failed", it) }
-        }
     }
 
     private companion object {
@@ -96,8 +89,11 @@ class SudokuApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Trace sections ("ps.*") are what the start-up benchmark measures beyond its timings.
+        Trace.beginSection("ps.appCreate")
         container = DefaultAppContainer(this).also {
             it.warmUp(CoroutineScope(SupervisorJob() + Dispatchers.IO))
         }
+        Trace.endSection()
     }
 }

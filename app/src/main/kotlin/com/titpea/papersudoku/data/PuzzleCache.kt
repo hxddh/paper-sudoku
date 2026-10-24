@@ -1,5 +1,6 @@
 package com.titpea.papersudoku.data
 
+import android.os.Trace
 import android.util.Log
 import com.titpea.papersudoku.engine.Difficulty
 import com.titpea.papersudoku.engine.Technique
@@ -56,7 +57,10 @@ class CachedPuzzleSource(
         // work, while different pages do not wait for each other.
         locks.getOrPut(key) { Mutex() }.withLock {
             val file = File(directory, "$key$SUFFIX")
-            read(file) ?: generate().also { write(file, it) }
+            read(file) ?: run {
+                Trace.beginSection("ps.deal")
+                try { generate() } finally { Trace.endSection() }
+            }.also { write(file, it) }
         }
     }
 
