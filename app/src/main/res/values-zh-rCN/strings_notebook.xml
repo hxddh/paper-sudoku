@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="practice_learning">正在学：%1$s</string>
+    <string name="practice_known">已掌握 %1$d 个，共 %2$d 个</string>
+    <string name="notebook_continue">接着做</string>
+    <string name="notebook_version">版本 %1$s</string>
+    <string name="notebook_privacy">没有账号、广告或网络访问。</string>
+    <string name="notebook_licences">开源许可</string>
+</resources>

@@ -128,10 +128,7 @@
     <string name="next_practice_body">这一页不计入进度，换上新的一页练习。</string>
     <string name="next_practice_confirm">换一页</string>
     <string name="notebook">本子</string>
-    <string name="notebook_earlier">盖过章的页</string>
-    <string name="notebook_unfinished">没做完的页</string>
     <string name="page_stamped_coached">已盖章 · %1$s · 看过答案</string>
-    <string name="notebook_summary_empty">做完一页，就盖一个章。</string>
     <string name="notebook_techniques">技巧手册</string>
     <string name="page_blank">空白页</string>
     <string name="page_in_progress">进行中</string>
@@ -186,8 +183,6 @@
     <string name="contents_clean">干净完成</string>
     <string name="contents_coached">看过答案</string>
     <string name="today_support">%2$s %1$s</string>
-<string name="contents_key_clean">干净完成</string>
-    <string name="contents_key_coached">看过答案</string>
     <string name="handbook_example">看这个例子</string>
     <string name="handbook_pen">怎么用笔</string>
     <string name="handbook_pen_summary">写数、瞄准、拿起数字和铅笔。</string>
