@@ -1,4 +1,4 @@
-# Android 开发规范 / Checklist — v9.0
+# Android 开发规范 / Checklist — v10.0
 
 > 基线：`targetSdk 36`、`compileSdk 37`、`minSdk 26`，Jetpack Compose + Material 3 Expressive
 > （`material3 1.5.0-beta01`）、Material 3 Adaptive 1.1、Navigation 3、Room 2.8、DataStore、Glance。

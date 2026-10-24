@@ -30,7 +30,7 @@ day is there. Finish a page and it is stamped. When you are stuck, the Coach wri
 | Page header | small transparent `TopAppBar`: back (one-pane only), weekday · level, date, overflow (start over, print and, on practice, a new page). A solved page's note already offers share, print and read back, so its overflow keeps only "New practice page", and a solved page with nothing else has no overflow |
 | Tools | `HorizontalFloatingToolbar`: Undo, Pencil (an icon toggle, secondary container when on; a long press on 9×9 pencils in every candidate), Coach — all three equally quiet |
 | Keypad | `ButtonGroup` with connected keys (outer corners round, inner tight, press rounds fully); Erase is the last key: 5 + 5 on 9×9, seven keys on 6×6 |
-| Coach | margin note: 2dp ink rule, the technique as tag, "Why n/m" with step pips, note in upright `onSurfaceVariant`, two actions ("Back to the page" once it has helped); the answer is an outlined button with its cost said above it; boxes are named by position (top right box / 右上宫) |
+| Coach | margin note: 2dp ink rule, the technique as tag, "Why n/m" with step pips, note in upright `onSurfaceVariant`, two actions ("Back to the page" once it has helped); the answer is an outlined button with its cost said above it; boxes are named by position (top right box / 右上宫) ; it reads the page as the player has it (10.0): a pencil mark leaving out a cell's answer first, steps near the selected cell before others; a known technique's Look is the title alone, and a technique never found or explained opens its Why with what it is |
 | Transitions | taps: shared axis X (10%) on the motion scheme; back gesture: the leaving page scales to 90%, rounds 28dp and lifts, linear with the finger, fading as it commits; thumbnail ↔ board as shared bounds (cross-fade); ink connector drawn by pen to a bracket on the board's edge |
 | Icons | Material Symbols Rounded, weight 400, unfilled, as vector drawables |
 | Widget | Glance: date, status, page miniature drawn as tinted layers (follows day/night); opens today |
@@ -57,8 +57,9 @@ day is there. Finish a page and it is stamped. When you are stuck, the Coach wri
 - **Leaving** a page (back, notebook, background) stops the hidden clock.
 - **First page:** until the first digit is ever written, the status line reads "Tap a cell, then a
   digit. Or press and slide to aim." It is the app's only how-to.
-- **Solved:** the note says what comes next — the practice level reached or how many clean pages
-  to the next, or that a new daily page comes tomorrow. A page whose answer was shown says so in
+- **Solved:** the note says one true thing — a level reached, else the hardest technique the
+  player wrote with themselves on this page ("X-Wing: you found it yourself"), else how many clean
+  pages to the next level, or that a new daily page comes tomorrow. A page whose answer was shown says so in
   its header.
 - **Clean:** a page is clean unless the Coach gave its answer; pointing at a wrong digit does not
   count. The same rule drives stamps, practice levels and share text.
